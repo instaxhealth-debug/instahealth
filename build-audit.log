@@ -1,0 +1,636 @@
+
+> instahealth@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+(node:52144) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/35) ...
+prisma:error 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+Error fetching products: PrismaClientInitializationError: 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at ei.handleRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:7568)
+    at ei.handleAndLogRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6593)
+    at ei.request (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6300)
+    at async a (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:130:9551)
+    at async n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/products/route.js:1:1722)
+    at async c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/products/route.js:1:579)
+    at async /Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411
+    at async e_.execute (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)
+    at async e_.handle (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)
+    at async exportAppRoute (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/export/routes/app-route.js:77:26) {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined
+}
+   Generating static pages (8/35) 
+Error getting session: n [Error]: Dynamic server usage: Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94274)
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94372)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:2931)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94274)
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94372)
+    at s (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:93393)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94274)
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94372)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:2931)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94274)
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:94372)
+    at s (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:93393)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/stripe/webhook/route.js:1:5159)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8333)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8431)
+    at x (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/products/page.js:1:10452)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/stripe/webhook/route.js:1:5159)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8333)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8431)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:2521)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/stripe/webhook/route.js:1:5159)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8333)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8431)
+    at x (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/products/page.js:1:10452)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/stripe/webhook/route.js:1:5159)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8333)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:8431)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:2521)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/products couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5476)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5574)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/users/page.js:1:3097)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5476)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5574)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:2538)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5476)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5574)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/users/page.js:1:3097)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5476)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:5574)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:2538)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/users couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2031)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2129)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:3798)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2031)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2129)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/products/page.js:1:8201)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2031)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2129)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/page.js:1:3798)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2031)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/[id]/route.js:1:2129)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/products/page.js:1:8201)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/locations couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at m (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/vendors/page.js:1:4490)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/[id]/page.js:1:2776)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at m (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/vendors/page.js:1:4490)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/[id]/page.js:1:2776)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/vendors couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6306)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6404)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:89577)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6306)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6404)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:2106)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6306)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6404)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/health/page.js:404:89577)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6306)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:6404)
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:2106)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/health couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+   Generating static pages (17/35) 
+prisma:error 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+prisma:error 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+   Generating static pages (26/35) 
+PrismaClientInitializationError: 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at ei.handleRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:7568)
+    at ei.handleAndLogRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6593)
+    at ei.request (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6300)
+    at async a (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:130:9551)
+    at async l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/page.js:1:24289)
+    at async x (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/page.js:1:23126) {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '815413020'
+}
+PrismaClientInitializationError: 
+Invalid `prisma.product.findMany()` invocation:
+
+
+error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at ei.handleRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:7568)
+    at ei.handleAndLogRequestError (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6593)
+    at ei.request (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:121:6300)
+    at async a (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/@prisma/client/runtime/library.js:130:9551)
+    at async l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/page.js:1:24289)
+    at async x (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/page.js:1:23126) {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '815413020'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:4021)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/[id]/page.js:1:2776)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at u (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/payouts/page.js:1:4021)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at o (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2601)
+    at a (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/api/admin/vendors/route.js:1:2699)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/locations/[id]/page.js:1:2776)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/payouts couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4674)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4772)
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:3391)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4674)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4772)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:2040)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4674)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4772)
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/orders/page.js:1:3391)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error getting session: n [Error]: Dynamic server usage: Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at c (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/2510.js:1:59227)
+    at d (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:1:1668)
+    at /Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/chunks/7371.js:404:60433
+    at n (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4674)
+    at l (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:4772)
+    at i (/Users/cruzfrangieh/Desktop/instaxhealth website/.next/server/app/admin/page.js:1:2040)
+    at em (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:134808)
+    at e (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:137693)
+    at e_ (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:138168)
+    at Array.toJSON (/Users/cruzfrangieh/Desktop/instaxhealth website/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:135777) {
+  description: "Route /admin/orders couldn't be rendered statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+ ✓ Generating static pages (35/35)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ƒ /                                    5.69 kB         121 kB
+├ ƒ /_not-found                          170 B          87.5 kB
+├ ƒ /account                             2.74 kB         109 kB
+├ ƒ /admin                               198 B          96.2 kB
+├ ƒ /admin/health                        719 B          96.7 kB
+├ ƒ /admin/locations                     170 B          87.5 kB
+├ ƒ /admin/locations/[id]                199 B          96.2 kB
+├ ƒ /admin/orders                        200 B          96.2 kB
+├ ƒ /admin/orders/[id]                   199 B          96.2 kB
+├ ƒ /admin/payouts                       170 B          87.5 kB
+├ ƒ /admin/products                      1.96 kB        89.3 kB
+├ ƒ /admin/products/[id]                 199 B          96.2 kB
+├ ƒ /admin/users                         170 B          87.5 kB
+├ ƒ /admin/vendors                       169 B          87.5 kB
+├ ƒ /admin/vendors/[id]                  3.29 kB         106 kB
+├ ƒ /admin/vendors/[id]/edit             199 B          96.2 kB
+├ ƒ /api/admin/vendors                   0 B                0 B
+├ ƒ /api/admin/vendors/[id]              0 B                0 B
+├ ƒ /api/admin/vendors/[id]/products     0 B                0 B
+├ ƒ /api/auth/[...nextauth]              0 B                0 B
+├ ƒ /api/auth/register                   0 B                0 B
+├ ƒ /api/auth/signout                    0 B                0 B
+├ ƒ /api/cart                            0 B                0 B
+├ ƒ /api/cart/merge                      0 B                0 B
+├ ƒ /api/checkout                        0 B                0 B
+├ ƒ /api/location                        0 B                0 B
+├ ƒ /api/products                        0 B                0 B
+├ ƒ /api/stripe/webhook                  0 B                0 B
+├ ƒ /bloodz                              170 B          87.5 kB
+├ ƒ /bloodz/tests/[slug]                 1.49 kB         115 kB
+├ ƒ /cart                                3.87 kB         116 kB
+├ ƒ /categories                          188 B           101 kB
+├ ƒ /checkout                            3.86 kB         106 kB
+├ ƒ /checkout/cancel                     826 B          96.8 kB
+├ ƒ /checkout/success                    962 B            97 kB
+├ ƒ /debug/auth                          0 B                0 B
+├ ƒ /ivz                                 170 B          87.5 kB
+├ ƒ /ivz/services/[slug]                 1.21 kB         115 kB
+├ ƒ /login                               3.57 kB         110 kB
+├ ƒ /marketplace/[category]              2.46 kB         110 kB
+├ ƒ /marketplace/[category]/[vendor]     3.83 kB         116 kB
+├ ƒ /marketplace/peptides                2.46 kB         110 kB
+├ ƒ /orders                              170 B          87.5 kB
+├ ƒ /pepz                                170 B          87.5 kB
+├ ƒ /product/[handle]                    3.77 kB         107 kB
+├ ƒ /register                            3.67 kB         110 kB
+├ ƒ /shop/[vendorSlug]/[category]        654 B           116 kB
+└ ƒ /shop/[vendorSlug]/peptides          196 B           116 kB
++ First Load JS shared by all            87.3 kB
+  ├ chunks/2117-e20d6c4f15a0afc5.js      31.7 kB
+  ├ chunks/fd9d1056-a5f4aff4760f2e6f.js  53.7 kB
+  └ other shared chunks (total)          1.95 kB
+
+
+ƒ Middleware                             142 kB
+
+ƒ  (Dynamic)  server-rendered on demand
+

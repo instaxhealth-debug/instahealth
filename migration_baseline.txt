@@ -1,0 +1,59 @@
+=== MIGRATION BASELINE - January 27, 2026 ===
+
+SOURCE DATABASE: SQLite
+Path: /Users/cruzfrangieh/Desktop/instaxhealth website/prisma/prisma/dev.db
+
+BASELINE COUNTS (MUST MATCH AFTER MIGRATION):
+- Vendors: 30
+- Products: 79
+- Locations: 3
+- ProductLocations: 3
+
+TABLES IN SQLITE:
+Account, Cart, CartItem, Location, Order, OrderItem, Product, ProductLocation, ProductVariant, 
+Session, User, Vendor, VendorPayout, VerificationToken, _prisma_migrations
+
+CURRENT DATABASE_URL:
+file:/Users/cruzfrangieh/Desktop/instaxhealth website/prisma/prisma/dev.db
+
+SCHEMA PROVIDER (current):
+sqlite
+
+MIGRATION TARGET:
+Supabase PostgreSQL (pooled + direct connection strings TBD)
+
+PHASE A STATUS: ✅ BASELINE CAPTURED
+
+=== PHASE B RESULTS (January 27, 2026) ===
+
+FILES CREATED:
+✅ .env.supabase.example
+   - Direct connection string stored (READ-ONLY reference)
+   - Pooler connection string stored (READ-ONLY reference)
+   - .env.local UNTOUCHED
+
+CONNECTION TESTS (Pure SQL, READ-ONLY):
+✅ Direct Connection (db.pqphvvaqdjjcaaqvaowd.supabase.co:5432)
+   - Status: CONNECTED
+   - Database: postgres
+   - User: postgres
+   - Version: PostgreSQL 17.6 (aarch64)
+   - Tables: 0 (fresh database, as expected)
+   - Query: SELECT 1 → SUCCESS
+   
+✅ Transaction Pooler (aws-1-ap-south-1.pooler.supabase.com:6543)
+   - Status: CONNECTED
+   - Query: SELECT 1 → SUCCESS
+
+COMMANDS EXECUTED:
+1. npm install pg --save-dev (for connection testing)
+2. node script with pg client - SELECT 1 (direct connection)
+3. node script with pg client - SELECT 1 (pooler connection)
+
+SCHEMA STATE:
+✅ Supabase PostgreSQL is fresh (no tables)
+✅ Ready for data migration
+
+PHASE B STATUS: ✅ COMPLETE - APPROVED FOR PHASE C
+
+NEXT STEP: Phase C - Data Migration

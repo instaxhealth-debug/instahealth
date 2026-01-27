@@ -1,0 +1,142 @@
+import { createStorefrontApiClient } from "@shopify/storefront-api-client";
+
+const client = createStorefrontApiClient({
+  storeDomain: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || "",
+  apiVersion: "2024-01",
+  publicAccessToken: process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN || "",
+});
+
+export async function getProducts() {
+  const query = `
+    query getProducts {
+      products(first: 20) {
+        edges {
+          node {
+            id
+            title
+            handle
+            description
+            images(first: 1) {
+              edges {
+                node {
+                  url
+                  altText
+                }
+              }
+            }
+            variants(first: 1) {
+              edges {
+                node {
+                  id
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  compareAtPrice {
+                    amount
+                    currencyCode
+                  }
+                  availableForSale
+                  inventoryQuantity
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await client.request(query);
+    return response.data;
+  } catch (error) {
+    console.error("Shopify API error:", error);
+    throw error;
+  }
+}
+
+export async function getProductByHandle(handle: string) {
+  const query = `
+    query getProduct($handle: String!) {
+      product(handle: $handle) {
+        id
+        title
+        handle
+        description
+        images(first: 5) {
+          edges {
+            node {
+              url
+              altText
+            }
+          }
+        }
+        variants(first: 10) {
+          edges {
+            node {
+              id
+              title
+              price {
+                amount
+                currencyCode
+              }
+              compareAtPrice {
+                amount
+                currencyCode
+              }
+              availableForSale
+              inventoryQuantity
+              sku
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await client.request(query, { variables: { handle } });
+    return response.data;
+  } catch (error) {
+    console.error("Shopify API error:", error);
+    throw error;
+  }
+}
+
+export async function createCheckout(items: Array<{ variantId: string; quantity: number }>) {
+  const mutation = `
+    mutation createCheckout($input: CheckoutCreateInput!) {
+      checkoutCreate(input: $input) {
+        checkout {
+          id
+          webUrl
+        }
+        checkoutUserErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  const lineItems = items.map((item) => ({
+    variantId: item.variantId,
+    quantity: item.quantity,
+  }));
+
+  try {
+    const response = await client.request(mutation, {
+      variables: {
+        input: {
+          lineItems,
+        },
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Shopify checkout error:", error);
+    throw error;
+  }
+}
+
