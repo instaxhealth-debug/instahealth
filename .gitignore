@@ -38,7 +38,8 @@ next-env.d.ts
 
 # databases
 *.db
-prisma/*.db
-prisma/prisma/*.db
+*.db.*
+prisma/**/*.db
+prisma/**/*.db.*
 
 /lib/generated/prisma
