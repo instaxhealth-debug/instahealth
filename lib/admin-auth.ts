@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "./auth";
+import { auth } from "@/lib/auth";
 
 async function getSession() {
   try {
@@ -11,17 +11,27 @@ async function getSession() {
 }
 
 export async function requireAdmin() {
+  // Validate ADMIN_EMAIL is set
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  if (!adminEmail) {
+    throw new Error(
+      "❌ ADMIN_EMAIL environment variable is not set. Admin access is disabled for security."
+    );
+  }
+
   const session = await getSession();
   
   if (!session?.user?.email) {
     redirect("/login?next=/admin");
   }
 
-  const isAdmin =
-    session.user.role === "ADMIN" ||
-    (!!process.env.ADMIN_EMAIL && session.user.email === process.env.ADMIN_EMAIL);
-
-  if (!isAdmin) {
+  // Strict single-admin-email access: only this email can access /admin
+  const normalizedSessionEmail = session.user.email.toLowerCase().trim();
+  
+  if (normalizedSessionEmail !== adminEmail) {
+    console.warn(
+      `[AUTH] Unauthorized admin access attempt by: ${normalizedSessionEmail}`
+    );
     redirect("/account");
   }
 
@@ -30,16 +40,19 @@ export async function requireAdmin() {
 
 export async function isAdmin(): Promise<boolean> {
   try {
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    if (!adminEmail) {
+      return false;
+    }
+
     const session = await getSession();
     
     if (!session?.user?.email) {
       return false;
     }
 
-    return (
-      session.user.role === "ADMIN" ||
-      (!!process.env.ADMIN_EMAIL && session.user.email === process.env.ADMIN_EMAIL)
-    );
+    const normalizedSessionEmail = session.user.email.toLowerCase().trim();
+    return normalizedSessionEmail === adminEmail;
   } catch {
     return false;
   }

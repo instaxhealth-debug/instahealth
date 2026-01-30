@@ -88,7 +88,7 @@ async function main() {
       name: "BPC-157 Injectable",
       slug: "bpc-157-injectable",
       description: "Premium peptide for healing and recovery",
-      category: "Peptides",
+      category: "peptides",
       priceFils: 10000, // Base price 100 AED (not used when variants exist)
       imageUrl: null,
       inStock: true,
@@ -133,7 +133,7 @@ async function main() {
       name: "Glutathione IV Drip",
       slug: "glutathione-iv-drip",
       description: "Powerful antioxidant IV therapy",
-      category: "IV Drips",
+      category: "iv-drips",
       priceFils: 15000, // 150 AED
       imageUrl: null,
       inStock: true,

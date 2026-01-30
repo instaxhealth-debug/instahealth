@@ -9,11 +9,32 @@ export const authOptions: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   trustHost: true,
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      allowDangerousEmailAccountLinking: true,
-    }),
+    (() => {
+      const google = GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID || "",
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+        allowDangerousEmailAccountLinking: false,
+      });
+
+      const originalProfile = google.profile;
+      google.profile = (profile, tokens) => {
+        const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+        const profileEmail = profile?.email?.toLowerCase?.() || "";
+        google.allowDangerousEmailAccountLinking =
+          !!adminEmail && profileEmail === adminEmail;
+
+        return originalProfile
+          ? originalProfile(profile, tokens)
+          : {
+              id: profile.sub || profile.id || profile.email,
+              name: profile.name,
+              email: profile.email,
+              image: profile.picture,
+            };
+      };
+
+      return google;
+    })(),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -82,6 +103,7 @@ export const authOptions: NextAuthConfig = {
   },
   callbacks: {
     async jwt({ token, user }) {
+      // Only set role during initial login - don't query DB in Edge runtime
       if (user) {
         token.id = user.id;
         token.email = user.email;
@@ -96,6 +118,46 @@ export const authOptions: NextAuthConfig = {
         session.user.role = (token as any).role || "USER";
       }
       return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Create cart for brand new users (OAuth + credentials both trigger this)
+      try {
+        await prisma.cart.create({
+          data: {
+            userId: user.id,
+            status: "ACTIVE",
+          },
+        });
+        console.log("[AUTH] Created cart for new user:", user.id);
+      } catch (error) {
+        console.error("[AUTH] Failed to create cart for new user:", error);
+      }
+    },
+    async signIn({ user }) {
+      // Ensure existing users have a cart (safety net)
+      if (!user?.email) return;
+
+      try {
+        const dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        if (!dbUser) return;
+
+        const existingCart = await prisma.cart.findUnique({
+          where: { userId: dbUser.id },
+        });
+        if (!existingCart) {
+          await prisma.cart.create({
+            data: {
+              userId: dbUser.id,
+              status: "ACTIVE",
+            },
+          });
+          console.log("[AUTH] Created safety cart for existing user:", dbUser.id);
+        }
+      } catch (error) {
+        console.error("[AUTH] Failed to ensure cart for user:", error);
+      }
     },
   },
   session: {

@@ -28,7 +28,7 @@ export default async function VendorPeptidesPage({ params }: VendorPeptidesPageP
         where: {
           active: true,
           inStock: true,
-          category: "Peptides",
+          category: "peptides",
         },
         include: {
           variants: {

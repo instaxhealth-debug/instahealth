@@ -99,6 +99,26 @@ async function main() {
       ratingCount: 240,
       isHouseBrand: false
     },
+    { 
+      name: "InstaIVZ",
+      slug: "ivz",
+      status: "active",
+      logoUrl: "/vendors/ivdripvendors/ivz.png",
+      tagline: "On-demand IV therapy",
+      rating: 4.8,
+      ratingCount: 180,
+      isHouseBrand: true
+    },
+    { 
+      name: "Wellth",
+      slug: "wellth",
+      status: "active",
+      logoUrl: "/vendors/ivdripvendors/wellth.png",
+      tagline: "Premium IV wellness",
+      rating: 4.7,
+      ratingCount: 210,
+      isHouseBrand: false
+    },
 
     // Supplements (3 vendors)
     { 

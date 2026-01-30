@@ -118,13 +118,15 @@ export function Footer() {
           <div className="space-y-6">
             <h3 className="text-[15px] font-semibold text-gray-900">Apps</h3>
             <div className="flex flex-col gap-3">
-              <Image
-                src="/Footerimages/appstoregoogleplay.png"
-                alt="Download on App Store and Google Play"
-                width={300}
-                height={84}
-                className="h-auto w-auto"
-              />
+              <div className="relative w-[180px] h-[54px] sm:w-[200px] sm:h-[60px]">
+                <Image
+                  src="/Footerimages/appstoregoogleplay.png"
+                  alt="Download on App Store and Google Play"
+                  fill
+                  sizes="(min-width: 640px) 200px, 180px"
+                  className="object-contain"
+                />
+              </div>
             </div>
           </div>
         </div>

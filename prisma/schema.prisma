@@ -16,6 +16,8 @@ model User {
   email             String     @unique
   passwordHash      String?    // Nullable for future OAuth support
   name              String?
+  image             String?    // NextAuth required
+  emailVerified     DateTime?  // NextAuth required
   role              Role       @default(USER)
   defaultLocationId String?    // User's default location preference
   defaultLocation   Location?  @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)

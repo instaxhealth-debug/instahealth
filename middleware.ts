@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "./lib/auth";
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Early return for API routes, Next.js internals, and static assets
@@ -14,39 +13,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth();
-
-  const isAdmin = session?.user?.role === "ADMIN";
-
-  // Protect /admin routes
-  if (pathname.startsWith("/admin")) {
-    if (!session?.user) {
-      const url = new URL("/login", request.url);
-      url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
-    }
-    if (!isAdmin) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    return NextResponse.next();
-  }
-
-  // Protect /account route (requires login but not admin)
-  if (pathname.startsWith("/account")) {
-    if (!session?.user) {
-      const url = new URL("/login", request.url);
-      url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
-
-  // Redirect logged-in users from /login based on role
-  if (pathname === "/login" && session?.user) {
-    const destination = isAdmin ? "/admin" : "/account";
-    return NextResponse.redirect(new URL(destination, request.url));
-  }
-
+  // For now, don't gate routes in middleware to avoid Edge/Prisma issues
+  // Let server components handle auth checks instead
   return NextResponse.next();
 }
 

@@ -1,131 +1,229 @@
 import "dotenv/config";
-import { PrismaClient as PostgresClient } from "@prisma/client";
-import { PrismaClient as SqliteClient } from "@prisma/client-sqlite";
+import { PrismaClient } from "@prisma/client";
+import Database from "better-sqlite3";
 
-// Default to local SQLite path if env is missing
-const SQLITE_URL = process.env.DATABASE_URL_SQLITE || "file:./prisma/prisma/dev.db";
+const sqliteDbPath = "/Users/cruzfrangieh/Desktop/instaxhealth website/prisma/prisma/dev.db";
 
-// Guard: ensure Postgres URL is present
-if (!process.env.DATABASE_URL || !process.env.DIRECT_URL) {
-  console.error("❌ Missing DATABASE_URL or DIRECT_URL for Postgres. Aborting migration.");
-  process.exit(1);
-}
+const pg = new PrismaClient();
+const sqlite = new Database(sqliteDbPath, { readonly: true });
 
-const sqlite = new SqliteClient({ datasources: { db: { url: SQLITE_URL } } });
-const pg = new PostgresClient();
+const toBool = (value: any) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") return value === "1" || value.toLowerCase() === "true";
+  return value;
+};
 
-// Helpers
-async function truncatePostgres() {
-  // Only safe if target is empty; ensures idempotency
-  await pg.$executeRawUnsafe(`TRUNCATE "VerificationToken", "Session", "Account", "VendorPayout", "CartItem", "Cart", "OrderItem", "Order", "ProductLocation", "ProductVariant", "Product", "Vendor", "Location", "User" RESTART IDENTITY CASCADE`);
-}
+const toDate = (value: any) => {
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) return value;
+  if (typeof value === "number") return new Date(value);
+  if (typeof value === "string") return new Date(value);
+  return value;
+};
 
-async function migrate() {
-  console.log("Starting migration SQLite -> Postgres");
-  console.log("Source:", SQLITE_URL);
-  console.log("Target:", process.env.DATABASE_URL?.replace(/:[^:@/]+@/, ":****@"));
+const mapLocation = (row: any) => ({
+  ...row,
+  isActive: toBool(row.isActive),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  await truncatePostgres();
+const mapVendor = (row: any) => ({
+  ...row,
+  complianceAccepted: toBool(row.complianceAccepted),
+  complianceAcceptedAt: toDate(row.complianceAcceptedAt),
+  isHouseBrand: toBool(row.isHouseBrand),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 1) Location
-  const locations = await sqlite.location.findMany();
-  await pg.location.createMany({ data: locations });
-  console.log(`Locations migrated: ${locations.length}`);
+const mapProduct = (row: any) => ({
+  ...row,
+  inStock: toBool(row.inStock),
+  active: toBool(row.active),
+  isGlobal: toBool(row.isGlobal),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 2) User
-  const users = await sqlite.user.findMany();
-  await pg.user.createMany({ data: users });
-  console.log(`Users migrated: ${users.length}`);
+const mapProductVariant = (row: any) => ({
+  ...row,
+  inStock: toBool(row.inStock),
+  active: toBool(row.active),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 3) Vendor
-  const vendors = await sqlite.vendor.findMany();
-  await pg.vendor.createMany({ data: vendors });
-  console.log(`Vendors migrated: ${vendors.length}`);
+const mapUser = (row: any) => ({
+  ...row,
+  emailVerified: toDate(row.emailVerified),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 4) Product
-  const products = await sqlite.product.findMany();
-  await pg.product.createMany({ data: products });
-  console.log(`Products migrated: ${products.length}`);
+const mapCart = (row: any) => ({
+  ...row,
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 5) ProductVariant
-  const variants = await sqlite.productVariant.findMany();
-  if (variants.length > 0) {
-    await pg.productVariant.createMany({ data: variants });
-  }
-  console.log(`ProductVariants migrated: ${variants.length}`);
+const mapCartItem = (row: any) => ({
+  ...row,
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 6) ProductLocation
-  const productLocations = await sqlite.productLocation.findMany();
-  if (productLocations.length > 0) {
-    await pg.productLocation.createMany({ data: productLocations });
-  }
-  console.log(`ProductLocations migrated: ${productLocations.length}`);
+const mapSession = (row: any) => ({
+  ...row,
+  expires: toDate(row.expires),
+});
 
-  // 7) Cart
-  const carts = await sqlite.cart.findMany();
-  if (carts.length > 0) {
-    await pg.cart.createMany({ data: carts });
-  }
-  console.log(`Carts migrated: ${carts.length}`);
+const mapVerificationToken = (row: any) => ({
+  ...row,
+  expires: toDate(row.expires),
+});
 
-  // 8) CartItem
-  const cartItems = await sqlite.cartItem.findMany();
-  if (cartItems.length > 0) {
-    await pg.cartItem.createMany({ data: cartItems });
-  }
-  console.log(`CartItems migrated: ${cartItems.length}`);
+const mapOrder = (row: any) => ({
+  ...row,
+  acceptedTerms: toBool(row.acceptedTerms),
+  acceptedDisclaimer: toBool(row.acceptedDisclaimer),
+  ageConfirmed: toBool(row.ageConfirmed),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 9) Order
-  const orders = await sqlite.order.findMany();
-  if (orders.length > 0) {
-    await pg.order.createMany({ data: orders });
-  }
-  console.log(`Orders migrated: ${orders.length}`);
+const mapOrderItem = (row: any) => ({
+  ...row,
+  fulfilled: toBool(row.fulfilled),
+  fulfilledAt: toDate(row.fulfilledAt),
+});
 
-  // 10) OrderItem
-  const orderItems = await sqlite.orderItem.findMany();
-  if (orderItems.length > 0) {
-    await pg.orderItem.createMany({ data: orderItems });
-  }
-  console.log(`OrderItems migrated: ${orderItems.length}`);
+const mapVendorPayout = (row: any) => ({
+  ...row,
+  paidAt: toDate(row.paidAt),
+  periodStart: toDate(row.periodStart),
+  periodEnd: toDate(row.periodEnd),
+  createdAt: toDate(row.createdAt),
+  updatedAt: toDate(row.updatedAt),
+});
 
-  // 11) VendorPayout
-  const payouts = await sqlite.vendorPayout.findMany();
-  if (payouts.length > 0) {
-    await pg.vendorPayout.createMany({ data: payouts });
-  }
-  console.log(`VendorPayouts migrated: ${payouts.length}`);
+async function migrateData() {
+  console.log("🔄 SQLite → Postgres Migration\n");
 
-  // 12) Account
-  const accounts = await sqlite.account.findMany();
-  if (accounts.length > 0) {
-    await pg.account.createMany({ data: accounts });
-  }
-  console.log(`Accounts migrated: ${accounts.length}`);
+  try {
+    const locations = sqlite.prepare("SELECT * FROM Location").all() as any[];
+    if (locations.length > 0) {
+      await pg.location.createMany({ data: locations.map(mapLocation), skipDuplicates: true });
+    }
+    console.log(`✓ Location: ${locations.length}`);
 
-  // 13) Session
-  const sessions = await sqlite.session.findMany();
-  if (sessions.length > 0) {
-    await pg.session.createMany({ data: sessions });
-  }
-  console.log(`Sessions migrated: ${sessions.length}`);
+    const vendors = sqlite.prepare("SELECT * FROM Vendor").all() as any[];
+    if (vendors.length > 0) {
+      await pg.vendor.createMany({ data: vendors.map(mapVendor), skipDuplicates: true });
+    }
+    console.log(`✓ Vendor: ${vendors.length}`);
 
-  // 14) VerificationToken
-  const vtoks = await sqlite.verificationToken.findMany();
-  if (vtoks.length > 0) {
-    await pg.verificationToken.createMany({ data: vtoks });
-  }
-  console.log(`VerificationTokens migrated: ${vtoks.length}`);
+    const products = sqlite.prepare("SELECT * FROM Product").all() as any[];
+    if (products.length > 0) {
+      await pg.product.createMany({ data: products.map(mapProduct), skipDuplicates: true });
+    }
+    console.log(`✓ Product: ${products.length}`);
 
-  console.log("✅ Migration completed");
-}
+    const productLocations = sqlite.prepare("SELECT * FROM ProductLocation").all() as any[];
+    if (productLocations.length > 0) {
+      for (const pl of productLocations) {
+        try {
+          await pg.productLocation.upsert({
+            where: { productId_locationId: { productId: pl.productId, locationId: pl.locationId } },
+            create: pl,
+            update: pl,
+          });
+        } catch {}
+      }
+    }
+    console.log(`✓ ProductLocation: ${productLocations.length}`);
 
-migrate()
-  .catch((err) => {
-    console.error("Migration failed", err);
-    process.exit(1);
-  })
-  .finally(async () => {
+    const variants = sqlite.prepare("SELECT * FROM ProductVariant").all() as any[];
+    if (variants.length > 0) {
+      await pg.productVariant.createMany({ data: variants.map(mapProductVariant), skipDuplicates: true });
+    }
+    console.log(`✓ ProductVariant: ${variants.length}`);
+
+    const users = sqlite.prepare("SELECT * FROM User").all() as any[];
+    if (users.length > 0) {
+      await pg.user.createMany({ data: users.map(mapUser), skipDuplicates: true });
+    }
+    console.log(`✓ User: ${users.length}`);
+
+    const carts = sqlite.prepare("SELECT * FROM Cart").all() as any[];
+    if (carts.length > 0) {
+      await pg.cart.createMany({ data: carts.map(mapCart), skipDuplicates: true });
+    }
+    console.log(`✓ Cart: ${carts.length}`);
+
+    const cartItems = sqlite.prepare("SELECT * FROM CartItem").all() as any[];
+    if (cartItems.length > 0) {
+      await pg.cartItem.createMany({ data: cartItems.map(mapCartItem), skipDuplicates: true });
+    }
+    console.log(`✓ CartItem: ${cartItems.length}`);
+
+    const accounts = sqlite.prepare("SELECT * FROM Account").all() as any[];
+    if (accounts.length > 0) {
+      await pg.account.createMany({ data: accounts, skipDuplicates: true });
+    }
+    console.log(`✓ Account: ${accounts.length}`);
+
+    const sessions = sqlite.prepare("SELECT * FROM Session").all() as any[];
+    if (sessions.length > 0) {
+      await pg.session.createMany({ data: sessions.map(mapSession), skipDuplicates: true });
+    }
+    console.log(`✓ Session: ${sessions.length}`);
+
+    const orders = sqlite.prepare("SELECT * FROM \"Order\"").all() as any[];
+    if (orders.length > 0) {
+      await pg.order.createMany({ data: orders.map(mapOrder), skipDuplicates: true });
+    }
+    console.log(`✓ Order: ${orders.length}`);
+
+    const orderItems = sqlite.prepare("SELECT * FROM \"OrderItem\"").all() as any[];
+    if (orderItems.length > 0) {
+      await pg.orderItem.createMany({ data: orderItems.map(mapOrderItem), skipDuplicates: true });
+    }
+    console.log(`✓ OrderItem: ${orderItems.length}`);
+
+    const payouts = sqlite.prepare("SELECT * FROM VendorPayout").all() as any[];
+    if (payouts.length > 0) {
+      await pg.vendorPayout.createMany({ data: payouts.map(mapVendorPayout), skipDuplicates: true });
+    }
+    console.log(`✓ VendorPayout: ${payouts.length}`);
+
+    const tokens = sqlite.prepare("SELECT * FROM VerificationToken").all() as any[];
+    if (tokens.length > 0) {
+      for (const token of tokens) {
+        const mappedToken = mapVerificationToken(token);
+        try {
+          await pg.verificationToken.upsert({
+            where: { identifier_token: { identifier: mappedToken.identifier, token: mappedToken.token } },
+            create: mappedToken,
+            update: mappedToken,
+          });
+        } catch {}
+      }
+    }
+    console.log(`✓ VerificationToken: ${tokens.length}`);
+
+    console.log("\n✅ Migration complete!");
+  } catch (error) {
+    console.error("❌ Migration failed:", error);
+    throw error;
+  } finally {
     await pg.$disconnect();
-    await sqlite.$disconnect();
-  });
+    sqlite.close();
+  }
+}
+
+migrateData().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

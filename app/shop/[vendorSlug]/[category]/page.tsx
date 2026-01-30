@@ -133,25 +133,30 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
   console.log(`[VENDOR SHOP] products after location filter:`, products.length);
 
   // Transform products to StorefrontProduct format
-  const storefrontProducts: StorefrontProduct[] = products.map((product) => ({
-    id: product.id,
-    type: "product" as const,
-    vertical: "pepz" as const, // Generic vertical, can be enhanced later
-    name: product.name,
-    slug: product.slug,
-    description: product.description || "",
-    image: product.imageUrl || "",
-    categoryId: categorySlug,
-    price: product.priceFils / 100,
-    priceFils: product.priceFils,
-    priceDisplay: formatPriceAED(product.priceFils),
-    currency: "AED" as const,
-    isActive: product.active,
-    vendorId: vendor.id,
-    vendorName: vendor.name,
-    createdAt: product.createdAt,
-    updatedAt: product.updatedAt,
-  }));
+  const storefrontProducts: StorefrontProduct[] = products.map((product) => {
+    // Special handling for InstaBloodz inquiry pricing
+    const isInquiryOnly = vendor.slug === "instabloodz" && product.priceFils === 0;
+    
+    return {
+      id: product.id,
+      type: "product" as const,
+      vertical: "pepz" as const, // Generic vertical, can be enhanced later
+      name: product.name,
+      slug: product.slug,
+      description: product.description || "",
+      image: product.imageUrl || "",
+      categoryId: categorySlug,
+      price: product.priceFils / 100,
+      priceFils: product.priceFils,
+      priceDisplay: isInquiryOnly ? "Inquire" : formatPriceAED(product.priceFils),
+      currency: "AED" as const,
+      isActive: product.active,
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  });
 
   return (
     <div className="container mx-auto px-4 py-6">

@@ -37,14 +37,16 @@ export function VendorShopCard({
       
       {/* Top Row: Logo + Home Brand Badge */}
         <div className="flex items-center justify-between gap-3">
-          <Image
-            src={vendor.logoUrl ?? "/logos/vendor-fallback.png"}
-            alt={vendor.name}
-            width={220}
-            height={80}
-            className="h-20 w-auto object-contain"
-            priority
-          />
+          <div className="h-20 w-48 flex items-center flex-shrink-0">
+            <Image
+              src={vendor.logoUrl ?? "/logos/vendor-fallback.png"}
+              alt={vendor.name}
+              width={220}
+              height={80}
+              className="h-20 w-auto object-contain"
+              priority
+            />
+          </div>
           {vendor.isHouseBrand && (
             <div className="flex items-center gap-1 text-xs text-slate-600 bg-white px-2 py-1 rounded-md shadow-sm">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

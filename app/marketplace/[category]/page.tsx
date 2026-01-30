@@ -182,6 +182,12 @@ export default async function MarketplaceCategoryPage({
         },
       },
     },
+    orderBy: [
+      { isHouseBrand: "desc" },
+      { rating: "desc" },
+      { ratingCount: "desc" },
+      { name: "asc" },
+    ],
     include: {
       products: {
         where: {

@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const callbackUrl = useMemo(() => searchParams?.get("callbackUrl"), [searchParams]);
+  const oauthError = useMemo(() => searchParams?.get("error"), [searchParams]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -30,6 +31,14 @@ export default function LoginPage() {
 
     router.replace(destination);
   }, [status, session?.user?.role, callbackUrl, router]);
+
+  useEffect(() => {
+    if (oauthError === "OAuthAccountNotLinked") {
+      setError(
+        "This email already has a password account. Please sign in with email+password."
+      );
+    }
+  }, [oauthError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +70,8 @@ export default function LoginPage() {
     setError("");
     setIsLoading(true);
     try {
-      await signIn("google", { redirect: false });
+      // Use callbackUrl so browser actually redirects to Google
+      await signIn("google", { callbackUrl: "/account" });
     } catch (err) {
       setError("Failed to sign in with Google. Please try again.");
       setIsLoading(false);
