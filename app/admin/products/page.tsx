@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
 import { CATEGORY_SLUGS } from "@/lib/utils/category";
 import { CreateProductForm } from "./CreateProductForm";
+import { upsertProductToAlgolia } from "@/server/services/algolia";
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,7 @@ async function createProduct(formData: FormData) {
     return !!existing;
   });
 
+  let createdProductId = "";
   await prisma.$transaction(async (tx: any) => {
     const product = await tx.product.create({
       data: {
@@ -63,6 +65,8 @@ async function createProduct(formData: FormData) {
       },
     });
 
+    createdProductId = product.id;
+
     if (!isGlobal && locationIds.length > 0) {
       await tx.productLocation.createMany({
         data: locationIds.map((locationId) => ({
@@ -72,6 +76,10 @@ async function createProduct(formData: FormData) {
       });
     }
   });
+
+  if (createdProductId) {
+    await upsertProductToAlgolia(createdProductId);
+  }
 
   revalidatePath("/admin/products");
 }

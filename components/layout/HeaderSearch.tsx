@@ -1,15 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { mockIVServices, mockBloodTests } from "@/lib/data/mock-data";
-import type { SearchResult, Item } from "@/types";
-import type { StorefrontProduct } from "@/lib/api/products";
+import { useSearch } from "@/app/(marketplace)/search/useSearch";
+
+type ProductSearchHit = {
+  objectID: string;
+  slug: string;
+  name: string;
+  description?: string;
+  vendorName: string;
+  price: number;
+  currency: string;
+};
 
 interface HeaderSearchProps {
   className?: string;
@@ -20,9 +28,8 @@ interface HeaderSearchProps {
 export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const { data, loading, error, empty, refetch } = useSearch({ q: query });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -35,96 +42,18 @@ export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSearch = async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      setIsOpen(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setIsOpen(true);
-    onSearch?.(searchQuery);
-
-    // TODO: Replace with Algolia search
-    // For now, search Prisma products and mock services/tests
-    try {
-      const lowerQuery = searchQuery.toLowerCase();
-      
-      // Fetch products from Prisma
-      const productsResponse = await fetch("/api/products");
-      let productResults: SearchResult[] = [];
-      if (productsResponse.ok) {
-        const productsData = await productsResponse.json();
-        productResults = productsData
-          .filter(
-            (p: Item) =>
-              p.name.toLowerCase().includes(lowerQuery) ||
-              (p.description && p.description.toLowerCase().includes(lowerQuery))
-          )
-          .map((item: Item) => ({
-            item: item,
-            type: "product" as const,
-            vertical: "pepz" as const,
-            relevance: 1,
-          }));
-      }
-
-      const serviceResults = mockIVServices
-        .filter(
-          (s) =>
-            s.name.toLowerCase().includes(lowerQuery) ||
-            s.description.toLowerCase().includes(lowerQuery)
-        )
-        .map((item) => ({
-          item: item as Item,
-          type: "service" as const,
-          vertical: "ivz" as const,
-          relevance: 1,
-        }));
-
-      const testResults = mockBloodTests
-        .filter(
-          (t) =>
-            t.name.toLowerCase().includes(lowerQuery) ||
-            t.description.toLowerCase().includes(lowerQuery)
-        )
-        .map((item) => ({
-          item: item as Item,
-          type: "test" as const,
-          vertical: "bloodz" as const,
-          relevance: 1,
-        }));
-
-      setResults([...productResults, ...serviceResults, ...testResults]);
-    } catch (error) {
-      console.error("Error searching:", error);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
-    handleSearch(value);
-  };
-
-  const getItemUrl = (result: SearchResult) => {
-    if (result.type === "product") {
-      return `/pepz/products/${result.item.slug}`;
-    } else if (result.type === "service") {
-      return `/ivz/services/${result.item.slug}`;
+    if (value.trim()) {
+      setIsOpen(true);
     } else {
-      return `/bloodz/tests/${result.item.slug}`;
+      setIsOpen(false);
     }
+    onSearch?.(value);
   };
 
-  const getActionLabel = (result: SearchResult) => {
-    if (result.type === "product") return "Add to cart";
-    return "Book now";
-  };
+  const results = data?.hits || [];
 
   return (
     <div ref={searchRef} className={cn("relative w-full", className)}>
@@ -138,7 +67,7 @@ export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProp
           placeholder={isMobile ? "Search products…" : "Search for products, IV drips, blood tests…"}
           value={query}
           onChange={handleInputChange}
-          onFocus={() => query && setIsOpen(true)}
+          onFocus={() => setIsOpen(true)}
           className={cn(
             "pl-12 pr-10 rounded-full border focus:ring-2 focus:border-transparent",
             isMobile 
@@ -153,7 +82,6 @@ export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProp
             className="absolute right-1 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full hover:bg-gray-100"
             onClick={() => {
               setQuery("");
-              setResults([]);
               setIsOpen(false);
             }}
           >
@@ -162,18 +90,37 @@ export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProp
         )}
       </div>
 
-      {isOpen && (query || results.length > 0 || isLoading) && (
+      {isOpen && (query || results.length > 0 || loading) && (
         <div className="absolute top-full z-50 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          {query.trim().length < 2 ? (
+            <div className="p-6 text-center text-sm text-gray-500">Start typing…</div>
+          ) : loading ? (
+            <div className="p-4 space-y-3">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className="rounded-lg border border-gray-200 p-3">
+                  <div className="h-3 w-24 bg-gray-100 rounded mb-2" />
+                  <div className="h-4 w-3/4 bg-gray-100 rounded mb-1" />
+                  <div className="h-3 w-1/2 bg-gray-100 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="p-6 text-center text-sm text-gray-500">
+              <div className="mb-3">Search failed. Please try again.</div>
+              <Button size="sm" variant="outline" onClick={refetch}>
+                Retry
+              </Button>
+            </div>
+          ) : empty ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              No results found for &quot;{query}&quot;
             </div>
           ) : results.length > 0 ? (
             <div className="max-h-96 overflow-y-auto p-2">
               {results.map((result, idx) => (
                 <Link
-                  key={idx}
-                  href={getItemUrl(result)}
+                  key={result.objectID || idx}
+                  href={`/product/${result.slug}`}
                   onClick={() => {
                     setIsOpen(false);
                     setQuery("");
@@ -184,36 +131,22 @@ export function HeaderSearch({ className, onSearch, isMobile }: HeaderSearchProp
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-medium text-[#41a59b] bg-[#41a59b]/10 px-2 py-0.5 rounded-md">
-                            {result.type === "product"
-                              ? "Product"
-                              : result.type === "service"
-                              ? "IV Service"
-                              : "Blood Test"}
+                            Product
                           </span>
-                          <span className="text-xs text-gray-500">
-                            {result.vertical === "pepz"
-                              ? "InstaPepz"
-                              : result.vertical === "ivz"
-                              ? "InstaIVZ"
-                              : "InstaBloodz"}
-                          </span>
+                          <span className="text-xs text-gray-500">{result.vendorName}</span>
                         </div>
-                        <p className="text-sm font-medium line-clamp-1 text-gray-900">{result.item.name}</p>
+                        <p className="text-sm font-medium line-clamp-1 text-gray-900">{result.name}</p>
                         <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-                          {result.item.description}
+                          {result.description}
                         </p>
                         <p className="text-xs font-medium text-[#41a59b] mt-1">
-                          {getActionLabel(result)} →
+                          View product →
                         </p>
                       </div>
                     </div>
                   </Card>
                 </Link>
               ))}
-            </div>
-          ) : query ? (
-            <div className="p-8 text-center text-sm text-gray-500">
-              No results found for &quot;{query}&quot;
             </div>
           ) : null}
         </div>

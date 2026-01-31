@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { reindexProductsByIds, removeProductFromAlgolia } from "@/server/services/algolia";
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,12 @@ async function updateVendor(formData: FormData) {
     },
   });
 
+  const vendorProducts = await prisma.product.findMany({
+    where: { vendorId: id },
+    select: { id: true },
+  });
+  await reindexProductsByIds(vendorProducts.map((p) => p.id));
+
   revalidatePath("/admin/vendors");
   redirect("/admin/vendors");
 }
@@ -83,7 +90,14 @@ async function deleteVendor(formData: FormData) {
     throw new Error("ID is required");
   }
 
+  const vendorProducts = await prisma.product.findMany({
+    where: { vendorId: id },
+    select: { id: true },
+  });
+
   await prisma.vendor.delete({ where: { id } });
+
+  await Promise.all(vendorProducts.map((p) => removeProductFromAlgolia(p.id)));
 
   revalidatePath("/admin/vendors");
   redirect("/admin/vendors");

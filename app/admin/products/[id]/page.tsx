@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { CATEGORY_SLUGS } from "@/lib/utils/category";
 import Link from "next/link";
+import { removeProductFromAlgolia, upsertProductToAlgolia } from "@/server/services/algolia";
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,8 @@ async function updateProduct(formData: FormData) {
     }
   });
 
+  await upsertProductToAlgolia(id);
+
   revalidatePath("/admin/products");
   redirect("/admin/products");
 }
@@ -84,6 +87,8 @@ async function deleteProduct(formData: FormData) {
   }
 
   await prisma.product.delete({ where: { id } });
+
+  await removeProductFromAlgolia(id);
 
   revalidatePath("/admin/products");
   redirect("/admin/products");

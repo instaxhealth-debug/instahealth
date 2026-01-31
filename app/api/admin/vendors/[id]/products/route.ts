@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { generateSlug } from "@/lib/utils/slug";
 import { aedToFils } from "@/lib/utils/price";
 import { normalizeCategory } from "@/lib/utils/category";
+import { upsertProductToAlgolia } from "@/server/services/algolia";
 
 export async function GET(
   request: Request,
@@ -126,6 +127,8 @@ export async function POST(
         throw createError;
       }
     }
+
+    await upsertProductToAlgolia(product.id);
 
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {

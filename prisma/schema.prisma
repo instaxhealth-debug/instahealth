@@ -81,6 +81,7 @@ model Vendor {
   slug      String      @unique
   email     String?     @unique
   status    String      @default("active")
+  verified  Boolean     @default(false)  // Replaces complianceAccepted for search
   legalEntityName String?
   country   String?
   licenseNumber String?
@@ -111,8 +112,11 @@ model Product {
   priceFils   Int
   imageUrl    String?
   inStock     Boolean         @default(true)
+  inventoryStatus String      @default("in_stock")  // in_stock, low, out
   active      Boolean         @default(true)
+  published   Boolean         @default(true)  // Separate from active for editorial control
   isGlobal    Boolean         @default(false) // If true, available in all locations regardless of ProductLocation rows
+  tags        String[]        @default([])    // Search tags
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   locations   ProductLocation[]
