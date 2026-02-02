@@ -55,6 +55,11 @@ export default async function AccountPage() {
                 <span>View Cart</span>
               </Link>
             </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/account/addresses">
+                <span>Saved Addresses</span>
+              </Link>
+            </Button>
             <SignOutButton />
           </CardContent>
         </Card>

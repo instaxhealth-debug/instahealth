@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { getCartWithProducts, clearCart } from '@/lib/cart';
+import { assertAddressInVendorRadius } from '@/server/services/geo';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -26,6 +27,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
+      addressId, // Saved address ID
+      placeId,   // One-time place ID (if not using saved address)
       locationId,
       shippingName,
       shippingPhone,
@@ -48,6 +51,56 @@ export async function POST(req: NextRequest) {
     if (!ageConfirmed || !acceptedTerms || !acceptedDisclaimer) {
       return NextResponse.json(
         { error: 'You must confirm age, accept terms, and accept the disclaimer to checkout.' },
+        { status: 400 }
+      );
+    }
+
+    // Resolve delivery address for geo validation
+    let deliveryLat: number;
+    let deliveryLng: number;
+
+    if (addressId) {
+      // Use saved address
+      const address = await prisma.address.findFirst({
+        where: {
+          id: addressId,
+          userId: user.id, // Ensure user owns this address
+        },
+      });
+
+      if (!address) {
+        return NextResponse.json(
+          { error: 'Address not found or unauthorized' },
+          { status: 404 }
+        );
+      }
+
+      deliveryLat = address.lat;
+      deliveryLng = address.lng;
+    } else if (placeId) {
+      // Resolve one-time place ID server-side
+      const resolveResponse = await fetch(
+        `${process.env.NEXTAUTH_URL}/api/geo/resolve-place`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ placeId }),
+        }
+      );
+
+      if (!resolveResponse.ok) {
+        return NextResponse.json(
+          { error: 'Failed to resolve delivery address' },
+          { status: 400 }
+        );
+      }
+
+      const placeData = await resolveResponse.json();
+      deliveryLat = placeData.lat;
+      deliveryLng = placeData.lng;
+    } else {
+      return NextResponse.json(
+        { error: 'Either addressId or placeId is required for delivery address validation' },
         { status: 400 }
       );
     }
@@ -97,6 +150,55 @@ export async function POST(req: NextRequest) {
       if (!item.product.active || (!item.variant && !item.product.inStock)) {
         return NextResponse.json(
           { error: `Product "${item.product.name}" is not available` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // CRITICAL: Enforce vendor service radius before creating order
+    // Group cart items by vendor
+    const vendorIds = Array.from(new Set(items.map((item: any) => item.product!.vendorId)));
+    
+    for (const vendorId of vendorIds) {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: {
+          id: true,
+          name: true,
+          enforceServiceRadius: true,
+          baseLat: true,
+          baseLng: true,
+          serviceRadiusKm: true,
+          allowOutOfRadiusOverride: true,
+        },
+      });
+
+      if (!vendor) {
+        return NextResponse.json(
+          { error: `Vendor not found: ${vendorId}` },
+          { status: 400 }
+        );
+      }
+
+      try {
+        assertAddressInVendorRadius({
+          vendor,
+          addressLat: deliveryLat,
+          addressLng: deliveryLng,
+          isAdminOverride: false, // Regular checkout, no admin override
+        });
+      } catch (geoError: any) {
+        // Return geo validation error to client
+        return NextResponse.json(
+          {
+            ok: false,
+            error: geoError.message || 'Address not serviceable by vendor',
+            code: geoError.code,
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            distanceKm: geoError.distanceKm,
+            radiusKm: geoError.radiusKm,
+          },
           { status: 400 }
         );
       }
