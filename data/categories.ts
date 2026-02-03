@@ -22,11 +22,11 @@ export const categories: CategoryItem[] = [
     description: "IV therapy and wellness drips",
   },
   {
-    id: "supplements",
-    name: "Supplements",
-    marketplaceRoute: "/marketplace/supplements",
-    image: "/suppslogo.png",
-    description: "Vitamins and supplements",
+    id: "clinics",
+    name: "Clinics",
+    marketplaceRoute: "/marketplace/clinics",
+    image: "/CLINICSLOGO.png",
+    description: "Medical clinics and healthcare facilities",
   },
   {
     id: "peptides",
@@ -57,11 +57,11 @@ export const categories: CategoryItem[] = [
     description: "Health insurance plans",
   },
   {
-    id: "skincare",
-    name: "Skincare",
-    marketplaceRoute: "/marketplace/skincare",
-    image: "/skincarelogo.png",
-    description: "Skincare products",
+    id: "supplements",
+    name: "Supplements",
+    marketplaceRoute: "/marketplace/supplements",
+    image: "/suppslogo.png",
+    description: "Vitamins and supplements",
   },
   {
     id: "haircare",
