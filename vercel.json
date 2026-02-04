@@ -10,14 +10,5 @@
     "app/api/**": {
       "maxDuration": 30
     }
-  },
-  "crons": [
-    {
-      "path": "/api/admin/sla/enforce",
-      "schedule": "*/5 * * * *",
-      "headers": {
-        "x-cron-secret": "$CRON_SECRET"
-      }
-    }
-  ]
+  }
 }
