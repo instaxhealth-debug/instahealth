@@ -177,6 +177,9 @@ model Vendor {
   serviceRadiusKm       Int     @default(25)
   enforceServiceRadius  Boolean @default(true)
   allowOutOfRadiusOverride Boolean @default(false)
+
+  // Approved vendor applications
+  approvedApplications VendorApplication[]
   
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -456,4 +459,82 @@ model OrderEvent {
   @@index([vendorOrderId])
   @@index([eventType])
   @@index([createdAt])
+}
+
+model VendorApplication {
+  id                 String   @id @default(cuid())
+  status             String   @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  // Business identity
+  legalBusinessName  String
+  tradingName        String?
+  country            String
+  city               String
+  businessRegNumber  String
+  taxVatNumber       String?
+  website            String?
+  businessCategory   String
+  businessDescription String
+
+  // Contact person
+  contactFullName    String
+  contactRole        String
+  contactEmail       String
+  contactPhone       String
+  contactWhatsApp    String?
+  preferredContactMethod String
+
+  // Operations
+  operationRegion    String
+  fulfillmentType    String
+  deliveryTimeframe  String
+  hasProductImages   Boolean  @default(false)
+  complianceDocs     String[] @default([])
+
+  // Products
+  productDescription String
+  skuCount           Int?
+  hasPricing         Boolean  @default(false)
+
+  // Agreements
+  informationAccuracy Boolean @default(false)
+  agreeContact       Boolean  @default(false)
+
+  // Metadata
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  approvedAt         DateTime?
+  approvedBy         String?
+  notes              String?
+  ipAddress          String?
+  userAgent          String?
+
+  // Relation to created vendor (if approved)
+  approvedVendorId   String?  @unique
+  approvedVendor     Vendor?  @relation(fields: [approvedVendorId], references: [id], onDelete: SetNull)
+
+  // Invite tokens for this application
+  inviteTokens       InviteToken[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([contactEmail])
+}
+
+model InviteToken {
+  id                  String   @id @default(cuid())
+  vendorApplicationId String
+  vendorApplication   VendorApplication @relation(fields: [vendorApplicationId], references: [id], onDelete: Cascade)
+
+  tokenHash           String   @unique
+  email               String
+
+  expiresAt           DateTime
+  usedAt              DateTime?
+  createdVendorId     String?
+
+  createdAt           DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
 }
