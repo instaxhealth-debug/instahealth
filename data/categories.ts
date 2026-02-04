@@ -25,7 +25,7 @@ export const categories: CategoryItem[] = [
     id: "clinics",
     name: "Clinics",
     marketplaceRoute: "/marketplace/clinics",
-    image: "/CLINICSLOGO.png",
+    image: "/category-icons/CLINICSLOGO.png",
     description: "Medical clinics and healthcare facilities",
   },
   {

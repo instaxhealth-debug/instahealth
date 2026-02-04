@@ -16,8 +16,8 @@ export function Footer() {
               <Image
                 src="/InstaHealth Logo white background.png"
                 alt="InstaHealth logo"
-                width={140}
-                height={32}
+                width={210}
+                height={48}
                 className="object-contain"
                 unoptimized
               />
