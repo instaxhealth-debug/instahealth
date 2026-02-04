@@ -20,7 +20,7 @@ const vendorData = {
   rating: 5.0,
   ratingCount: 500,
   isHouseBrand: true,
-  logoUrl: "/vendors/Bloodtestvendors/bloodz.png",
+  logoUrl: "/vendors/bloodtestvendors/bloodz.png",
   complianceAccepted: true,
   complianceAcceptedAt: new Date(),
 };

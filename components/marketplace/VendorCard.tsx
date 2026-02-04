@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Star, MapPin, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Vendor } from "@/types/vendor";
@@ -14,14 +13,27 @@ interface VendorCardProps {
 }
 
 export function VendorCard({ vendor, className, showOfferingsCount, offeringsCount }: VendorCardProps) {
-  // Safety check for logo URLs in dev
-  if (process.env.NODE_ENV === 'development' && vendor.logoUrl) {
-    if (!vendor.logoUrl.startsWith('/')) {
-      console.warn(`[VendorCard] Logo URL missing leading slash: "${vendor.logoUrl}" for vendor "${vendor.name}"`);
+  const normalizeLogoUrl = (logoUrl?: string) => {
+    if (!logoUrl) return undefined;
+    let normalized = logoUrl.trim();
+
+    if (normalized.startsWith("/public/")) {
+      normalized = normalized.replace(/^\/public/, "");
     }
-    if (vendor.logoUrl.includes('Bloodtestvendors')) {
-      console.warn(`[VendorCard] Logo URL uses mixed case folder: "${vendor.logoUrl}" for vendor "${vendor.name}". Use lowercase /vendors/bloodtestvendors/ instead.`);
+
+    if (!normalized.startsWith("/")) {
+      normalized = `/${normalized}`;
     }
+
+    normalized = normalized.replace(/\/vendors\/bloodtestvendors\//i, "/vendors/bloodtestvendors/");
+
+    return normalized;
+  };
+
+  const normalizedLogo = normalizeLogoUrl(vendor.logoUrl);
+
+  if (process.env.NODE_ENV === "development" && vendor.logoUrl) {
+    console.log("[VendorLogo]", vendor.name, { logoUrl: vendor.logoUrl, normalizedLogo });
   }
 
   return (
@@ -32,14 +44,18 @@ export function VendorCard({ vendor, className, showOfferingsCount, offeringsCou
     )}>
       <div className="flex items-start justify-between gap-4 mb-3">
         {/* Logo */}
-        {vendor.logoUrl && (
+        {normalizedLogo && (
           <div className="flex-shrink-0">
             <div className="relative h-16 w-16 md:h-20 md:w-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-              <Image
-                src={vendor.logoUrl}
+              <img
+                src={normalizedLogo}
                 alt={`${vendor.name} logo`}
-                fill
-                className="object-contain p-1"
+                width={20}
+                height={20}
+                className="h-full w-full object-contain bg-white"
+                onError={() => {
+                  console.warn("[VendorLogoError]", vendor.name, normalizedLogo);
+                }}
               />
             </div>
           </div>
