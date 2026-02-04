@@ -207,6 +207,11 @@ export default async function MarketplaceCategoryPage({
   });
 
   console.log(`[${categorySlug}] vendors found:`, vendors.length);
+  
+  // DEBUG: Log vendor details for logo resolution
+  vendors.forEach((v) => {
+    console.log(`  [vendor] name="${v.name}" slug="${v.slug}" logoUrl="${v.logoUrl}"`);
+  });
 
   // Build vendor shop data
   const vendorShops = vendors.map((vendor) => {

@@ -31,6 +31,72 @@ export function VendorShopCard({
   sampleImages = [],
   className,
 }: VendorShopCardProps) {
+  // Strict logo resolution with vendor name/slug matching
+  const resolveLogoUrl = (vendor: VendorShopCardProps["vendor"]): string => {
+    // Step 1: If logoUrl exists and starts with "/", use it directly
+    if (vendor.logoUrl && typeof vendor.logoUrl === "string" && vendor.logoUrl.startsWith("/")) {
+      return vendor.logoUrl;
+    }
+
+    // Step 2: Match vendor by name or slug (case-insensitive)
+    const vendorNameLower = vendor.name.toLowerCase();
+    const vendorSlugLower = vendor.slug.toLowerCase();
+    const vendorIdLower = vendor.id.toLowerCase();
+
+    // Blood test vendor mapping
+    if (
+      vendorNameLower.includes("instabloodz") ||
+      vendorSlugLower.includes("instablood") ||
+      vendorIdLower.includes("instablood")
+    ) {
+      return "/vendors/bloodtestvendors/bloodz.png";
+    }
+
+    if (
+      vendorNameLower.includes("healthchecks360") ||
+      vendorSlugLower.includes("healthchecks")
+    ) {
+      return "/vendors/bloodtestvendors/healthchecks360.png";
+    }
+
+    if (
+      vendorNameLower.includes("healthone") ||
+      vendorSlugLower.includes("healthone")
+    ) {
+      return "/vendors/bloodtestvendors/healthone-healthcare.png";
+    }
+
+    if (
+      vendorNameLower.includes("firstresponse") ||
+      vendorSlugLower.includes("firstresponse")
+    ) {
+      return "/vendors/bloodtestvendors/firstresponse-healthcare.png";
+    }
+
+    if (
+      vendorNameLower.includes("mydoctor") ||
+      vendorSlugLower.includes("mydoctor")
+    ) {
+      return "/vendors/bloodtestvendors/mydoctor-healthcare.png";
+    }
+
+    // Step 3: Fallback to fallback image only as last resort
+    return "/logos/vendor-fallback.png";
+  };
+
+  const resolvedLogoSrc = resolveLogoUrl(vendor);
+
+  // Hard debug logging (always in development)
+  if (typeof window !== "undefined") {
+    console.log("[VendorLogo]", {
+      vendor: vendor.name,
+      slug: vendor.slug,
+      id: vendor.id,
+      logoUrl: vendor.logoUrl,
+      resolvedLogoSrc,
+    });
+  }
+
   return (
     <Link href={`/shop/${vendor.slug}/${category}`}>
       <div className={cn("w-full rounded-2xl border border-slate-200 shadow-sm bg-slate-50/70 p-4 hover:shadow-md transition-shadow", className)}>
@@ -39,12 +105,15 @@ export function VendorShopCard({
         <div className="flex items-center justify-between gap-3">
           <div className="h-20 w-48 flex items-center flex-shrink-0">
             <Image
-              src={vendor.logoUrl ?? "/logos/vendor-fallback.png"}
+              src={resolvedLogoSrc}
               alt={vendor.name}
               width={220}
               height={80}
               className="h-20 w-auto object-contain"
               priority
+              onError={() => {
+                console.warn("[VendorLogoError]", vendor.name, resolvedLogoSrc, "falling back to generic fallback");
+              }}
             />
           </div>
           {vendor.isHouseBrand && (
