@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -33,6 +33,15 @@ export function PromoBanner() {
   const goToSlide = (index: number) => {
     setCurrentIndex(index);
   };
+
+  // Auto-advance carousel every 4.5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % promoImages.length);
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl shadow-lg mb-8">
