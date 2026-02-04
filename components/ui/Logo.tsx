@@ -14,7 +14,7 @@ interface LogoProps {
 }
 
 const logoPaths: Record<LogoType, string> = {
-  instahealth: "/InstaHealth Logo white background.png",
+  instahealth: "/instahealth.png",
   pepz: "/logos/pepz.png",
   ivz: "/logos/ivz.png",
   bloodz: "/logos/bloodz.png",
