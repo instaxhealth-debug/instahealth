@@ -169,11 +169,22 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-gray-600">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-[#41a59b] hover:underline">
-              Create one
-            </Link>
+          <div className="mt-6 space-y-3 border-t pt-4">
+            {/* Vendor Login Link */}
+            <div className="text-center text-sm text-gray-600">
+              Are you a vendor?{" "}
+              <Link href="/vendor/login" className="text-[#41a59b] font-medium hover:underline">
+                Vendor login
+              </Link>
+            </div>
+
+            {/* Customer Registration Link */}
+            <div className="text-center text-sm text-gray-600">
+              Don&apos;t have an account?{" "}
+              <Link href="/register" className="text-[#41a59b] hover:underline">
+                Create one
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>

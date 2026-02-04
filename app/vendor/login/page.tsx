@@ -5,23 +5,33 @@
  * No OAuth. No shared credentials.
  * VendorId is derived from session → userId → vendor lookup.
  *
- * This page is a placeholder for the foundational auth system.
- * Full UI/UX polish is NOT included in this phase.
+ * Redirects to /vendor dashboard after successful login.
  */
 
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useState, useEffect } from 'react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function VendorLoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Redirect if already logged in as vendor
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.role === 'VENDOR') {
+      router.replace('/vendor');
+    }
+  }, [status, session?.user?.role, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +59,7 @@ export default function VendorLoginPage() {
         return;
       }
 
+      // Redirect to vendor dashboard
       router.push('/vendor');
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -56,80 +67,88 @@ export default function VendorLoginPage() {
     }
   }
 
-  return (
-    <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
-      <h1>Vendor Login</h1>
-      
-      {error && (
-        <div style={{ color: 'red', marginBottom: '10px', padding: '10px', border: '1px solid red' }}>
-          {error}
-        </div>
-      )}
+  const isResolving = status === 'loading' || (status === 'authenticated' && session?.user?.role === 'VENDOR');
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="email" style={{ display: 'block', marginBottom: '5px' }}>
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="password" style={{ display: 'block', marginBottom: '5px' }}>
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '10px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {loading ? 'Signing in...' : 'Sign In'}
-        </button>
-      </form>
-
-      <p style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-        <Link href="/login" style={{ color: '#007bff' }}>
-          Back to customer login
-        </Link>
-      </p>
-
-      {/* DEVELOPMENT ONLY: Remove before production */}
-      <div style={{ marginTop: '30px', padding: '10px', backgroundColor: '#f0f0f0', fontSize: '12px' }}>
-        <p style={{ margin: '0 0 5px 0' }}>
-          <strong>VENDOR AUTH FOUNDATION (WIP)</strong>
-        </p>
-        <p style={{ margin: '0 0 5px 0' }}>✅ Email + password authentication</p>
-        <p style={{ margin: '0 0 5px 0' }}>✅ Session-based (no OAuth)</p>
-        <p style={{ margin: '0 0 5px 0' }}>✅ VendorId derived from session</p>
-        <p style={{ margin: '0' }}>🔲 Full vendor dashboard (coming)</p>
+  if (isResolving) {
+    return (
+      <div className="container mx-auto max-w-md px-4 py-16">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center">
+              Redirecting to dashboard...
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center text-sm text-gray-600">
+            Please wait.
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto max-w-md px-4 py-16">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">
+            Vendor Login
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="vendor@email.com"
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                disabled={loading}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center text-sm text-gray-600">
+            <Link href="/login" className="text-[#41a59b] hover:underline">
+              Back to customer login
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
