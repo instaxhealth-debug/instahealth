@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,7 +45,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         className
       )}
     >
-      <Link href={`/product/${product.slug}`}>
+      <a href={`/product/${product.slug}`}>
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden bg-muted">
             {product.image && 
@@ -120,7 +119,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             </Button>
           </div>
         </CardContent>
-      </Link>
+      </a>
     </Card>
   );
 }

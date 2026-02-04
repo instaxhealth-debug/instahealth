@@ -24,7 +24,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/account");
+      router.replace("/my-account/personal-details");
     }
   }, [status, router]);
 
@@ -80,7 +80,7 @@ export default function RegisterPage() {
           setError("Account created, but login failed. Please sign in manually.");
           setIsLoading(false);
         } else {
-          router.push("/account");
+          router.push("/my-account/personal-details");
         }
       }, 500);
     } catch (err) {

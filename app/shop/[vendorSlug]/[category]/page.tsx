@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { ProductCard } from "@/components/cards/ProductCard";
 import { WhatsAppCTAButton } from "@/components/shop/WhatsAppCTAButton";
 import { unstable_noStore as noStore } from "next/cache";
-import Link from "next/link";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPriceAED } from "@/lib/utils/price";
 import { getSelectedLocationId, getSelectedLocation } from "@/lib/location";
@@ -60,11 +60,44 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
   // Get vendor
   const vendor = await prisma.vendor.findUnique({
     where: { slug: params.vendorSlug },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+      tagline: true,
+      logoUrl: true,
+    },
   });
 
   if (!vendor || vendor.status !== "active") {
     notFound();
   }
+
+  const normalizeLogoUrl = (logoUrl: string | null) => {
+    if (!logoUrl) return null;
+    let normalized = logoUrl.trim();
+
+    if (normalized.includes("/public/")) {
+      normalized = normalized.replace(/^.*\/public/, "");
+    }
+
+    if (!normalized.startsWith("/")) {
+      normalized = `/${normalized}`;
+    }
+
+    return normalized;
+  };
+
+  const resolvedLogoUrl = normalizeLogoUrl(vendor.logoUrl);
+
+  console.log("[VENDOR HEADER]", {
+    name: vendor.name,
+    slug: vendor.slug,
+    logoUrl: vendor.logoUrl,
+    resolvedLogoUrl,
+    keys: Object.keys(vendor),
+  });
 
   const selectedLocationId = await getSelectedLocationId();
   const selectedLocation = await getSelectedLocation();
@@ -163,16 +196,26 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
       {/* Back button */}
       <div className="mb-4">
         <Button variant="ghost" asChild className="rounded-full">
-          <Link href={`/marketplace/${categorySlug}`}>
+          <a href={`/marketplace/${categorySlug}`}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to {categoryTitle}
-          </Link>
+          </a>
         </Button>
       </div>
 
       {/* Vendor Header */}
       <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">{vendor.name}</h1>
+        {resolvedLogoUrl ? (
+          <div className="mb-2">
+            <img
+              src={resolvedLogoUrl}
+              alt={`${vendor.name} logo`}
+              className="max-h-20 w-auto"
+            />
+          </div>
+        ) : (
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">{vendor.name}</h1>
+        )}
         {vendor.tagline && (
           <p className="text-muted-foreground mb-2">{vendor.tagline}</p>
         )}

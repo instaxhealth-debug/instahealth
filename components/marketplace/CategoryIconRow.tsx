@@ -22,7 +22,7 @@ export function CategoryIconRow() {
   const activeCategory = params?.category as string;
 
   return (
-    <div className="overflow-x-auto flex gap-4 px-4 py-3 bg-white border-b scrollbar-hide">
+    <div className="overflow-x-auto flex gap-4 px-4 py-3 bg-white border-b scrollbar-hide lg:justify-center">
       {CATEGORIES.map((cat) => {
         const isActive = activeCategory === cat.slug;
         return (

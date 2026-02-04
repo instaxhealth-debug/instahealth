@@ -27,7 +27,7 @@ export default function LoginPage() {
     if (status !== "authenticated") return;
 
     const destination =
-      callbackUrl || (session?.user?.role === "ADMIN" ? "/admin" : "/account");
+      callbackUrl || (session?.user?.role === "ADMIN" ? "/admin" : "/my-account/personal-details");
 
     router.replace(destination);
   }, [status, session?.user?.role, callbackUrl, router]);
@@ -71,7 +71,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       // Use callbackUrl so browser actually redirects to Google
-      await signIn("google", { callbackUrl: "/account" });
+      await signIn("google", { callbackUrl: "/my-account/personal-details" });
     } catch (err) {
       setError("Failed to sign in with Google. Please try again.");
       setIsLoading(false);

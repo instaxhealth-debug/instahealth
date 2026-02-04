@@ -33,25 +33,28 @@ export function VendorShopCard({
 }: VendorShopCardProps) {
   // Strict logo resolution with vendor name/slug matching
   const resolveLogoUrl = (vendor: VendorShopCardProps["vendor"]): string => {
+    const instabloodzLogo = "/vendors/bloodtestvendors/bloodz.png";
+
+    const vendorNameLower = vendor.name.toLowerCase();
+    const vendorSlugLower = vendor.slug.toLowerCase();
+    const vendorIdLower = vendor.id.toLowerCase();
+
+    // Force InstaBloodz logo override (exact path, no fallback)
+    if (
+      vendorNameLower.includes("instabloodz") ||
+      vendorSlugLower.includes("instablood") ||
+      vendorIdLower.includes("instablood")
+    ) {
+      return instabloodzLogo;
+    }
+
     // Step 1: If logoUrl exists and starts with "/", use it directly
     if (vendor.logoUrl && typeof vendor.logoUrl === "string" && vendor.logoUrl.startsWith("/")) {
       return vendor.logoUrl;
     }
 
     // Step 2: Match vendor by name or slug (case-insensitive)
-    const vendorNameLower = vendor.name.toLowerCase();
-    const vendorSlugLower = vendor.slug.toLowerCase();
-    const vendorIdLower = vendor.id.toLowerCase();
-
     // Blood test vendor mapping
-    if (
-      vendorNameLower.includes("instabloodz") ||
-      vendorSlugLower.includes("instablood") ||
-      vendorIdLower.includes("instablood")
-    ) {
-      return "/vendors/bloodtestvendors/bloodz.png";
-    }
-
     if (
       vendorNameLower.includes("healthchecks360") ||
       vendorSlugLower.includes("healthchecks")

@@ -30,7 +30,7 @@ export function Header({ initialLocation: _initialLocation, locations: _location
               <Link href="/" className="flex items-center h-14 flex-shrink-0">
                 <Logo type="instahealth" width={220} height={44} priority />
               </Link>
-              <div className="flex-1 min-w-0 max-w-full">
+              <div className="flex-1 min-w-0 max-w-full lg:flex-none lg:w-[560px] xl:w-[640px]">
                 <HeaderSearch />
               </div>
             </div>
@@ -45,7 +45,7 @@ export function Header({ initialLocation: _initialLocation, locations: _location
                 <HeaderNavItem
                   icon={User}
                   label="Account"
-                  href="/account"
+                  href="/my-account/personal-details"
                 />
               ) : (
                 <HeaderNavItem
@@ -97,7 +97,7 @@ export function Header({ initialLocation: _initialLocation, locations: _location
                 <HeaderNavItem
                   icon={User}
                   label="Account"
-                  href="/account"
+                  href="/my-account/personal-details"
                 />
               ) : (
                 <HeaderNavItem

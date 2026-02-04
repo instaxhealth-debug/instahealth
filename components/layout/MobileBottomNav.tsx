@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   },
   {
     label: "Account",
-    href: "/account",
+    href: "/my-account/personal-details",
     icon: User,
   },
 ] as const;

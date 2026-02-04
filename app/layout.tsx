@@ -7,7 +7,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "./providers";
-import { getActiveLocations, getSelectedLocation } from "@/lib/location";
+import { LocationBootstrap } from "@/components/location/LocationBootstrap";
 import { logDatabaseConnection } from "@/lib/db/guardrail";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -25,20 +25,22 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [locations, selectedLocation] = await Promise.all([
-    getActiveLocations(),
-    getSelectedLocation(),
-  ]);
+  // RootLayout is now DB-free
+  // Location data will be loaded client-side via LocationBootstrap
+  // Fallback empty state provided to Header components
 
   return (
     <html lang="en">
       <body className={inter.className}>
         <Providers>
+          {/* Location Bootstrap - loads locations client-side */}
+          <LocationBootstrap />
+          
           {/* Desktop Header - hidden on mobile */}
-          <Header initialLocation={selectedLocation} locations={locations} />
+          <Header initialLocation={null} locations={[]} />
           
           {/* Mobile Header - visible only on mobile */}
-          <MobileHeader initialLocation={selectedLocation} locations={locations} />
+          <MobileHeader initialLocation={null} locations={[]} />
           
           {/* Main content with bottom padding on mobile for bottom nav */}
           <main className="min-h-screen pb-16 md:pb-0">{children}</main>

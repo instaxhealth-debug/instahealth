@@ -30,7 +30,14 @@ export function VendorCard({ vendor, className, showOfferingsCount, offeringsCou
     return normalized;
   };
 
-  const normalizedLogo = normalizeLogoUrl(vendor.logoUrl);
+  const instabloodzLogo = "/vendors/bloodtestvendors/bloodz.png";
+  const vendorNameLower = vendor.name?.toLowerCase() || "";
+  const vendorSlugLower = vendor.slug?.toLowerCase() || "";
+
+  const normalizedLogo =
+    vendorNameLower.includes("instabloodz") || vendorSlugLower.includes("instablood")
+      ? instabloodzLogo
+      : normalizeLogoUrl(vendor.logoUrl);
 
   if (process.env.NODE_ENV === "development" && vendor.logoUrl) {
     console.log("[VendorLogo]", vendor.name, { logoUrl: vendor.logoUrl, normalizedLogo });

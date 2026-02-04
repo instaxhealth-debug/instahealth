@@ -63,125 +63,158 @@ function prismaProductToStorefrontProduct(prismaProduct: {
 
 // Fetch all active products from Prisma
 export async function getProductsFromPrisma(): Promise<StorefrontProduct[]> {
-  const prismaProducts = await prisma.product.findMany({
-    where: {
-      active: true,
-      inStock: true,
-    },
-    include: {
-      vendor: {
-        select: {
-          id: true,
-          name: true,
+  try {
+    const prismaProducts = await prisma.product.findMany({
+      where: {
+        active: true,
+        inStock: true,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  return prismaProducts.map(prismaProductToStorefrontProduct);
+    return prismaProducts.map(prismaProductToStorefrontProduct);
+  } catch (error) {
+    console.error("[getProductsFromPrisma] Database error:", error);
+    return [];
+  }
 }
 
 // Fetch products by category
 export async function getProductsByCategoryFromPrisma(
   category: string
 ): Promise<StorefrontProduct[]> {
-  const prismaProducts = await prisma.product.findMany({
-    where: {
-      active: true,
-      inStock: true,
-      category: category,
-    },
-    include: {
-      vendor: {
-        select: {
-          id: true,
-          name: true,
+  try {
+    const prismaProducts = await prisma.product.findMany({
+      where: {
+        active: true,
+        inStock: true,
+        category: category,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  return prismaProducts.map(prismaProductToStorefrontProduct);
+    return prismaProducts.map(prismaProductToStorefrontProduct);
+  } catch (error) {
+    console.error(
+      "[getProductsByCategoryFromPrisma] Database error for category:",
+      category,
+      error
+    );
+    return [];
+  }
 }
 
 // Fetch products by vendor ID
 export async function getProductsByVendorIdFromPrisma(
   vendorId: string
 ): Promise<StorefrontProduct[]> {
-  const prismaProducts = await prisma.product.findMany({
-    where: {
-      active: true,
-      inStock: true,
-      vendorId: vendorId,
-    },
-    include: {
-      vendor: {
-        select: {
-          id: true,
-          name: true,
+  try {
+    const prismaProducts = await prisma.product.findMany({
+      where: {
+        active: true,
+        inStock: true,
+        vendorId: vendorId,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-  return prismaProducts.map(prismaProductToStorefrontProduct);
+    return prismaProducts.map(prismaProductToStorefrontProduct);
+  } catch (error) {
+    console.error(
+      "[getProductsByVendorIdFromPrisma] Database error for vendor:",
+      vendorId,
+      error
+    );
+    return [];
+  }
 }
 
 // Fetch a single product by slug
 export async function getProductBySlugFromPrisma(
   slug: string
 ): Promise<StorefrontProduct | null> {
-  const prismaProduct = await prisma.product.findUnique({
-    where: {
-      slug: slug,
-    },
-    include: {
-      vendor: {
-        select: {
-          id: true,
-          name: true,
+  try {
+    const prismaProduct = await prisma.product.findUnique({
+      where: {
+        slug: slug,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+    if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+      return null;
+    }
+
+    return prismaProductToStorefrontProduct(prismaProduct);
+  } catch (error) {
+    console.error("[getProductBySlugFromPrisma] Database error for slug:", slug, error);
     return null;
   }
-
-  return prismaProductToStorefrontProduct(prismaProduct);
 }
 
 // Fetch a single product by ID
 export async function getProductByIdFromPrisma(
   id: string
 ): Promise<StorefrontProduct | null> {
-  const prismaProduct = await prisma.product.findUnique({
-    where: {
-      id: id,
-    },
-    include: {
-      vendor: {
-        select: {
-          id: true,
-          name: true,
+  try {
+    const prismaProduct = await prisma.product.findUnique({
+      where: {
+        id: id,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+    if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+      return null;
+    }
+
+    return prismaProductToStorefrontProduct(prismaProduct);
+  } catch (error) {
+    console.error("[getProductByIdFromPrisma] Database error for id:", id, error);
     return null;
   }
-
-  return prismaProductToStorefrontProduct(prismaProduct);
 }

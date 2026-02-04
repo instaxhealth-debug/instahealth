@@ -43,6 +43,8 @@ model User {
   email             String     @unique
   passwordHash      String?    // Nullable for future OAuth support
   name              String?
+  phone             String?    // E.164 format (e.g. +971545988544)
+  countryCode       String?    // Country code (e.g. "+971")
   image             String?    // NextAuth required
   emailVerified     DateTime?  // NextAuth required
   role              Role       @default(USER)

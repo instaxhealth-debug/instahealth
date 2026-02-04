@@ -182,7 +182,7 @@ export default function AccountAddressesPage() {
           <p className="text-gray-600">Manage delivery addresses for checkout</p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/account">Back to account</Link>
+          <Link href="/my-account/personal-details">Back to account</Link>
         </Button>
       </div>
 

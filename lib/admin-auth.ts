@@ -32,7 +32,7 @@ export async function requireAdmin() {
     console.warn(
       `[AUTH] Unauthorized admin access attempt by: ${normalizedSessionEmail}`
     );
-    redirect("/account");
+    redirect("/my-account/personal-details");
   }
 
   return session;
