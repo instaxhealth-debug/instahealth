@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Star, MapPin, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Vendor } from "@/types/vendor";
@@ -20,6 +21,20 @@ export function VendorCard({ vendor, className, showOfferingsCount, offeringsCou
       className
     )}>
       <div className="flex items-start justify-between gap-4 mb-3">
+        {/* Logo */}
+        {vendor.logoUrl && (
+          <div className="flex-shrink-0">
+            <div className="relative h-16 w-16 md:h-20 md:w-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+              <Image
+                src={vendor.logoUrl}
+                alt={`${vendor.name} logo`}
+                fill
+                className="object-contain p-1"
+              />
+            </div>
+          </div>
+        )}
+        
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <Link href={`/vendor/${vendor.slug}`}>

@@ -18,6 +18,7 @@ export interface Vendor {
   // Optional metadata
   rating?: number;
   reviewCount?: number;
+  logoUrl?: string; // Path to vendor logo image
   promo?: {
     text: string;
     type: "free_delivery" | "discount" | "first_order";
