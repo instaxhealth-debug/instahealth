@@ -8,8 +8,12 @@ import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "./providers";
 import { getActiveLocations, getSelectedLocation } from "@/lib/location";
+import { logDatabaseConnection } from "@/lib/db/guardrail";
 
 const inter = Inter({ subsets: ["latin"] });
+
+// Log database connection on server boot
+logDatabaseConnection();
 
 export const metadata: Metadata = {
   title: "InstaHealth - Your Health Marketplace",

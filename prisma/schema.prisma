@@ -1,11 +1,38 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// ==========================================
+// INSTAHEALTH PRISMA SCHEMA
+// ==========================================
+// DATABASE STRATEGY: Neon PostgreSQL ONLY
+// ==========================================
+//
+// PRODUCTION ARCHITECTURE:
+// - DEV Database: Neon (https://neon.tech) - used by local development & preview deployments
+// - PROD Database: Neon (https://neon.tech) - used by production only (instahealth.ae)
+//
+// ENVIRONMENT VARIABLES:
+// - LOCAL DEVELOPMENT: DATABASE_URL=<DEV_NEON_URL>
+// - VERCEL PREVIEW: DATABASE_URL=<DEV_NEON_URL>
+// - VERCEL PRODUCTION: DATABASE_URL=<PROD_NEON_URL>
+//
+// MIGRATION STRATEGY:
+// Data is NEVER auto-synced between DEV and PROD.
+// Data moves manually only via:
+//   1. Admin UI seeding on production
+//   2. Explicit export/import scripts
+//   3. Seed scripts run with explicit PROD DATABASE_URL
+//
+// NOTE: SQLite (file:./prisma/dev.db) is NO LONGER active.
+// It remains only as legacy/fallback documentation.
+// All development uses DEV Neon.
+//
+// ==========================================
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
+  // Use Neon PostgreSQL (https://neon.tech)
+  // DATABASE_URL and DIRECT_URL are set via environment variables
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
@@ -35,6 +62,7 @@ model User {
 enum Role {
   ADMIN
   USER
+  VENDOR
 }
 
 enum VendorOrderStatus {
