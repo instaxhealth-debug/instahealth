@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Logo } from "@/components/ui/Logo";
 import { Facebook, Instagram, Twitter, Linkedin, Youtube } from "lucide-react";
 import Image from "next/image";
 
@@ -14,7 +13,14 @@ export function Footer() {
           {/* Column 1: Brand Description */}
           <div className="space-y-6">
             <Link href="/" className="inline-block">
-              <Logo type="instahealth" width={140} height={32} />
+              <Image
+                src="/InstaHealth Logo white background.png"
+                alt="InstaHealth logo"
+                width={140}
+                height={32}
+                className="object-contain"
+                unoptimized
+              />
             </Link>
             <p className="text-[14px] text-gray-600 leading-relaxed font-light">
               InstaHealth offers a streamlined digital health marketplace connecting customers with licensed providers, regulated services, and trusted wellness brands — all in one unified platform.
