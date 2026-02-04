@@ -141,6 +141,16 @@ export default function VendorLoginPage() {
             </Button>
           </form>
 
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push('/vendor/apply')}
+            >
+              Become a Vendor
+            </Button>
+          </div>
+
           <div className="mt-4 text-center text-sm text-gray-600">
             <Link href="/login" className="text-[#41a59b] hover:underline">
               Back to customer login
