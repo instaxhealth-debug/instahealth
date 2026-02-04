@@ -14,6 +14,16 @@ interface VendorCardProps {
 }
 
 export function VendorCard({ vendor, className, showOfferingsCount, offeringsCount }: VendorCardProps) {
+  // Safety check for logo URLs in dev
+  if (process.env.NODE_ENV === 'development' && vendor.logoUrl) {
+    if (!vendor.logoUrl.startsWith('/')) {
+      console.warn(`[VendorCard] Logo URL missing leading slash: "${vendor.logoUrl}" for vendor "${vendor.name}"`);
+    }
+    if (vendor.logoUrl.includes('Bloodtestvendors')) {
+      console.warn(`[VendorCard] Logo URL uses mixed case folder: "${vendor.logoUrl}" for vendor "${vendor.name}". Use lowercase /vendors/bloodtestvendors/ instead.`);
+    }
+  }
+
   return (
     <div className={cn(
       "bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 md:p-5",
