@@ -43,6 +43,7 @@ interface PlacePrediction {
   description: string;
   mainText: string;
   secondaryText: string;
+  rawSuggestion?: any; // Store raw suggestion for debugging
 }
 
 const UAE_EMIRATES = [
@@ -54,6 +55,53 @@ const UAE_EMIRATES = [
   "Ras Al Khaimah",
   "Fujairah",
 ];
+
+// Helper to extract display label from suggestion (new API or legacy)
+function getSuggestionLabel(s: any): { main: string; secondary: string } {
+  // Priority 1: New API structured format
+  if (s?.placePrediction?.structuredFormat) {
+    const mainText = s.placePrediction.structuredFormat.mainText?.text || "";
+    const secondaryText = s.placePrediction.structuredFormat.secondaryText?.text || "";
+    if (mainText) {
+      return { main: mainText, secondary: secondaryText };
+    }
+  }
+  
+  // Priority 2: New API text field (full text)
+  if (s?.placePrediction?.text?.text) {
+    const fullText = s.placePrediction.text.text;
+    // Try to split on comma for main/secondary
+    const parts = fullText.split(", ");
+    if (parts.length > 1) {
+      return { main: parts[0], secondary: parts.slice(1).join(", ") };
+    }
+    return { main: fullText, secondary: "" };
+  }
+  
+  // Priority 3: Legacy API format
+  if (s?.description) {
+    const parts = s.description.split(", ");
+    if (parts.length > 1) {
+      return { main: parts[0], secondary: parts.slice(1).join(", ") };
+    }
+    return { main: s.description, secondary: "" };
+  }
+  
+  // Priority 4: Legacy structured formatting
+  if (s?.structured_formatting) {
+    return {
+      main: s.structured_formatting.main_text || "",
+      secondary: s.structured_formatting.secondary_text || "",
+    };
+  }
+  
+  // Fallback
+  const fallback = s?.placePrediction?.placeId || s?.place_id || "Unknown place";
+  if (process.env.NODE_ENV === "development" && !s?.placePrediction?.text) {
+    console.log("[AddressModal] Suggestion missing expected text fields:", s);
+  }
+  return { main: fallback, secondary: "" };
+}
 
 export function AddressModal({ isOpen, onClose, onSave, editingAddress }: AddressModalProps) {
   const [mode, setMode] = useState<ModalMode>("search");
@@ -163,12 +211,16 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
         
         if (suggestions && suggestions.length > 0) {
           setPredictions(
-            suggestions.map((suggestion: any) => ({
-              placeId: suggestion.placePrediction?.placeId || "",
-              description: suggestion.placePrediction?.text?.text || "",
-              mainText: suggestion.placePrediction?.structuredFormat?.mainText?.text || "",
-              secondaryText: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || "",
-            }))
+            suggestions.map((suggestion: any) => {
+              const { main, secondary } = getSuggestionLabel(suggestion);
+              return {
+                placeId: suggestion.placePrediction?.placeId || "",
+                description: suggestion.placePrediction?.text?.text || main,
+                mainText: main,
+                secondaryText: secondary,
+                rawSuggestion: suggestion,
+              };
+            })
           );
         } else {
           setPredictions([]);
@@ -487,17 +539,21 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
 
             {predictions.length > 0 && (
               <div className="space-y-2">
-                {predictions.map((prediction) => (
+                {predictions.map((prediction, index) => (
                   <button
-                    key={prediction.placeId}
+                    key={prediction.placeId || `suggestion-${index}`}
                     onClick={() => handleSelectPrediction(prediction)}
                     className="w-full text-left p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-start gap-3">
                       <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div className="font-medium text-gray-900">{prediction.mainText}</div>
-                        <div className="text-sm text-gray-500">{prediction.secondaryText}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900">
+                          {prediction.mainText || prediction.description || "Unknown location"}
+                        </div>
+                        {prediction.secondaryText && (
+                          <div className="text-sm text-gray-500">{prediction.secondaryText}</div>
+                        )}
                       </div>
                     </div>
                   </button>
