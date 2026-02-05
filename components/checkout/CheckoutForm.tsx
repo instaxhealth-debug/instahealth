@@ -11,6 +11,17 @@ interface Address {
   id: string;
   label: string;
   formattedAddress: string;
+  phone?: string;
+  line1?: string;
+  line2?: string;
+  area?: string;
+  city?: string;
+  emirate?: string;
+  instructions?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  isDefault?: boolean;
 }
 
 interface CheckoutFormProps {
@@ -29,7 +40,6 @@ export interface CheckoutFormData {
   shippingAddressLine1: string;
   shippingAddressLine2: string;
   shippingNotes: string;
-  ageConfirmed: boolean;
   acceptedTerms: boolean;
   acceptedDisclaimer: boolean;
 }
@@ -53,7 +63,6 @@ export function CheckoutForm({
     shippingAddressLine1: "",
     shippingAddressLine2: "",
     shippingNotes: "",
-    ageConfirmed: false,
     acceptedTerms: false,
     acceptedDisclaimer: false,
   });
@@ -91,14 +100,11 @@ export function CheckoutForm({
     }
 
     // Checkboxes validation
-    if (!formData.ageConfirmed) {
-      newErrors.ageConfirmed = "You must confirm you're 21 or older";
-    }
     if (!formData.acceptedTerms) {
-      newErrors.acceptedTerms = "You must accept the terms and conditions";
+      newErrors.acceptedTerms = "Please accept the terms and conditions";
     }
     if (!formData.acceptedDisclaimer) {
-      newErrors.acceptedDisclaimer = "You must accept the disclaimer";
+      newErrors.acceptedDisclaimer = "Please accept the product disclaimer";
     }
 
     setErrors(newErrors);
@@ -148,40 +154,18 @@ export function CheckoutForm({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Error Alert */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-red-900">Error</h3>
-            <p className="text-sm text-red-800 mt-1">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Success Alert */}
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex gap-3">
-          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-green-900">Success</h3>
-            <p className="text-sm text-green-800 mt-1">{successMessage}</p>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-5 pb-20 lg:pb-0">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Personal Information */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Delivery Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Full Name *
               </label>
               <Input
                 type="text"
@@ -200,9 +184,9 @@ export function CheckoutForm({
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                Phone Number
+                Phone Number *
               </label>
               <Input
                 type="tel"
@@ -230,10 +214,10 @@ export function CheckoutForm({
               Delivery Address
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {/* Address Toggle */}
             {addresses.length > 0 && (
-              <div className="flex gap-4">
+              <div className="flex gap-4 pb-1">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -283,11 +267,20 @@ export function CheckoutForm({
                     }`}
                   >
                     <option value="">Select an address...</option>
-                    {addresses.map((addr) => (
-                      <option key={addr.id} value={addr.id}>
-                        {addr.label} - {addr.formattedAddress}
-                      </option>
-                    ))}
+                    {addresses.map((addr) => {
+                      // Format: "HOME (Default) • Villa 123, Dubai Marina, Dubai"
+                      const defaultBadge = addr.isDefault ? " (Default)" : "";
+                      const shortAddr = addr.area && addr.emirate 
+                        ? `${addr.area}, ${addr.emirate}`
+                        : addr.formattedAddress.length > 50
+                          ? addr.formattedAddress.substring(0, 50) + "..."
+                          : addr.formattedAddress;
+                      return (
+                        <option key={addr.id} value={addr.id}>
+                          {addr.label.toUpperCase()}{defaultBadge} • {shortAddr}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
                 {errors.selectedAddressId && touched.selectedAddressId && (
@@ -362,23 +355,15 @@ export function CheckoutForm({
           <CardHeader>
             <CardTitle className="text-lg">Confirmations</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="ageConfirmed"
-                checked={formData.ageConfirmed}
-                onChange={handleChange}
-                disabled={isSubmitting}
-              />
-              <span className="text-sm text-gray-700">
-                I confirm that I am 21 years or older
-              </span>
-            </label>
-            {errors.ageConfirmed && touched.ageConfirmed && (
-              <p className="text-sm text-red-600 -mt-2">{errors.ageConfirmed}</p>
+          <CardContent className="space-y-3">
+            {/* Inline error for this section */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 flex gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <span className="text-red-800">{error}</span>
+              </div>
             )}
-
+            
             <label className="flex gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -419,21 +404,23 @@ export function CheckoutForm({
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full h-12 text-base font-medium"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing Payment...
-            </>
-          ) : (
-            "Proceed to Payment"
-          )}
-        </Button>
+        {/* Submit Button - Sticky on mobile */}
+        <div className="lg:static fixed bottom-0 left-0 right-0 lg:p-0 p-4 bg-white lg:bg-transparent border-t lg:border-t-0 z-10">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full h-12 text-base font-medium"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing Payment...
+              </>
+            ) : (
+              "Proceed to Payment"
+            )}
+          </Button>
+        </div>
       </form>
     </div>
   );

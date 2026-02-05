@@ -52,9 +52,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate other required fields
-    if (!locationId || !shippingName || !shippingPhone || !shippingAddressLine1) {
+    if (!shippingName || !shippingPhone || !shippingAddressLine1) {
       return NextResponse.json(
-        { error: 'Missing required fields: locationId, shippingName, shippingPhone, shippingAddressLine1' },
+        { error: 'Missing required fields: name, phone, and address' },
         { status: 400 }
       );
     }

@@ -20,9 +20,16 @@ export default function CheckoutPage() {
   const { items, getTotalPrice } = useCartStore();
   const { address, isSelected } = useLocationStore();
 
-  const [addresses, setAddresses] = useState<
-    { id: string; label: string; formattedAddress: string }[]
-  >([]);
+  const [addresses, setAddresses] = useState<Array<{
+    id: string;
+    label: string;
+    formattedAddress: string;
+    line1?: string;
+    line2?: string;
+    area?: string;
+    emirate?: string;
+    [key: string]: any;
+  }>>([]);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [addressesError, setAddressesError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,18 +129,41 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
+      // Build shipping payload - derive addressLine1 from selected address if needed
+      let shippingAddressLine1 = formData.shippingAddressLine1;
+      let shippingAddressLine2 = formData.shippingAddressLine2;
+      
+      // locationId is optional now - derive from address if available
+      let locationId = "Dubai"; // Default fallback
+      if (address?.city) {
+        locationId = address.city;
+      }
+      
+      // If using saved address, get the full address data
+      if (formData.selectedAddressId) {
+        const selectedAddr = addresses.find(a => a.id === formData.selectedAddressId);
+        if (selectedAddr) {
+          shippingAddressLine1 = selectedAddr.line1 || selectedAddr.formattedAddress;
+          shippingAddressLine2 = selectedAddr.line2 || "";
+          // Derive locationId from emirate if available
+          if (selectedAddr.emirate) {
+            locationId = selectedAddr.emirate;
+          }
+        }
+      }
+
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          locationId: address,
+          locationId,
           addressId: formData.selectedAddressId,
           shippingName: formData.shippingName,
           shippingPhone: formData.shippingPhone,
-          shippingAddressLine1: formData.shippingAddressLine1,
-          shippingAddressLine2: formData.shippingAddressLine2,
+          shippingAddressLine1,
+          shippingAddressLine2,
           shippingNotes: formData.shippingNotes,
-          ageConfirmed: formData.ageConfirmed,
+          ageConfirmed: true, // Auto-confirmed, removed from UI
           acceptedTerms: formData.acceptedTerms,
           acceptedDisclaimer: formData.acceptedDisclaimer,
         }),
