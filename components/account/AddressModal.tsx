@@ -139,7 +139,7 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
     }
   }, [editingAddress, isOpen]);
 
-  // Debounced search
+  // Debounced search (using new Places Autocomplete API)
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 3 || mode !== "search") {
       setPredictions([]);
@@ -148,37 +148,45 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
 
     const timer = setTimeout(async () => {
       setIsSearching(true);
+      setError(null);
       try {
         await loadGoogleMaps();
-        const service = new google.maps.places.AutocompleteService();
         
-        service.getPlacePredictions(
-          {
-            input: searchQuery,
-            componentRestrictions: { country: "ae" },
-            types: ["address"],
-          },
-          (results: any, status: any) => {
-            if (status === "OK" && results) {
-              setPredictions(
-                results.map((r: any) => ({
-                  placeId: r.place_id,
-                  description: r.description,
-                  mainText: r.structured_formatting.main_text,
-                  secondaryText: r.structured_formatting.secondary_text || "",
-                }))
-              );
-            } else {
-              setPredictions([]);
-            }
-            setIsSearching(false);
-          }
-        );
-      } catch (err) {
-        console.error("[Search] Error:", err);
+        // Use new AutocompleteSuggestion API
+        const request = {
+          input: searchQuery,
+          includedRegionCodes: ["AE"],
+          language: "en",
+        };
+
+        const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        
+        if (suggestions && suggestions.length > 0) {
+          setPredictions(
+            suggestions.map((suggestion: any) => ({
+              placeId: suggestion.placePrediction?.placeId || "",
+              description: suggestion.placePrediction?.text?.text || "",
+              mainText: suggestion.placePrediction?.structuredFormat?.mainText?.text || "",
+              secondaryText: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || "",
+            }))
+          );
+        } else {
+          setPredictions([]);
+        }
+        setIsSearching(false);
+      } catch (err: any) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Search] Autocomplete fetch failed:", {
+            name: err?.name,
+            code: err?.code,
+            message: err?.message,
+          });
+        }
+        setError("Address search temporarily unavailable. You can still set location on map.");
+        setPredictions([]);
         setIsSearching(false);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery, mode]);
@@ -266,7 +274,7 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
     }
   };
 
-  // Handle prediction selection
+  // Handle prediction selection (using new Places API)
   const handleSelectPrediction = async (prediction: PlacePrediction) => {
     setIsLoading(true);
     setError(null);
@@ -274,63 +282,72 @@ export function AddressModal({ isOpen, onClose, onSave, editingAddress }: Addres
     try {
       await loadGoogleMaps();
       
-      // Create a temporary map element for PlacesService
-      const tempDiv = document.createElement("div");
-      const tempMap = new google.maps.Map(tempDiv);
-      const service = new google.maps.places.PlacesService(tempMap);
+      // Use new Place API to fetch place details
+      const { Place } = await google.maps.importLibrary("places") as any;
+      
+      const place = new Place({
+        id: prediction.placeId,
+      });
 
-      service.getDetails(
-        {
-          placeId: prediction.placeId,
-          fields: ["geometry", "formatted_address", "address_components", "place_id"],
-        },
-        (place: any, status: any) => {
-          if (status === "OK" && place?.geometry?.location) {
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
+      // Fetch fields we need
+      await place.fetchFields({
+        fields: ["location", "formattedAddress", "addressComponents"],
+      });
 
-            let city: string | undefined;
-            let area: string | undefined;
-            let emirate: string | undefined;
+      if (place.location) {
+        const lat = place.location.lat();
+        const lng = place.location.lng();
 
-            place.address_components?.forEach((component: any) => {
-              if (component.types.includes("locality")) {
-                city = component.long_name;
-              }
-              if (component.types.includes("sublocality") || component.types.includes("neighborhood")) {
-                area = component.long_name;
-              }
-              if (component.types.includes("administrative_area_level_1")) {
-                emirate = component.long_name;
-              }
-            });
+        let city: string | undefined;
+        let area: string | undefined;
+        let emirate: string | undefined;
 
-            setSelectedLocation({
-              lat,
-              lng,
-              formattedAddress: place.formatted_address || prediction.description,
-              placeId: place.place_id || prediction.placeId,
-              city,
-              area,
-              emirate,
-            });
-
-            setMode("map");
-            setIsLoading(false);
-
-            // Initialize map in next tick
-            setTimeout(() => {
-              initializeMap(lat, lng);
-            }, 100);
-          } else {
-            setError("Failed to get place details");
-            setIsLoading(false);
-          }
+        // Parse address components
+        if (place.addressComponents) {
+          place.addressComponents.forEach((component: any) => {
+            const types = component.types || [];
+            if (types.includes("locality")) {
+              city = component.longText;
+            }
+            if (types.includes("sublocality") || types.includes("neighborhood")) {
+              area = component.longText;
+            }
+            if (types.includes("administrative_area_level_1")) {
+              emirate = component.longText;
+            }
+          });
         }
-      );
-    } catch (err) {
-      console.error("[SelectPrediction] Error:", err);
-      setError("Failed to select location");
+
+        setSelectedLocation({
+          lat,
+          lng,
+          formattedAddress: place.formattedAddress || prediction.description,
+          placeId: prediction.placeId,
+          city,
+          area,
+          emirate,
+        });
+
+        setMode("map");
+        setIsLoading(false);
+
+        // Initialize map in next tick
+        setTimeout(() => {
+          initializeMap(lat, lng);
+        }, 100);
+      } else {
+        setError("Failed to get place location");
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[SelectPrediction] Place fetch failed:", {
+          name: err?.name,
+          code: err?.code,
+          message: err?.message,
+        });
+      }
+      setError("Failed to select location. Please try setting location on map.");
       setIsLoading(false);
     }
   };
