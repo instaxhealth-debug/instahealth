@@ -22,7 +22,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await addItem(product.id, product.id, 1);
+      if (process.env.NEXT_PUBLIC_DEBUG_CART === "true") {
+        console.log("[CART:PRODUCT_CARD] Adding item:", { productId: product.id, variantId: undefined, qty: 1 });
+      }
+      await addItem(product.id, undefined, 1);
       toast({
         title: "Added to cart",
         description: `${product.name} added to your cart`,

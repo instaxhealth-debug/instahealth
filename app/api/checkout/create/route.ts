@@ -194,6 +194,7 @@ export async function POST(req: NextRequest) {
       });
     }
     
+    // FIX: Ensure cart has items before proceeding
     if (!cartData || cartData.items.length === 0) {
       if (DEBUG) {
         // Debug: Check if cart exists in DB

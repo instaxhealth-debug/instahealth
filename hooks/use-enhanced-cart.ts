@@ -93,22 +93,37 @@ export function useEnhancedCart() {
   // Add item to cart (local for guests, DB for logged-in)
   const addItem = useCallback(
     async (productId: string, variantId: string | undefined, quantity: number = 1) => {
+      const DEBUG = process.env.NEXT_PUBLIC_DEBUG_CART === "true";
+      if (DEBUG) console.log("[CART:ADD] Starting addItem", { productId, variantId, quantity, status, userId: session?.user?.id });
+      
       if (status === "authenticated" && session?.user?.id) {
         // Add to DB cart
+        if (DEBUG) console.log("[CART:ADD] User authenticated, posting to /api/cart");
         setIsLoading(true);
         try {
+          const payload = { productId, variantId, quantity, action: "add" };
+          if (DEBUG) console.log("[CART:ADD] Request payload:", payload);
+          
           const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, variantId, quantity, action: "add" }),
+            body: JSON.stringify(payload),
           });
 
+          if (DEBUG) console.log("[CART:ADD] Response status:", res.status);
+          
           if (res.ok) {
             const cart = await res.json();
+            if (DEBUG) console.log("[CART:ADD] Cart updated:", { itemCount: cart.items?.length, cartId: cart.id });
             setDBCart(cart);
+          } else {
+            const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+            console.error("[CART:ADD] API error:", res.status, errorData);
+            throw new Error(errorData.error || "Failed to add to cart");
           }
         } catch (error) {
-          console.error("[ADD TO CART]", error);
+          console.error("[ADD TO CART] Error:", error);
+          throw error;
         }
         setIsLoading(false);
       } else {
@@ -131,21 +146,35 @@ export function useEnhancedCart() {
   // Remove item from cart
   const removeItem = useCallback(
     async (productId: string, variantId: string | undefined) => {
+      const DEBUG = process.env.NEXT_PUBLIC_DEBUG_CART === "true";
+      if (DEBUG) console.log("[CART:REMOVE] Starting removeItem", { productId, variantId, userId: session?.user?.id });
+      
       if (status === "authenticated" && session?.user?.id) {
         setIsLoading(true);
         try {
+          const payload = { productId, variantId, quantity: 0, action: "remove" };
+          if (DEBUG) console.log("[CART:REMOVE] Request payload:", payload);
+          
           const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, variantId, quantity: 0, action: "remove" }),
+            body: JSON.stringify(payload),
           });
 
+          if (DEBUG) console.log("[CART:REMOVE] Response status:", res.status);
+          
           if (res.ok) {
             const cart = await res.json();
+            if (DEBUG) console.log("[CART:REMOVE] Cart updated:", { itemCount: cart.items?.length, cartId: cart.id });
             setDBCart(cart);
+          } else {
+            const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+            console.error("[CART:REMOVE] API error:", res.status, errorData);
+            throw new Error(errorData.error || "Failed to remove item");
           }
         } catch (error) {
-          console.error("[REMOVE FROM CART]", error);
+          console.error("[REMOVE FROM CART] Error:", error);
+          throw error;
         }
         setIsLoading(false);
       } else {
@@ -158,21 +187,35 @@ export function useEnhancedCart() {
   // Update item quantity
   const updateQuantity = useCallback(
     async (productId: string, variantId: string | undefined, quantity: number) => {
+      const DEBUG = process.env.NEXT_PUBLIC_DEBUG_CART === "true";
+      if (DEBUG) console.log("[CART:UPDATE] Starting updateQuantity", { productId, variantId, quantity, userId: session?.user?.id });
+      
       if (status === "authenticated" && session?.user?.id) {
         setIsLoading(true);
         try {
+          const payload = { productId, variantId, quantity, action: "update" };
+          if (DEBUG) console.log("[CART:UPDATE] Request payload:", payload);
+          
           const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, variantId, quantity, action: "update" }),
+            body: JSON.stringify(payload),
           });
 
+          if (DEBUG) console.log("[CART:UPDATE] Response status:", res.status);
+          
           if (res.ok) {
             const cart = await res.json();
+            if (DEBUG) console.log("[CART:UPDATE] Cart updated:", { itemCount: cart.items?.length, cartId: cart.id });
             setDBCart(cart);
+          } else {
+            const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+            console.error("[CART:UPDATE] API error:", res.status, errorData);
+            throw new Error(errorData.error || "Failed to update quantity");
           }
         } catch (error) {
-          console.error("[UPDATE QUANTITY]", error);
+          console.error("[UPDATE QUANTITY] Error:", error);
+          throw error;
         }
         setIsLoading(false);
       } else {

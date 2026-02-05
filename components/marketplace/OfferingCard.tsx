@@ -23,25 +23,14 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
     e.preventDefault();
     e.stopPropagation();
     
-    if (offering.type === "product") {
-      try {
-        await addItem(
-          offering.id,
-          offering.shopifyVariantId || offering.id,
-          1
-        );
-        toast({
-          title: "Added to cart",
-          description: `${offering.name} added to your cart`,
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to add item to cart",
-          variant: "destructive",
-        });
-      }
+    if (process.env.NEXT_PUBLIC_DEBUG_CART === "true") {
+      console.warn("[CART:OFFERING_CARD] Cart not supported - OfferingCard uses mock IDs. Use ProductCard instead.");
     }
+    toast({
+      title: "Coming soon",
+      description: "Shopping will be available soon. Visit the shop to add items to your cart.",
+      variant: "default",
+    });
   };
 
   const getRoute = () => {

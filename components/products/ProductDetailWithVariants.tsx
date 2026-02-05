@@ -40,9 +40,12 @@ export function ProductDetailWithVariants({ product }: ProductDetailWithVariants
       return;
     }
 
-    const variantId = hasVariants ? selectedVariantId! : product.id;
+    const variantId = hasVariants ? selectedVariantId! : undefined;
 
     try {
+      if (process.env.NEXT_PUBLIC_DEBUG_CART === "true") {
+        console.log("[CART:PRODUCT_DETAIL] Adding item:", { productId: product.id, variantId, hasVariants, qty: quantity });
+      }
       await addItem(product.id, variantId, quantity);
       toast({
         title: "Added to cart",

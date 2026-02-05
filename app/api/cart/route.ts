@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+  const DEBUG = process.env.DEBUG_CART === "true";
   try {
     const session = await auth();
 
@@ -32,7 +33,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(cart);
+    // FIX: Filter out ghost items (items with null product or orphaned variants)
+    const validItems = cart.items.filter(item => {
+      const isGhost = !item.product || (item.variantId && !item.variant);
+      if (isGhost && DEBUG) {
+        console.log("[API:CART:GET] Dropped ghost item:", { itemId: item.id, productId: item.productId, variantId: item.variantId });
+      }
+      return !isGhost;
+    });
+    
+    if (DEBUG && validItems.length < cart.items.length) {
+      console.log("[API:CART:GET] Filtered ghost items:", { total: cart.items.length, valid: validItems.length, dropped: cart.items.length - validItems.length });
+    }
+
+    return NextResponse.json({ ...cart, items: validItems });
   } catch (error) {
     console.error("[CART GET]", error);
     return NextResponse.json(
@@ -43,10 +57,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const DEBUG = process.env.DEBUG_CART === "true";
   try {
     const session = await auth();
 
+    if (DEBUG) console.log("[API:CART:POST] Session:", session?.user?.email ? "✓ Authenticated" : "✗ No session");
+
     if (!session?.user?.id) {
+      if (DEBUG) console.log("[API:CART:POST] ✗ Rejected: No authenticated session");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -54,15 +72,45 @@ export async function POST(req: NextRequest) {
     }
 
     const { productId, variantId, quantity, action } = await req.json();
+    // FIX: Normalize variantId to undefined (not null) for consistency
+    const normalizedVariantId = variantId === undefined || variantId === null || variantId === "" ? undefined : variantId;
+    
+    if (DEBUG) console.log("[API:CART:POST] Request:", { userId: session.user.id, productId, normalizedVariantId, quantity, action });
 
     if (!productId) {
+      if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: productId missing");
       return NextResponse.json(
-        { error: "productId is required" },
+        { error: "productId is required", code: "INVALID_PRODUCT" },
         { status: 400 }
       );
     }
+    
+    // FIX: Validate product exists before attempting add/update
+    if (action !== "remove") {
+      const product = await prisma.product.findUnique({ where: { id: productId } });
+      if (!product) {
+        if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: product not found", productId);
+        return NextResponse.json(
+          { error: "Product not found", code: "INVALID_PRODUCT" },
+          { status: 400 }
+        );
+      }
+      
+      // FIX: If variantId provided, validate it exists and belongs to this product
+      if (normalizedVariantId) {
+        const variant = await prisma.productVariant.findUnique({ where: { id: normalizedVariantId } });
+        if (!variant || variant.productId !== productId) {
+          if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: variant not found or doesn't belong to product", { variantId: normalizedVariantId, productId });
+          return NextResponse.json(
+            { error: "Variant not found or invalid", code: "INVALID_VARIANT" },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     if (action !== "remove" && quantity === undefined) {
+      if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: quantity required for action", action);
       return NextResponse.json(
         { error: "quantity is required for add/update actions" },
         { status: 400 }
@@ -75,6 +123,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!cart) {
+      if (DEBUG) console.log("[API:CART:POST] Creating new cart for user:", session.user.id);
       cart = await prisma.cart.create({
         data: {
           userId: session.user.id,
@@ -82,35 +131,42 @@ export async function POST(req: NextRequest) {
         },
         include: { items: true },
       });
+      if (DEBUG) console.log("[API:CART:POST] ✓ Cart created:", cart.id);
+    } else {
+      if (DEBUG) console.log("[API:CART:POST] ✓ Found existing cart:", cart.id, "items:", cart.items.length);
     }
 
     if (action === "remove") {
-      await prisma.cartItem.deleteMany({
+      // FIX: Use null consistently for variantId in queries (schema stores null, not undefined)
+      const deleted = await prisma.cartItem.deleteMany({
         where: {
           cartId: cart.id,
           productId,
-          variantId: variantId || null,
+          variantId: normalizedVariantId ?? null,
         },
       });
+      if (DEBUG) console.log("[API:CART:POST] Removed items:", deleted.count);
     } else if (action === "update") {
       // Update quantity (or remove if quantity <= 0)
       if (quantity <= 0) {
-        await prisma.cartItem.deleteMany({
+        const deleted = await prisma.cartItem.deleteMany({
           where: {
             cartId: cart.id,
             productId,
-            variantId: variantId || null,
+            variantId: normalizedVariantId ?? null,
           },
         });
+        if (DEBUG) console.log("[API:CART:POST] Deleted (qty<=0):", deleted.count);
       } else {
-        await prisma.cartItem.updateMany({
+        const updated = await prisma.cartItem.updateMany({
           where: {
             cartId: cart.id,
             productId,
-            variantId: variantId || null,
+            variantId: normalizedVariantId ?? null,
           },
           data: { quantity },
         });
+        if (DEBUG) console.log("[API:CART:POST] Updated qty:", updated.count);
       }
     } else {
       // action === "add" or default (add/merge behavior)
@@ -118,32 +174,34 @@ export async function POST(req: NextRequest) {
         where: {
           cartId: cart.id,
           productId,
-          variantId: variantId || null,
+          variantId: normalizedVariantId ?? null,
         },
       });
 
       if (existingItem) {
         // Merge with existing: add to quantity
+        if (DEBUG) console.log("[API:CART:POST] Merging with existing item:", existingItem.id, "qty+", quantity);
         await prisma.cartItem.update({
           where: { id: existingItem.id },
           data: { quantity: existingItem.quantity + quantity },
         });
       } else {
-        // Fetch product to store price snapshot
+        // Fetch product to store price snapshot (already validated above)
         const product = await prisma.product.findUnique({
           where: { id: productId },
           include: { variants: true },
         });
 
-        const variant = variantId
-          ? product?.variants.find((v) => v.id === variantId)
+        const variant = normalizedVariantId
+          ? product?.variants.find((v) => v.id === normalizedVariantId)
           : null;
 
+        if (DEBUG) console.log("[API:CART:POST] Creating new item:", { productId, variantId: normalizedVariantId, qty: quantity });
         await prisma.cartItem.create({
           data: {
             cartId: cart.id,
             productId,
-            variantId: variantId || null,
+            variantId: normalizedVariantId ?? null,
             quantity,
             unitPriceFils: variant?.priceFils || product?.priceFils || 0,
           },
@@ -163,6 +221,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    if (DEBUG) console.log("[API:CART:POST] ✓ Returning cart:", { cartId: updatedCart?.id, itemCount: updatedCart?.items.length });
     return NextResponse.json(updatedCart);
   } catch (error) {
     console.error("[CART POST]", error);
