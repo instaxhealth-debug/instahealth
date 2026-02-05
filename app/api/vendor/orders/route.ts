@@ -11,7 +11,7 @@ export const revalidate = 0;
  * List all vendor orders for the authenticated vendor.
  * Vendor ID comes from authenticated session ONLY (no x-vendor-id header).
  *
- * Query params: ?status=PENDING_ACCEPTANCE&limit=50&offset=0
+ * Query params: ?status=READY_FOR_FULFILLMENT&limit=50&offset=0
  */
 export async function GET(req: NextRequest) {
   try {

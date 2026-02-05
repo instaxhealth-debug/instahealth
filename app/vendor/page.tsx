@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import VendorOrdersClient from './VendorOrdersClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ export default async function VendorDashboard() {
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1>Vendor Dashboard</h1>
         <form
@@ -104,28 +105,8 @@ export default async function VendorDashboard() {
         </p>
       </div>
 
-      {/* Foundation Status */}
-      <div style={{ border: '1px solid #ddd', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-        <h2>Authentication Foundation Status</h2>
-        <p style={{ margin: '0 0 10px 0' }}>✅ Email + password authentication</p>
-        <p style={{ margin: '0 0 10px 0' }}>✅ Session-based (NextAuth)</p>
-        <p style={{ margin: '0 0 10px 0' }}>✅ VendorId derived from session → userId → vendor lookup</p>
-        <p style={{ margin: '0 0 10px 0' }}>✅ No header-based vendor ID spoofing</p>
-        <p style={{ margin: '0 0 10px 0' }}>✅ Protected route with role=VENDOR check</p>
-        <p style={{ margin: '0 0 10px 0' }}>
-          ⏳ <strong>Coming Soon:</strong> Order management, product management, vendor dashboard UI
-        </p>
-      </div>
-
-      {/* Available Endpoints (for reference) */}
-      <div style={{ marginTop: '20px', padding: '10px', backgroundColor: '#f0f0f0', fontSize: '12px', borderRadius: '4px' }}>
-        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Available API Endpoints:</p>
-        <p style={{ margin: '0 0 5px 0' }}>GET /api/vendor/orders - List vendor orders</p>
-        <p style={{ margin: '0 0 5px 0' }}>GET /api/vendor/orders/[id]/details - Get order details</p>
-        <p style={{ margin: '0 0 5px 0' }}>POST /api/vendor/orders/[id]/accept - Accept order</p>
-        <p style={{ margin: '0 0 5px 0' }}>POST /api/vendor/orders/[id]/reject - Reject order</p>
-        <p style={{ margin: '0 0 5px 0' }}>POST /api/vendor/orders/[id]/cancel - Cancel order</p>
-        <p style={{ margin: '0' }}>POST /api/vendor/orders/[id]/update-status - Update order status</p>
+      <div style={{ marginTop: '20px' }}>
+        <VendorOrdersClient />
       </div>
     </div>
   );

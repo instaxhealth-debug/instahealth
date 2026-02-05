@@ -4,7 +4,7 @@
  * Should run every 1-5 minutes via cron or API endpoint
  *
  * IDEMPOTENT: Safe to run multiple times. Only updates orders with
- * status = PENDING_ACCEPTANCE and acceptBy < now.
+ * status = READY_FOR_FULFILLMENT and acceptBy < now.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -25,7 +25,7 @@ export interface SLAEnforcementResult {
  * This is idempotent - running multiple times is safe
  *
  * Concurrency safe: Uses WHERE guard to only update
- * PENDING_ACCEPTANCE orders with acceptBy < now
+ * READY_FOR_FULFILLMENT orders with acceptBy < now
  */
 export async function enforceSLA(): Promise<SLAEnforcementResult> {
   const result: SLAEnforcementResult = {
@@ -36,11 +36,11 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
   };
 
   try {
-    // Find all pending acceptance vendor orders where acceptBy < now
+    // Find all ready-for-fulfillment vendor orders where acceptBy < now
     // This query is safe to run multiple times (only finds expired)
     const expiredVendorOrders = await prisma.vendorOrder.findMany({
       where: {
-        status: 'PENDING_ACCEPTANCE',
+        status: 'READY_FOR_FULFILLMENT',
         acceptBy: {
           lt: new Date(),
         },
@@ -60,12 +60,12 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
 
     for (const vendorOrder of expiredVendorOrders) {
       try {
-        // Update with WHERE guard to ensure still PENDING_ACCEPTANCE
+        // Update with WHERE guard to ensure still READY_FOR_FULFILLMENT
         // (prevents race if another process already updated it)
         const updated = await prisma.vendorOrder.updateMany({
           where: {
             id: vendorOrder.id,
-            status: 'PENDING_ACCEPTANCE', // Guard: only update if still pending
+            status: 'READY_FOR_FULFILLMENT', // Guard: only update if still ready
             acceptBy: {
               lt: new Date(),
             },
@@ -175,12 +175,12 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
 }
 
 /**
- * Get current SLA status for all pending acceptance vendor orders
+ * Get current SLA status for all ready-for-fulfillment vendor orders
  */
 export async function getSLAStatus() {
   const pendingOrders = await prisma.vendorOrder.findMany({
     where: {
-      status: 'PENDING_ACCEPTANCE',
+      status: 'READY_FOR_FULFILLMENT',
     },
     include: {
       vendor: true,

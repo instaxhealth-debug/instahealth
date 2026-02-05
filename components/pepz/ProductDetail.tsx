@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShoppingCart, Package, Truck } from "lucide-react";
-import { useCartStore } from "@/lib/store/cart-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useLocationStore } from "@/lib/store/location-store";
 import { useToast } from "@/hooks/use-toast";
 // Shopify removed - This component replaced by ProductDetailWithVariants
@@ -19,7 +19,7 @@ export function ProductDetail({ slug }: ProductDetailProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const { addItem } = useCartStore();
+  const { addItem } = useEnhancedCart();
   const { address } = useLocationStore();
   const { toast } = useToast();
 
@@ -67,20 +67,36 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     fetchProduct();
   }, [slug]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-    addItem(product, product.shopifyVariantId, quantity);
-    toast({
-      title: "Added to cart",
-      description: `${quantity} x ${product.name} added to your cart`,
-    });
+    try {
+      await addItem(product.id, product.shopifyVariantId, quantity);
+      toast({
+        title: "Added to cart",
+        description: `${quantity} x ${product.name} added to your cart`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!product) return;
     // Add to cart first, then redirect
-    addItem(product, product.shopifyVariantId, quantity);
-    window.location.href = `/checkout?product=${product.id}&quantity=${quantity}`;
+    try {
+      await addItem(product.id, product.shopifyVariantId, quantity);
+      window.location.href = `/checkout?product=${product.id}&quantity=${quantity}`;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {

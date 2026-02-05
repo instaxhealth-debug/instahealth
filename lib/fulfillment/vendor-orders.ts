@@ -9,10 +9,13 @@ import { ActorType, VendorOrderStatus } from '@prisma/client';
 import { issueVendorOrderRefund } from '@/lib/payments/refunds';
 
 /**
- * Create vendor orders from a confirmed order
- * Called after Stripe webhook confirms payment
+ * Create vendor orders from an order
+ * Used for pre-payment (NEW) and post-payment (READY_FOR_FULFILLMENT)
  */
-export async function createVendorOrders(orderId: string) {
+export async function createVendorOrders(
+  orderId: string,
+  status: VendorOrderStatus = 'READY_FOR_FULFILLMENT'
+) {
   try {
     // Get order with items grouped by vendor
     const order = await prisma.order.findUnique({
@@ -30,8 +33,19 @@ export async function createVendorOrders(orderId: string) {
       throw new Error(`Order ${orderId} not found`);
     }
 
-    if (order.status !== 'PAID') {
-      throw new Error(`Order ${orderId} is not in PAID status, cannot create vendor orders`);
+    if (!['PENDING_PAYMENT', 'PAID', 'FULFILLING', 'FULFILLED'].includes(order.status)) {
+      throw new Error(`Order ${orderId} is not in a valid state to create vendor orders`);
+    }
+
+    // If vendor orders already exist, return them (idempotent)
+    const existing = await prisma.vendorOrder.findFirst({
+      where: { orderId },
+    });
+    if (existing) {
+      return await prisma.vendorOrder.findMany({
+        where: { orderId },
+        include: { items: true },
+      });
     }
 
     // Group items by vendor
@@ -48,11 +62,15 @@ export async function createVendorOrders(orderId: string) {
     const acceptByTime = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
     for (const [vendorId, items] of Object.entries(itemsByVendor)) {
+      const subtotalFils = items.reduce((sum, item) => sum + item.lineTotalFils, 0);
+
       const vendorOrder = await prisma.vendorOrder.create({
         data: {
           orderId,
           vendorId,
-          status: 'PENDING_ACCEPTANCE',
+          status,
+          subtotalFils,
+          totalFils: subtotalFils,
           acceptBy: acceptByTime,
           notesToVendor: `Please accept or reject this order within ${15} minutes.`,
         },
@@ -89,23 +107,13 @@ export async function createVendorOrders(orderId: string) {
       createdVendorOrders.push(vendorOrder);
     }
 
-    // Update parent order status to FULFILLING (payment is done, waiting on vendors)
-    await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'FULFILLING',
-      },
-    });
-
-    // Log order transition
+    // Log order creation event
     await logOrderEvent({
       orderId,
       actorType: ActorType.SYSTEM,
-      eventType: 'ORDER_STATUS_CHANGED',
+      eventType: 'VENDOR_ORDER_CREATED',
       data: {
-        from: 'PAID',
-        to: 'FULFILLING',
-        reason: 'Vendor orders created, awaiting acceptance',
+        status,
         vendorOrderCount: createdVendorOrders.length,
       },
     });
@@ -140,9 +148,9 @@ export async function acceptVendorOrder(vendorOrderId: string, vendorId: string)
       throw new Error(`Vendor ${vendorId} does not own VendorOrder ${vendorOrderId}`);
     }
 
-    // Verify status is PENDING_ACCEPTANCE
-    if (vendorOrder.status !== 'PENDING_ACCEPTANCE') {
-      throw new Error(`VendorOrder ${vendorOrderId} is not in PENDING_ACCEPTANCE status (current: ${vendorOrder.status})`);
+    // Verify status is READY_FOR_FULFILLMENT
+    if (vendorOrder.status !== 'READY_FOR_FULFILLMENT') {
+      throw new Error(`VendorOrder ${vendorOrderId} is not in READY_FOR_FULFILLMENT status (current: ${vendorOrder.status})`);
     }
 
     // Verify acceptBy deadline not passed
@@ -224,8 +232,8 @@ export async function rejectVendorOrder(
       throw new Error(`Vendor ${vendorId} does not own VendorOrder ${vendorOrderId}`);
     }
 
-    // Can only reject if PENDING_ACCEPTANCE or ACCEPTED
-    if (vendorOrder.status !== 'PENDING_ACCEPTANCE' && vendorOrder.status !== 'ACCEPTED') {
+    // Can only reject if READY_FOR_FULFILLMENT
+    if (vendorOrder.status !== 'READY_FOR_FULFILLMENT') {
       throw new Error(
         `Cannot reject VendorOrder ${vendorOrderId} with status ${vendorOrder.status}`
       );
@@ -289,7 +297,7 @@ export async function rejectVendorOrder(
 }
 
 /**
- * Update vendor order status (PREPARING → OUT_FOR_DELIVERY → DELIVERED)
+ * Update vendor order status (READY_FOR_FULFILLMENT → ACCEPTED → IN_PROGRESS → COMPLETED)
  */
 export async function updateVendorOrderStatus(
   vendorOrderId: string,
@@ -316,14 +324,13 @@ export async function updateVendorOrderStatus(
 
     // Validate status transition
     const validTransitions: Record<VendorOrderStatus, VendorOrderStatus[]> = {
-      PENDING_ACCEPTANCE: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
-      ACCEPTED: ['PREPARING', 'CANCELLED_BY_VENDOR', 'CANCELLED'],
+      NEW: ['READY_FOR_FULFILLMENT', 'CANCELLED'],
+      READY_FOR_FULFILLMENT: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
+      ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
+      IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+      COMPLETED: [],
       REJECTED: [],
-      PREPARING: ['OUT_FOR_DELIVERY', 'CANCELLED_BY_VENDOR', 'CANCELLED'],
-      OUT_FOR_DELIVERY: ['DELIVERED', 'CANCELLED_BY_VENDOR', 'CANCELLED'],
-      DELIVERED: [],
       CANCELLED: [],
-      CANCELLED_BY_VENDOR: [],
       FAILED: [],
     };
 
@@ -339,8 +346,8 @@ export async function updateVendorOrderStatus(
       status: newStatus,
     };
 
-    // Set fulfilled timestamp if delivering
-    if (newStatus === 'DELIVERED') {
+    // Set fulfilled timestamp if completed
+    if (newStatus === 'COMPLETED') {
       dataToUpdate.fulfilledAt = new Date();
     }
 
@@ -372,7 +379,7 @@ export async function updateVendorOrderStatus(
     });
 
     // Check if all vendor orders are fulfilled
-    if (newStatus === 'DELIVERED') {
+    if (newStatus === 'COMPLETED') {
       await checkAndUpdateParentOrderStatus(vendorOrder.orderId);
     }
 
@@ -403,13 +410,13 @@ async function checkAndUpdateParentOrderStatus(orderId: string) {
 
     // Check if all are in terminal state
     const allFulfilled = vendorOrders.every(
-      (vo) => vo.status === 'DELIVERED' || vo.status === 'CANCELLED' || vo.status === 'REJECTED'
+      (vo) => vo.status === 'COMPLETED' || vo.status === 'CANCELLED' || vo.status === 'REJECTED'
     );
 
     if (allFulfilled) {
       // Determine final order status
       const hasRejected = vendorOrders.some((vo) => vo.status === 'REJECTED');
-      const hasDelivered = vendorOrders.some((vo) => vo.status === 'DELIVERED');
+      const hasDelivered = vendorOrders.some((vo) => vo.status === 'COMPLETED');
 
       let finalStatus = 'FULFILLED';
       if (hasRejected && hasDelivered) {

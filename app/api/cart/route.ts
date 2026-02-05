@@ -55,9 +55,16 @@ export async function POST(req: NextRequest) {
 
     const { productId, variantId, quantity, action } = await req.json();
 
-    if (!productId || !quantity) {
+    if (!productId) {
       return NextResponse.json(
-        { error: "productId and quantity are required" },
+        { error: "productId is required" },
+        { status: 400 }
+      );
+    }
+
+    if (action !== "remove" && quantity === undefined) {
+      return NextResponse.json(
+        { error: "quantity is required for add/update actions" },
         { status: 400 }
       );
     }
@@ -85,7 +92,28 @@ export async function POST(req: NextRequest) {
           variantId: variantId || null,
         },
       });
+    } else if (action === "update") {
+      // Update quantity (or remove if quantity <= 0)
+      if (quantity <= 0) {
+        await prisma.cartItem.deleteMany({
+          where: {
+            cartId: cart.id,
+            productId,
+            variantId: variantId || null,
+          },
+        });
+      } else {
+        await prisma.cartItem.updateMany({
+          where: {
+            cartId: cart.id,
+            productId,
+            variantId: variantId || null,
+          },
+          data: { quantity },
+        });
+      }
     } else {
+      // action === "add" or default (add/merge behavior)
       const existingItem = await prisma.cartItem.findFirst({
         where: {
           cartId: cart.id,
@@ -95,9 +123,10 @@ export async function POST(req: NextRequest) {
       });
 
       if (existingItem) {
+        // Merge with existing: add to quantity
         await prisma.cartItem.update({
           where: { id: existingItem.id },
-          data: { quantity: quantity },
+          data: { quantity: existingItem.quantity + quantity },
         });
       } else {
         // Fetch product to store price snapshot

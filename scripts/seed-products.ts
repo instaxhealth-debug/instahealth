@@ -20,7 +20,8 @@ async function main() {
   const dubai = locations.find((l) => l.slug === "dubai")!;
   const abuDhabi = locations.find((l) => l.slug === "abu-dhabi")!;
   const instapepz = vendors.find((v) => v.slug === "instapepz")!;
-  const medipro = vendors.find((v) => v.slug === "medipro")!;
+  const alZahraLabs = vendors.find((v) => v.slug === "al-zahra-labs")!;
+  const ivDripsDubai = vendors.find((v) => v.slug === "iv-drips-dubai")!;
 
   const products = [
     // Peptides (InstaPepz)
@@ -42,9 +43,9 @@ async function main() {
       isGlobal: true,
       locationIds: [],
     },
-    // Blood Tests (MediPro)
+    // Blood Tests (Al Zahra Labs)
     {
-      vendorId: medipro.id,
+      vendorId: alZahraLabs.id,
       name: "Comprehensive Blood Panel",
       slug: "comprehensive-blood-panel",
       category: "blood-tests",
@@ -52,9 +53,9 @@ async function main() {
       isGlobal: false,
       locationIds: [dubai.id, abuDhabi.id],
     },
-    // IV Drips (MediPro - Abu Dhabi only)
+    // IV Drips (IV Drips Dubai - Abu Dhabi only)
     {
-      vendorId: medipro.id,
+      vendorId: ivDripsDubai.id,
       name: "Hydration IV Drip",
       slug: "hydration-iv-drip",
       category: "iv-drips",
@@ -72,9 +73,9 @@ async function main() {
       isGlobal: true,
       locationIds: [],
     },
-    // Hormones (MediPro - Dubai)
+    // Hormones (Al Zahra Labs - Dubai)
     {
-      vendorId: medipro.id,
+      vendorId: alZahraLabs.id,
       name: "TRT Starter Kit",
       slug: "trt-starter-kit",
       category: "hormones",

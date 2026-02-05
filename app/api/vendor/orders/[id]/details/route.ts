@@ -38,6 +38,8 @@ export async function GET(
             shippingPhone: true,
             shippingAddressLine1: true,
             shippingAddressLine2: true,
+            shippingArea: true,
+            shippingEmirate: true,
             shippingNotes: true,
             totalFils: true,
             createdAt: true,
@@ -114,6 +116,8 @@ export async function GET(
           address: {
             line1: vendorOrder.order.shippingAddressLine1,
             line2: vendorOrder.order.shippingAddressLine2,
+            area: vendorOrder.order.shippingArea,
+            emirate: vendorOrder.order.shippingEmirate,
           },
           deliveryNotes: vendorOrder.order.shippingNotes,
           amount: {

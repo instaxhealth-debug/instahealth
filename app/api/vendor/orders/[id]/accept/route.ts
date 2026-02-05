@@ -55,19 +55,19 @@ export async function POST(
     }
 
     // Check if already accepted
-    if (vendorOrder.status !== 'PENDING_ACCEPTANCE') {
+    if (vendorOrder.status !== 'READY_FOR_FULFILLMENT') {
       return NextResponse.json(
         { error: `Cannot accept order in status: ${vendorOrder.status}` },
         { status: 409 }
       );
     }
 
-    // UPDATE with WHERE guard - ensures only PENDING_ACCEPTANCE orders before deadline are updated
+    // UPDATE with WHERE guard - ensures only READY_FOR_FULFILLMENT orders before deadline are updated
     // This is the concurrency-safe operation
     const updated = await prisma.vendorOrder.updateMany({
       where: {
         id: vendorOrderId,
-        status: 'PENDING_ACCEPTANCE',
+        status: 'READY_FOR_FULFILLMENT',
         acceptBy: {
           gt: new Date(), // Guard: only update if deadline not passed
         },

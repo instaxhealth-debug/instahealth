@@ -64,13 +64,13 @@ export async function POST(
       );
     }
 
-    // Can only cancel if ACCEPTED or PREPARING
-    // Cannot cancel PENDING_ACCEPTANCE (use reject instead)
-    // Cannot cancel already DELIVERED or CANCELLED_BY_VENDOR
-    if (!['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY'].includes(vendorOrder.status)) {
+    // Can only cancel if ACCEPTED or IN_PROGRESS
+    // Cannot cancel READY_FOR_FULFILLMENT (use reject instead)
+    // Cannot cancel already COMPLETED or CANCELLED
+    if (!['ACCEPTED', 'IN_PROGRESS'].includes(vendorOrder.status)) {
       return NextResponse.json(
         {
-          error: `Cannot cancel order in status: ${vendorOrder.status}. Use reject endpoint for PENDING_ACCEPTANCE orders.`,
+          error: `Cannot cancel order in status: ${vendorOrder.status}. Use reject endpoint for READY_FOR_FULFILLMENT orders.`,
         },
         { status: 409 }
       );
@@ -81,11 +81,11 @@ export async function POST(
       where: {
         id: vendorOrderId,
         status: {
-          in: ['ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY'],
+          in: ['ACCEPTED', 'IN_PROGRESS'],
         },
       },
       data: {
-        status: 'CANCELLED_BY_VENDOR',
+        status: 'CANCELLED',
         cancelledAt: new Date(),
         notesInternal: `Cancelled by vendor: ${reason}`,
         terminalReason: 'VENDOR_CANCELLED',
@@ -162,7 +162,7 @@ export async function POST(
         message: 'Order cancelled by vendor and refund initiated',
         vendorOrder: {
           id: vendorOrderId,
-          status: 'CANCELLED_BY_VENDOR',
+          status: 'CANCELLED',
           cancelledAt: new Date().toISOString(),
           itemCount: vendorOrder.items.length,
         },

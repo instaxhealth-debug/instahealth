@@ -3,15 +3,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
-import { useCartStore } from "@/lib/store/cart-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useLocationStore } from "@/lib/store/location-store";
 import Link from "next/link";
 import Image from "next/image";
 
 export function CartView() {
-  const { items, removeItem, updateQuantity, getTotalPrice, clearCart } = useCartStore();
+  const { items, removeItem, updateQuantity } = useEnhancedCart();
   const { address, isSelected } = useLocationStore();
-  const total = getTotalPrice();
+
+  // Calculate total from items
+  const total = items.reduce((sum: any, item: any) => {
+    const itemTotal = (item.unitPriceFils ? item.unitPriceFils / 100 : item.product?.price || 0) * item.quantity;
+    return sum + itemTotal;
+  }, 0);
 
   if (items.length === 0) {
     return (
@@ -32,85 +37,95 @@ export function CartView() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-4">
-        {items.map((item) => (
-          <Card key={`${item.product.id}-${item.variantId}`} className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex gap-4">
-                <div className="w-24 h-24 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
-                  {item.product.image && 
-                   !item.product.image.startsWith("/Users") && 
-                   (item.product.image.startsWith("/logos/") || item.product.image.startsWith("http")) ? (
-                    <Image
-                      src={item.product.image}
-                      alt={item.product.name}
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                        const parent = target.parentElement;
-                        if (parent && !parent.querySelector(".image-fallback")) {
-                          const fallback = document.createElement("div");
-                          fallback.className = "image-fallback w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center";
-                          const span = document.createElement("span");
-                          span.className = "text-muted-foreground text-xs";
-                          span.textContent = "No image";
-                          fallback.appendChild(span);
-                          parent.appendChild(fallback);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                      <span className="text-muted-foreground text-xs">No image</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold mb-1 line-clamp-2">{item.product.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {item.product.currency} {item.product.price.toFixed(2)}
-                  </p>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 border border-border/50 rounded-xl">
+        {items.map((item) => {
+          // Handle both DB cart items (with unitPriceFils) and local cart items (with product.price)
+          const isDBItem = (item as any).unitPriceFils !== undefined;
+          const product = isDBItem ? (item as any).product : (item as any);
+          const productId = product.id;
+          const itemKey = `${productId}-${item.variantId}`;
+          const itemPrice = isDBItem ? ((item as any).unitPriceFils / 100) : (product.price || 0);
+          const productImage = product.image || product.imageUrl;
+          
+          return (
+            <Card key={itemKey} className="border-border/50">
+              <CardContent className="p-4">
+                <div className="flex gap-4">
+                  <div className="w-24 h-24 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
+                    {productImage && 
+                     !productImage.startsWith("/Users") && 
+                     (productImage.startsWith("/logos/") || productImage.startsWith("http")) ? (
+                      <Image
+                        src={productImage}
+                        alt={product.name}
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector(".image-fallback")) {
+                            const fallback = document.createElement("div");
+                            fallback.className = "image-fallback w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center";
+                            const span = document.createElement("span");
+                            span.className = "text-muted-foreground text-xs";
+                            span.textContent = "No image";
+                            fallback.appendChild(span);
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                        <span className="text-muted-foreground text-xs">No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold mb-1 line-clamp-2">{product.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {product.currency || "AED"} {itemPrice.toFixed(2)}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 border border-border/50 rounded-xl">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-l-xl rounded-r-none"
+                          onClick={() => updateQuantity(productId, item.variantId || undefined, item.quantity - 1)}
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-r-xl rounded-l-none"
+                          onClick={() => updateQuantity(productId, item.variantId || undefined, item.quantity + 1)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-l-xl rounded-r-none"
-                        onClick={() => updateQuantity(item.product.id, item.variantId, item.quantity - 1)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeItem(productId, item.variantId || undefined)}
                       >
-                        <Minus className="h-3.5 w-3.5" />
-                      </Button>
-                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-r-xl rounded-l-none"
-                        onClick={() => updateQuantity(item.product.id, item.variantId, item.quantity + 1)}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeItem(item.product.id, item.variantId)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-semibold text-base">
+                      {product.currency || "AED"} {(itemPrice * item.quantity).toFixed(2)}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-semibold text-base">
-                    {item.product.currency} {(item.product.price * item.quantity).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div>
@@ -121,7 +136,7 @@ export function CartView() {
           <CardContent className="space-y-4">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">{items[0]?.product.currency || "USD"} {total.toFixed(2)}</span>
+              <span className="font-medium">AED {total.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Shipping</span>
@@ -130,7 +145,7 @@ export function CartView() {
             <div className="border-t border-border/50 pt-4">
               <div className="flex justify-between font-semibold text-base">
                 <span>Total</span>
-                <span>{items[0]?.product.currency || "USD"} {total.toFixed(2)}</span>
+                <span>AED {total.toFixed(2)}</span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground text-center">

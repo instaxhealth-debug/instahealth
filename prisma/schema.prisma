@@ -75,14 +75,13 @@ enum Role {
 }
 
 enum VendorOrderStatus {
-  PENDING_ACCEPTANCE
+  NEW
+  READY_FOR_FULFILLMENT
   ACCEPTED
+  IN_PROGRESS
+  COMPLETED
   REJECTED
-  PREPARING
-  OUT_FOR_DELIVERY
-  DELIVERED
   CANCELLED
-  CANCELLED_BY_VENDOR
   FAILED
 }
 
@@ -164,6 +163,8 @@ model Address {
   normalizedHash    String   // For deduplication
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  orders            Order[]
 
   @@unique([userId, normalizedHash])
   @@index([userId])
@@ -287,6 +288,8 @@ model Order {
   userId                   String?
   user                     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   locationId               String?
+  addressId                String?
+  address                  Address?    @relation(fields: [addressId], references: [id], onDelete: SetNull)
   status                   String      @default("PENDING_PAYMENT") // PENDING_PAYMENT, PAID, FULFILLING, FULFILLED, PARTIALLY_FULFILLED, CANCELLED, REFUNDED
   subtotalFils             Int
   deliveryFils             Int         @default(0)
@@ -301,6 +304,8 @@ model Order {
   shippingPhone            String?
   shippingAddressLine1     String?
   shippingAddressLine2     String?
+  shippingArea             String?
+  shippingEmirate          String?
   shippingNotes            String?
   createdAt                DateTime    @default(now())
   updatedAt                DateTime    @updatedAt
@@ -310,6 +315,7 @@ model Order {
   refunds                  Refund[]
 
   @@index([userId])
+  @@index([addressId])
   @@index([stripeCheckoutSessionId])
   @@index([status])
 }
@@ -401,7 +407,9 @@ model VendorOrder {
   orderId         String
   vendorId        String
 
-  status          VendorOrderStatus @default(PENDING_ACCEPTANCE)
+  status          VendorOrderStatus @default(NEW)
+  subtotalFils    Int               @default(0)
+  totalFils       Int               @default(0)
   acceptBy        DateTime
   acceptedAt      DateTime?
   rejectedAt      DateTime?

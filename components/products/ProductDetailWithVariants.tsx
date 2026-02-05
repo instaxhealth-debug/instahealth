@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ShoppingCart } from "lucide-react";
-import { useCartStore } from "@/lib/store/cart-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
 import { ComplianceDisclaimer } from "@/components/compliance/Disclaimer";
 import { formatPriceAED } from "@/lib/utils/price";
@@ -19,7 +19,7 @@ interface ProductDetailWithVariantsProps {
 }
 
 export function ProductDetailWithVariants({ product }: ProductDetailWithVariantsProps) {
-  const { addItem } = useCartStore();
+  const { addItem } = useEnhancedCart();
   const { toast } = useToast();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     product.variants.length > 0 ? product.variants[0]?.id || null : null
@@ -30,7 +30,7 @@ export function ProductDetailWithVariants({ product }: ProductDetailWithVariants
   const hasVariants = product.variants.length > 0;
   const canAddToCart = !hasVariants || selectedVariantId !== null;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!canAddToCart) {
       toast({
         title: "Please select a variant",
@@ -41,25 +41,20 @@ export function ProductDetailWithVariants({ product }: ProductDetailWithVariants
     }
 
     const variantId = hasVariants ? selectedVariantId! : product.id;
-    const price = hasVariants ? selectedVariant!.priceFils : product.priceFils;
 
-    addItem(
-      {
-        id: product.id,
-        name: product.name,
-        price: price / 100, // Convert fils to AED
-        currency: "AED",
-        image: product.imageUrl || "",
-        slug: product.slug,
-      } as any,
-      variantId,
-      quantity
-    );
-
-    toast({
-      title: "Added to cart",
-      description: `${product.name}${hasVariants ? ` (${selectedVariant?.strength})` : ""} added to your cart`,
-    });
+    try {
+      await addItem(product.id, variantId, quantity);
+      toast({
+        title: "Added to cart",
+        description: `${product.name}${hasVariants ? ` (${selectedVariant?.strength})` : ""} added to your cart`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
+    }
   };
 
   const displayPrice = hasVariants && selectedVariant

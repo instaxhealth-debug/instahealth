@@ -63,9 +63,9 @@ export async function POST(
       );
     }
 
-    // HARD RULE: Can only reject if PENDING_ACCEPTANCE
+    // HARD RULE: Can only reject if READY_FOR_FULFILLMENT
     // After ACCEPTED, must use /cancel endpoint
-    if (vendorOrder.status !== 'PENDING_ACCEPTANCE') {
+    if (vendorOrder.status !== 'READY_FOR_FULFILLMENT') {
       return NextResponse.json(
         {
           error: `Cannot reject order in status: ${vendorOrder.status}. Use cancel endpoint if order is ACCEPTED.`,
@@ -78,7 +78,7 @@ export async function POST(
     const updated = await prisma.vendorOrder.updateMany({
       where: {
         id: vendorOrderId,
-        status: 'PENDING_ACCEPTANCE',
+        status: 'READY_FOR_FULFILLMENT',
       },
       data: {
         status: 'REJECTED',

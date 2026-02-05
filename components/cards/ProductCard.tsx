@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCartStore } from "@/lib/store/cart-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
 import type { StorefrontProduct } from "@/lib/api/products";
 
@@ -15,18 +15,25 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  const { addItem } = useCartStore();
+  const { addItem } = useEnhancedCart();
   const { toast } = useToast();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // StorefrontProduct doesn't have shopifyVariantId, use product id
-    addItem(product as any, product.id, 1);
-    toast({
-      title: "Added to cart",
-      description: `${product.name} added to your cart`,
-    });
+    try {
+      await addItem(product.id, product.id, 1);
+      toast({
+        title: "Added to cart",
+        description: `${product.name} added to your cart`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
+    }
   };
 
   const stockStatus = product.inventoryQuantity

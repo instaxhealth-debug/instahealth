@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCartStore } from "@/lib/store/cart-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
 import type { Offering } from "@/types/offering";
 
@@ -16,31 +16,31 @@ interface OfferingCardProps {
 }
 
 export function OfferingCard({ offering, className }: OfferingCardProps) {
-  const { addItem } = useCartStore();
+  const { addItem } = useEnhancedCart();
   const { toast } = useToast();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     if (offering.type === "product") {
-      addItem(
-        {
-          id: offering.id,
-          name: offering.name,
-          price: offering.price,
-          currency: offering.currency,
-          image: offering.image,
-          slug: offering.slug,
-          shopifyVariantId: offering.shopifyVariantId || "",
-        } as any,
-        offering.shopifyVariantId || offering.id,
-        1
-      );
-      toast({
-        title: "Added to cart",
-        description: `${offering.name} added to your cart`,
-      });
+      try {
+        await addItem(
+          offering.id,
+          offering.shopifyVariantId || offering.id,
+          1
+        );
+        toast({
+          title: "Added to cart",
+          description: `${offering.name} added to your cart`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to add item to cart",
+          variant: "destructive",
+        });
+      }
     }
   };
 

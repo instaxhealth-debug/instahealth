@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useCartStore } from "@/lib/store/cart-store";
-import { useLocationStore } from "@/lib/store/location-store";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
+import { buildShippingPayload } from "@/lib/checkout/buildShippingPayload";
 import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,8 +17,7 @@ import Link from "next/link";
 export default function CheckoutPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { items, getTotalPrice } = useCartStore();
-  const { address, isSelected } = useLocationStore();
+  const { items, getTotalPrice, getTotalItems } = useEnhancedCart();
 
   const [addresses, setAddresses] = useState<Array<{
     id: string;
@@ -27,7 +26,9 @@ export default function CheckoutPage() {
     line1?: string;
     line2?: string;
     area?: string;
+    city?: string;
     emirate?: string;
+    isDefault?: boolean;
     [key: string]: any;
   }>>([]);
   const [addressesLoading, setAddressesLoading] = useState(false);
@@ -129,59 +130,76 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      // Build shipping payload - derive addressLine1 from selected address if needed
-      let shippingAddressLine1 = formData.shippingAddressLine1;
-      let shippingAddressLine2 = formData.shippingAddressLine2;
-      
-      // locationId is optional now - derive from address if available
-      let locationId = "Dubai"; // Default fallback
-      if (address?.city) {
-        locationId = address.city;
-      }
-      
-      // If using saved address, get the full address data
-      if (formData.selectedAddressId) {
-        const selectedAddr = addresses.find(a => a.id === formData.selectedAddressId);
-        if (selectedAddr) {
-          shippingAddressLine1 = selectedAddr.line1 || selectedAddr.formattedAddress;
-          shippingAddressLine2 = selectedAddr.line2 || "";
-          // Derive locationId from emirate if available
-          if (selectedAddr.emirate) {
-            locationId = selectedAddr.emirate;
-          }
-        }
+      const selectedAddr = formData.selectedAddressId
+        ? addresses.find((a) => a.id === formData.selectedAddressId)
+        : null;
+
+      if (!selectedAddr) {
+        throw new Error("Selected address not found");
       }
 
-      const response = await fetch("/api/checkout", {
+      console.log("[CHECKOUT] Submitting with address:", selectedAddr.id);
+
+      const shippingPayload = buildShippingPayload({
+        shippingName: formData.shippingName,
+        shippingPhone: formData.shippingPhone,
+        shippingAddressLine1: formData.shippingAddressLine1,
+        shippingAddressLine2: formData.shippingAddressLine2,
+        selectedAddress: selectedAddr,
+      });
+
+      console.log("[CHECKOUT] Shipping payload:", shippingPayload);
+
+      // 1) Create order (PENDING_PAYMENT)
+      const createResponse = await fetch("/api/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          locationId,
           addressId: formData.selectedAddressId,
-          shippingName: formData.shippingName,
-          shippingPhone: formData.shippingPhone,
-          shippingAddressLine1,
-          shippingAddressLine2,
+          shippingName: shippingPayload.shippingName,
+          shippingPhone: shippingPayload.shippingPhone,
+          shippingAddressLine1: shippingPayload.shippingAddressLine1,
+          shippingAddressLine2: shippingPayload.shippingAddressLine2,
+          shippingArea: shippingPayload.shippingArea,
+          shippingEmirate: shippingPayload.shippingEmirate,
           shippingNotes: formData.shippingNotes,
-          ageConfirmed: true, // Auto-confirmed, removed from UI
           acceptedTerms: formData.acceptedTerms,
           acceptedDisclaimer: formData.acceptedDisclaimer,
         }),
       });
 
-      const data = await response.json();
+      const createData = await createResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create checkout session");
+      if (!createResponse.ok) {
+        console.error("[CHECKOUT] Create order failed:", createData);
+        throw new Error(createData.error || "Failed to create order");
       }
 
-      // Redirect to Stripe Checkout
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No checkout URL returned");
+      console.log("[CHECKOUT] Order created:", createData.orderId);
+
+      // 2) Create Stripe session
+      const sessionResponse = await fetch("/api/checkout/stripe-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: createData.orderId }),
+      });
+
+      const sessionData = await sessionResponse.json();
+
+      if (!sessionResponse.ok) {
+        console.error("[CHECKOUT] Stripe session failed:", sessionData);
+        throw new Error(sessionData.error || "Failed to create payment session");
       }
+
+      if (!sessionData.url) {
+        console.error("[CHECKOUT] Stripe session URL missing:", sessionData);
+        throw new Error("No payment session URL returned");
+      }
+
+      console.log("[CHECKOUT] Redirecting to Stripe:", sessionData.url);
+      window.location.assign(sessionData.url);
     } catch (err: any) {
+      console.error("[CHECKOUT] Error:", err);
       setError(err.message || "An error occurred during checkout");
       setIsSubmitting(false);
     }
@@ -281,9 +299,12 @@ export default function CheckoutPage() {
             <CheckoutForm
               addresses={addresses}
               addressesLoading={addressesLoading}
+              onAddAddress={() => {
+                setShowAddressModal(true);
+                setModalForceOpen(true);
+              }}
               onSubmit={handleCheckoutSubmit}
               isSubmitting={isSubmitting}
-              error={error}
             />
           </div>
 

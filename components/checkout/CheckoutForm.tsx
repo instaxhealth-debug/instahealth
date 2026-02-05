@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, AlertCircle, CheckCircle, Phone, MapPin } from "lucide-react";
+import { Loader2, Phone, MapPin } from "lucide-react";
+import { ValidationCallout } from "./ValidationCallout";
 
 interface Address {
   id: string;
@@ -28,8 +29,8 @@ interface CheckoutFormProps {
   addresses: Address[];
   addressesLoading: boolean;
   onSubmit: (formData: CheckoutFormData) => Promise<void>;
+  onAddAddress: () => void;
   isSubmitting: boolean;
-  error?: string;
   successMessage?: string;
 }
 
@@ -48,12 +49,20 @@ interface FormErrors {
   [key: string]: string;
 }
 
+interface TouchedFields {
+  shippingName?: boolean;
+  shippingPhone?: boolean;
+  selectedAddressId?: boolean;
+  acceptedTerms?: boolean;
+  acceptedDisclaimer?: boolean;
+}
+
 export function CheckoutForm({
   addresses,
   addressesLoading,
   onSubmit,
+  onAddAddress,
   isSubmitting,
-  error,
   successMessage,
 }: CheckoutFormProps) {
   const [formData, setFormData] = useState<CheckoutFormData>({
@@ -68,10 +77,34 @@ export function CheckoutForm({
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
+  const [touched, setTouched] = useState<TouchedFields>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [useNewAddress, setUseNewAddress] = useState(!addresses.length);
+  const [addressesInitialized, setAddressesInitialized] = useState(false);
 
-  // Validation logic
+  // Auto-select default address when addresses load
+  useEffect(() => {
+    if (addresses.length > 0 && !addressesInitialized) {
+      setUseNewAddress(false);
+      const defaultAddress = addresses.find((addr) => addr.isDefault);
+      if (defaultAddress) {
+        setFormData((prev) => ({
+          ...prev,
+          selectedAddressId: defaultAddress.id,
+        }));
+      } else if (addresses.length === 1) {
+        // If only one address, select it
+        setFormData((prev) => ({
+          ...prev,
+          selectedAddressId: addresses[0].id,
+        }));
+      }
+      setAddressesInitialized(true);
+    }
+  }, [addresses, addressesInitialized]);
+
+
+  // Validation logic - only validates fields that are relevant
   const validateForm = useCallback((): boolean => {
     const newErrors: FormErrors = {};
 
@@ -91,12 +124,8 @@ export function CheckoutForm({
     }
 
     // Address validation
-    if (useNewAddress) {
-      if (!formData.shippingAddressLine1.trim()) {
-        newErrors.shippingAddressLine1 = "Address line 1 is required";
-      }
-    } else if (!formData.selectedAddressId) {
-      newErrors.selectedAddressId = "Please select a saved address";
+    if (!formData.selectedAddressId) {
+      newErrors.selectedAddressId = "Please select a delivery address";
     }
 
     // Checkboxes validation
@@ -109,7 +138,20 @@ export function CheckoutForm({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, useNewAddress]);
+  }, [formData]);
+
+  // Get errors to show: only show if submitAttempted OR field touched
+  const getFieldError = (fieldName: string): string | undefined => {
+    if (submitAttempted || touched[fieldName as keyof TouchedFields]) {
+      return errors[fieldName];
+    }
+    return undefined;
+  };
+
+  // Check if field should show as invalid
+  const isFieldInvalid = (fieldName: string): boolean => {
+    return !!(getFieldError(fieldName));
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -122,16 +164,14 @@ export function CheckoutForm({
       [name]: type === "checkbox" ? checked : value,
     }));
 
-    // Clear error for this field when user starts typing
-    if (touched[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
+    // Mark field as touched on change
+    setTouched((prev) => ({
+      ...prev,
+      [name]: true,
+    }));
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name } = e.target;
     setTouched((prev) => ({
       ...prev,
@@ -141,6 +181,7 @@ export function CheckoutForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
 
     if (!validateForm()) {
       return;
@@ -153,19 +194,29 @@ export function CheckoutForm({
     }
   };
 
+  // Check form validity for button state
+  const phoneRegex = /^(?:\+971|0)(?:50|51|52|54|55|56|2|3|4|6|7|9)\d{7}$/;
+  const isPhoneValid = formData.shippingPhone && phoneRegex.test(formData.shippingPhone.replace(/\s/g, ""));
+  const isFormValid =
+    formData.shippingName.trim().length >= 2 &&
+    isPhoneValid &&
+    !!formData.selectedAddressId &&
+    formData.acceptedTerms &&
+    formData.acceptedDisclaimer;
+
   return (
     <div className="space-y-5 pb-20 lg:pb-0">
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Personal Information */}
+        {/* Delivery Information Card */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Delivery Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Name */}
+          <CardContent className="space-y-4">
+            {/* Name Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Full Name *
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name <span className="text-red-500">*</span>
               </label>
               <Input
                 type="text"
@@ -175,18 +226,21 @@ export function CheckoutForm({
                 onBlur={handleBlur}
                 placeholder="John Doe"
                 disabled={isSubmitting}
-                className={errors.shippingName && touched.shippingName ? "border-red-500" : ""}
+                className={isFieldInvalid("shippingName") ? "border-red-500 focus:ring-red-500" : ""}
               />
-              {errors.shippingName && touched.shippingName && (
-                <p className="text-sm text-red-600 mt-1">{errors.shippingName}</p>
+              {getFieldError("shippingName") && (
+                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1">
+                  <span className="h-1 w-1 bg-red-600 rounded-full" />
+                  {getFieldError("shippingName")}
+                </p>
               )}
             </div>
 
-            {/* Phone */}
+            {/* Phone Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                Phone Number *
+                Phone Number <span className="text-red-500">*</span>
               </label>
               <Input
                 type="tel"
@@ -196,29 +250,37 @@ export function CheckoutForm({
                 onBlur={handleBlur}
                 placeholder="+971 50 xxx xxxx"
                 disabled={isSubmitting}
-                className={errors.shippingPhone && touched.shippingPhone ? "border-red-500" : ""}
+                className={isFieldInvalid("shippingPhone") ? "border-red-500 focus:ring-red-500" : ""}
               />
               <p className="text-xs text-gray-500 mt-1">UAE phone numbers required</p>
-              {errors.shippingPhone && touched.shippingPhone && (
-                <p className="text-sm text-red-600 mt-1">{errors.shippingPhone}</p>
+              {getFieldError("shippingPhone") && (
+                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1">
+                  <span className="h-1 w-1 bg-red-600 rounded-full" />
+                  {getFieldError("shippingPhone")}
+                </p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Address Selection */}
+        {/* Delivery Address Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Delivery Address
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Delivery Address
+              </CardTitle>
+              <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                Required
+              </span>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Address Toggle */}
+          <CardContent className="space-y-4">
+            {/* Address Mode Toggle - Only show if multiple addresses */}
             {addresses.length > 0 && (
-              <div className="flex gap-4 pb-1">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="flex gap-6 pb-1">
+                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded">
                   <input
                     type="radio"
                     name="addressType"
@@ -226,10 +288,11 @@ export function CheckoutForm({
                     checked={!useNewAddress}
                     onChange={() => setUseNewAddress(false)}
                     disabled={isSubmitting}
+                    className="w-4 h-4"
                   />
-                  <span className="text-sm">Use Saved Address</span>
+                  <span className="text-sm font-medium text-gray-700">Use Saved Address</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded">
                   <input
                     type="radio"
                     name="addressType"
@@ -237,8 +300,9 @@ export function CheckoutForm({
                     checked={useNewAddress}
                     onChange={() => setUseNewAddress(true)}
                     disabled={isSubmitting}
+                    className="w-4 h-4"
                   />
-                  <span className="text-sm">Enter New Address</span>
+                  <span className="text-sm font-medium text-gray-700">Enter New Address</span>
                 </label>
               </div>
             )}
@@ -251,91 +315,76 @@ export function CheckoutForm({
                 </label>
                 {addressesLoading ? (
                   <div className="flex items-center gap-2 py-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                     <span className="text-sm text-gray-500">Loading addresses...</span>
                   </div>
                 ) : (
-                  <select
-                    name="selectedAddressId"
-                    value={formData.selectedAddressId}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.selectedAddressId && touched.selectedAddressId
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    <option value="">Select an address...</option>
-                    {addresses.map((addr) => {
-                      // Format: "HOME (Default) • Villa 123, Dubai Marina, Dubai"
-                      const defaultBadge = addr.isDefault ? " (Default)" : "";
-                      const shortAddr = addr.area && addr.emirate 
-                        ? `${addr.area}, ${addr.emirate}`
-                        : addr.formattedAddress.length > 50
-                          ? addr.formattedAddress.substring(0, 50) + "..."
-                          : addr.formattedAddress;
-                      return (
-                        <option key={addr.id} value={addr.id}>
-                          {addr.label.toUpperCase()}{defaultBadge} • {shortAddr}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <>
+                    <select
+                      name="selectedAddressId"
+                      value={formData.selectedAddressId}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      disabled={isSubmitting}
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition ${
+                        isFieldInvalid("selectedAddressId")
+                          ? "border-red-500 focus:ring-red-500"
+                          : "border-gray-300 focus:ring-primary"
+                      }`}
+                    >
+                      <option value="">Select an address...</option>
+                      {addresses.map((addr) => {
+                        const defaultBadge = addr.isDefault ? " (Default)" : "";
+                        const shortAddr =
+                          addr.area && addr.emirate
+                            ? `${addr.area}, ${addr.emirate}`
+                            : addr.formattedAddress.length > 50
+                              ? addr.formattedAddress.substring(0, 50) + "..."
+                              : addr.formattedAddress;
+                        return (
+                          <option key={addr.id} value={addr.id}>
+                            {addr.label.toUpperCase()}
+                            {defaultBadge} • {shortAddr}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <a
+                      href="/my-account/delivery-addresses"
+                      className="inline-block text-xs text-primary hover:underline mt-2"
+                    >
+                      Manage addresses
+                    </a>
+                  </>
                 )}
-                {errors.selectedAddressId && touched.selectedAddressId && (
-                  <p className="text-sm text-red-600 mt-1">{errors.selectedAddressId}</p>
+                {getFieldError("selectedAddressId") && (
+                  <ValidationCallout message={getFieldError("selectedAddressId")!} />
                 )}
               </div>
             )}
 
-            {/* New Address Input */}
+            {/* New Address CTA */}
             {useNewAddress && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address Line 1 *
-                  </label>
-                  <Input
-                    type="text"
-                    name="shippingAddressLine1"
-                    value={formData.shippingAddressLine1}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Street address, apartment, etc"
-                    disabled={isSubmitting}
-                    className={
-                      errors.shippingAddressLine1 && touched.shippingAddressLine1
-                        ? "border-red-500"
-                        : ""
-                    }
-                  />
-                  {errors.shippingAddressLine1 && touched.shippingAddressLine1 && (
-                    <p className="text-sm text-red-600 mt-1">{errors.shippingAddressLine1}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address Line 2 (Optional)
-                  </label>
-                  <Input
-                    type="text"
-                    name="shippingAddressLine2"
-                    value={formData.shippingAddressLine2}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Building, floor, apartment number, etc"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </>
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-10"
+                  onClick={onAddAddress}
+                  disabled={isSubmitting}
+                >
+                  Add new address
+                </Button>
+                {getFieldError("selectedAddressId") && (
+                  <ValidationCallout message={getFieldError("selectedAddressId")!} />
+                )}
+              </div>
             )}
 
-            {/* Notes */}
+            {/* Delivery Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Delivery Notes (Optional)
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Notes <span className="text-xs text-gray-500 font-normal">(Optional)</span>
               </label>
               <Textarea
                 name="shippingNotes"
@@ -345,70 +394,70 @@ export function CheckoutForm({
                 placeholder="E.g., instructions for delivery driver, gate codes, etc."
                 disabled={isSubmitting}
                 rows={3}
+                className="text-sm resize-none"
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Compliance & Terms */}
+        {/* Confirmations Card */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Confirmations</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Inline error for this section */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 flex gap-2 text-sm">
-                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <span className="text-red-800">{error}</span>
-              </div>
-            )}
-            
-            <label className="flex gap-3 cursor-pointer">
+          <CardContent className="space-y-4">
+            <label className="flex gap-3 cursor-pointer p-2 -m-2 rounded hover:bg-gray-50">
               <input
                 type="checkbox"
                 name="acceptedTerms"
                 checked={formData.acceptedTerms}
                 onChange={handleChange}
                 disabled={isSubmitting}
+                className="w-4 h-4 mt-0.5 flex-shrink-0"
               />
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-gray-700 leading-relaxed">
                 I accept the{" "}
-                <a href="#" className="text-primary hover:underline">
+                <a href="#" className="text-primary hover:underline font-medium">
                   terms and conditions
                 </a>
               </span>
             </label>
-            {errors.acceptedTerms && touched.acceptedTerms && (
-              <p className="text-sm text-red-600 -mt-2">{errors.acceptedTerms}</p>
+            {getFieldError("acceptedTerms") && (
+              <ValidationCallout message={getFieldError("acceptedTerms")!} />
             )}
 
-            <label className="flex gap-3 cursor-pointer">
+            <label className="flex gap-3 cursor-pointer p-2 -m-2 rounded hover:bg-gray-50">
               <input
                 type="checkbox"
                 name="acceptedDisclaimer"
                 checked={formData.acceptedDisclaimer}
                 onChange={handleChange}
                 disabled={isSubmitting}
+                className="w-4 h-4 mt-0.5 flex-shrink-0"
               />
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-gray-700 leading-relaxed">
                 I accept the{" "}
-                <a href="#" className="text-primary hover:underline">
+                <a href="#" className="text-primary hover:underline font-medium">
                   product disclaimer
                 </a>
               </span>
             </label>
-            {errors.acceptedDisclaimer && touched.acceptedDisclaimer && (
-              <p className="text-sm text-red-600 -mt-2">{errors.acceptedDisclaimer}</p>
+            {getFieldError("acceptedDisclaimer") && (
+              <ValidationCallout message={getFieldError("acceptedDisclaimer")!} />
             )}
           </CardContent>
         </Card>
 
         {/* Submit Button - Sticky on mobile */}
         <div className="lg:static fixed bottom-0 left-0 right-0 lg:p-0 p-4 bg-white lg:bg-transparent border-t lg:border-t-0 z-10">
+          {!isFormValid && !submitAttempted && (
+            <p className="text-xs text-gray-500 text-center mb-2">
+              Complete all required fields to proceed
+            </p>
+          )}
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !isFormValid}
             className="w-full h-12 text-base font-medium"
           >
             {isSubmitting ? (

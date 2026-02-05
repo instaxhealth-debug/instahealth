@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 import { createVendorOrders } from '@/lib/fulfillment/vendor-orders';
+import { clearCart } from '@/lib/cart';
 import { logOrderEvent } from '@/lib/fulfillment/order-events';
 import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
 import { ActorType } from '@prisma/client';
@@ -52,9 +53,12 @@ export async function POST(req: NextRequest) {
 
       console.log('Checkout session completed:', session.id);
 
-      // Find order by Stripe session ID
-      const order = await prisma.order.findUnique({
-        where: { stripeCheckoutSessionId: session.id },
+      // Find order by Stripe session ID (or metadata fallback)
+      const metadataOrderId = session.metadata?.orderId;
+      const order = await prisma.order.findFirst({
+        where: metadataOrderId
+          ? { id: metadataOrderId }
+          : { stripeCheckoutSessionId: session.id },
       });
 
       if (!order) {
@@ -78,6 +82,10 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      if (order.userId) {
+        await clearCart(order.userId);
+      }
+
       // Log payment confirmation event
       await logOrderEvent({
         orderId: order.id,
@@ -91,20 +99,26 @@ export async function POST(req: NextRequest) {
 
       console.log('Order marked as PAID:', order.id);
 
-      // Create vendor orders for multi-vendor fulfillment
+      // Ensure vendor orders exist and are ready for fulfillment
       try {
-        await createVendorOrders(order.id);
-        console.log('Vendor orders created for order:', order.id);
+        await createVendorOrders(order.id, 'READY_FOR_FULFILLMENT');
 
-        // Update parent order status to FULFILLING
+        // Promote any NEW vendor orders to READY_FOR_FULFILLMENT
+        await prisma.vendorOrder.updateMany({
+          where: { orderId: order.id, status: 'NEW' },
+          data: {
+            status: 'READY_FOR_FULFILLMENT',
+            acceptBy: new Date(Date.now() + 15 * 60 * 1000),
+          },
+        });
+
         await checkAndUpdateParentOrderStatus(order.id);
       } catch (error) {
-        console.error('Failed to create vendor orders:', error);
-        // Log event but don't fail the webhook
+        console.error('Failed to update vendor orders:', error);
         await logOrderEvent({
           orderId: order.id,
           actorType: ActorType.SYSTEM,
-          eventType: 'VENDOR_ORDER_CREATION_FAILED',
+          eventType: 'VENDOR_ORDER_UPDATE_FAILED',
           data: {
             error: error instanceof Error ? error.message : String(error),
           },
@@ -121,7 +135,11 @@ export async function POST(req: NextRequest) {
       });
 
       if (order && order.status === 'PENDING_PAYMENT') {
-        // Keep status as PENDING_PAYMENT (don't change, just log)
+        // Mark as FAILED
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'FAILED' },
+        });
         await logOrderEvent({
           orderId: order.id,
           actorType: ActorType.SYSTEM,
@@ -130,7 +148,19 @@ export async function POST(req: NextRequest) {
             stripePaymentIntentId: paymentIntent.id,
           },
         });
-        console.log('Payment failed for order:', order.id, '- status remains PENDING_PAYMENT');
+        console.log('Payment failed for order:', order.id, '- status set to FAILED');
+      }
+    } else if (event.type === 'checkout.session.expired') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const order = await prisma.order.findFirst({
+        where: { stripeCheckoutSessionId: session.id },
+      });
+
+      if (order && order.status === 'PENDING_PAYMENT') {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'CANCELLED' },
+        });
       }
     } else if (event.type === 'charge.refunded') {
       const charge = event.data.object as Stripe.Charge;

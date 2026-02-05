@@ -2,7 +2,7 @@
  * POST /api/vendor/orders/[id]/update-status
  * 
  * Vendor updates fulfillment status:
- * ACCEPTED → PREPARING → OUT_FOR_DELIVERY → DELIVERED
+ * READY_FOR_FULFILLMENT → ACCEPTED → IN_PROGRESS → COMPLETED
  *
  * CONCURRENCY SAFE: Uses WHERE guard to validate transitions
  */
@@ -15,9 +15,9 @@ import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status
 import { requireVendor } from '@/lib/auth/requireVendor';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  ACCEPTED: ['PREPARING'],
-  PREPARING: ['OUT_FOR_DELIVERY'],
-  OUT_FOR_DELIVERY: ['DELIVERED'],
+  READY_FOR_FULFILLMENT: ['ACCEPTED', 'REJECTED'],
+  ACCEPTED: ['IN_PROGRESS'],
+  IN_PROGRESS: ['COMPLETED'],
 };
 
 export async function POST(
@@ -84,7 +84,7 @@ export async function POST(
       },
       data: {
         status: newStatus,
-        ...(newStatus === 'DELIVERED' && { fulfilledAt: new Date() }),
+        ...(newStatus === 'COMPLETED' && { fulfilledAt: new Date() }),
       },
     });
 
@@ -112,8 +112,8 @@ export async function POST(
       },
     });
 
-    // If delivered, try to update parent order status
-    if (newStatus === 'DELIVERED') {
+    // If completed, try to update parent order status
+    if (newStatus === 'COMPLETED') {
       try {
         await checkAndUpdateParentOrderStatus(vendorOrder.orderId);
       } catch (e) {

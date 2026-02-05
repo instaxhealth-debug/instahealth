@@ -10,10 +10,9 @@ import { logOrderEvent } from '@/lib/fulfillment/order-events';
 import { ActorType } from '@prisma/client';
 
 const TERMINAL_VENDOR_STATUSES = new Set([
-  'DELIVERED',
+  'COMPLETED',
   'REJECTED',
   'CANCELLED',
-  'CANCELLED_BY_VENDOR',
   'FAILED',
 ]);
 
@@ -22,8 +21,8 @@ const TERMINAL_VENDOR_STATUSES = new Set([
  *
  * Rules:
  * - If all VendorOrders are terminal:
- *   - All DELIVERED → Order = FULFILLED
- *   - Some DELIVERED, rest terminal non-delivered → Order = PARTIALLY_FULFILLED
+ *   - All COMPLETED → Order = FULFILLED
+ *   - Some COMPLETED, rest terminal non-delivered → Order = PARTIALLY_FULFILLED
  *   - None delivered, all terminal non-delivered → Order = CANCELLED
  * - Otherwise: Order = FULFILLING
  */
@@ -44,7 +43,7 @@ export async function checkAndUpdateParentOrderStatus(orderId: string) {
     if (TERMINAL_VENDOR_STATUSES.has(vo.status)) {
       terminalCount++;
     }
-    if (vo.status === 'DELIVERED') {
+    if (vo.status === 'COMPLETED') {
       deliveredCount++;
     }
   }
@@ -57,11 +56,11 @@ export async function checkAndUpdateParentOrderStatus(orderId: string) {
     if (deliveredCount === vendorOrders.length) {
       // All delivered
       newStatus = 'FULFILLED';
-      reason = 'All vendor orders delivered';
+      reason = 'All vendor orders completed';
     } else if (deliveredCount > 0) {
       // Some delivered
       newStatus = 'PARTIALLY_FULFILLED';
-      reason = `${deliveredCount} of ${vendorOrders.length} vendor orders delivered`;
+      reason = `${deliveredCount} of ${vendorOrders.length} vendor orders completed`;
     } else {
       // None delivered (all rejected/cancelled)
       newStatus = 'CANCELLED';
