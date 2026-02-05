@@ -35,7 +35,7 @@ export function AccountSidebar({ activeItem = "personal-details" }: AccountSideb
       icon: MapPin,
       title: "Delivery Addresses",
       subtitle: "Add, edit and delete addresses",
-      href: "/my-account/addresses",
+      href: "/my-account/delivery-addresses",
     },
     {
       icon: CreditCard,
@@ -53,7 +53,7 @@ export function AccountSidebar({ activeItem = "personal-details" }: AccountSideb
       icon: Database,
       title: "Personal Data",
       subtitle: "Manage your data options",
-      href: "/my-account/data",
+      href: "/my-account/personal-data",
     },
     {
       icon: Settings,

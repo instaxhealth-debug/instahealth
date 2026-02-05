@@ -11,6 +11,7 @@ import { ComplianceDisclaimer } from "@/components/compliance/Disclaimer";
 import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
 import { CheckoutForm, CheckoutFormData } from "@/components/checkout/CheckoutForm";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
+import { AddressModal } from "@/components/account/AddressModal";
 import Link from "next/link";
 
 export default function CheckoutPage() {
@@ -26,6 +27,8 @@ export default function CheckoutPage() {
   const [addressesError, setAddressesError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [modalForceOpen, setModalForceOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -57,9 +60,10 @@ export default function CheckoutPage() {
       setAddressesError("");
       
       try {
-        const response = await fetch("/api/account/addresses", {
+        const response = await fetch("/api/my-account/addresses", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
+          cache: "no-store",
         });
 
         if (!response.ok) {
@@ -69,6 +73,12 @@ export default function CheckoutPage() {
 
         const data = await response.json();
         setAddresses(data.addresses || []);
+        
+        // If no addresses, force open the modal for gating
+        if (!data.addresses || data.addresses.length === 0) {
+          setShowAddressModal(true);
+          setModalForceOpen(true);
+        }
       } catch (err: any) {
         setAddressesError(err.message || "Failed to load addresses");
       } finally {
@@ -78,6 +88,37 @@ export default function CheckoutPage() {
 
     fetchAddresses();
   }, [sessionStatus]);
+
+  // Handle add address in checkout gating
+  const handleAddAddressInCheckout = async (addressData: any) => {
+    try {
+      const response = await fetch("/api/my-account/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addressData),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to save address");
+      }
+
+      // Refresh addresses list
+      await fetch("/api/my-account/addresses", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          setAddresses(data.addresses || []);
+          setShowAddressModal(false);
+          setModalForceOpen(false);
+        });
+    } catch (err: any) {
+      throw err; // Re-throw to show error in modal
+    }
+  };
 
   // Handle form submission
   const handleCheckoutSubmit = async (formData: CheckoutFormData) => {
@@ -172,6 +213,37 @@ export default function CheckoutPage() {
     lineTotal: item.product.price * item.quantity,
   }));
 
+  // If user has 0 addresses and modal is forced open, block checkout
+  if (addresses.length === 0 && modalForceOpen) {
+    return (
+      <>
+        <CheckoutProgress currentStep="shipping" />
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Secure Checkout</h1>
+            <p className="text-gray-600">Complete your order securely</p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <p className="text-blue-900 font-medium">
+              You need to add a delivery address before proceeding with checkout.
+            </p>
+          </div>
+        </div>
+
+        <AddressModal
+          isOpen={showAddressModal}
+          onClose={() => {
+            // Don't allow closing if forced open and no addresses exist
+            if (addresses.length === 0) return;
+            setShowAddressModal(false);
+          }}
+          onSave={handleAddAddressInCheckout}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       {/* Progress Bar */}
@@ -223,6 +295,13 @@ export default function CheckoutPage() {
           </p>
         </div>
       </div>
+
+      {/* Address modal for adding during checkout */}
+      <AddressModal
+        isOpen={showAddressModal && !modalForceOpen}
+        onClose={() => setShowAddressModal(false)}
+        onSave={handleAddAddressInCheckout}
+      />
     </>
   );
 }

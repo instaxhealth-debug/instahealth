@@ -13,6 +13,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Redirect legacy /account/* routes to /my-account/*
+  if (pathname.startsWith("/account/")) {
+    const newPathname = pathname.replace(/^\/account/, "/my-account");
+    return NextResponse.redirect(new URL(newPathname, request.url), { status: 307 });
+  }
+
+  if (pathname === "/account") {
+    return NextResponse.redirect(new URL("/my-account/personal-details", request.url), { status: 307 });
+  }
+
   // For now, don't gate routes in middleware to avoid Edge/Prisma issues
   // Let server components handle auth checks instead
   return NextResponse.next();

@@ -53,6 +53,13 @@ model User {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   
+  // Personal data preferences
+  heightCm                 Int?     // Height in centimeters
+  weightKg                 Int?     // Weight in kilograms
+  consentShareBodyMetrics  Boolean  @default(false) // Consent to share height/weight for recommendations
+  marketingPushOptIn       Boolean  @default(false) // Push notification marketing consent
+  marketingEmailOptIn      Boolean  @default(false) // Email marketing consent
+  
   // Relations
   orders            Order[]
   carts             Cart[]
@@ -135,14 +142,24 @@ model Address {
   id                String   @id @default(cuid())
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   label             String   // e.g. "Home", "Work"
-  formattedAddress  String
-  placeId           String
+  phone             String?  // Optional contact phone for delivery
+  line1             String   // Apartment/villa + building
+  line2             String?  // Additional address line
+  area              String?  // Neighborhood/community
+  city              String?
+  emirate           String?  // UAE emirate
+  country           String   @default("United Arab Emirates")
+  instructions      String?  // Delivery instructions
+  
   lat               Float
   lng               Float
-  city              String?
-  state             String?
-  country           String?
+  placeId           String
+  formattedAddress  String   // Full formatted address from Google
+  
+  isDefault         Boolean  @default(false)
+  
   postalCode        String?
   normalizedHash    String   // For deduplication
   createdAt         DateTime @default(now())
@@ -150,6 +167,7 @@ model Address {
 
   @@unique([userId, normalizedHash])
   @@index([userId])
+  @@index([userId, isDefault])
 }
 
 model Vendor {
