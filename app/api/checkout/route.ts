@@ -40,7 +40,18 @@ export async function POST(req: NextRequest) {
       acceptedDisclaimer,
     } = body;
 
-    // Validate required fields
+    // Validate address presence first (critical for checkout gating)
+    if (!addressId && !placeId) {
+      return NextResponse.json(
+        { 
+          error: 'Delivery address is required to complete checkout',
+          code: 'ADDRESS_REQUIRED',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate other required fields
     if (!locationId || !shippingName || !shippingPhone || !shippingAddressLine1) {
       return NextResponse.json(
         { error: 'Missing required fields: locationId, shippingName, shippingPhone, shippingAddressLine1' },
@@ -99,8 +110,12 @@ export async function POST(req: NextRequest) {
       deliveryLat = placeData.lat;
       deliveryLng = placeData.lng;
     } else {
+      // This should never happen due to earlier validation
       return NextResponse.json(
-        { error: 'Either addressId or placeId is required for delivery address validation' },
+        { 
+          error: 'Delivery address is required',
+          code: 'ADDRESS_REQUIRED',
+        },
         { status: 400 }
       );
     }

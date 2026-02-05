@@ -44,12 +44,8 @@ export default function CheckoutPage() {
     }
   }, [items.length, sessionStatus, router]);
 
-  // Redirect if location not selected
-  useEffect(() => {
-    if (sessionStatus !== "loading" && !isSelected) {
-      router.push("/?selectLocation=true");
-    }
-  }, [sessionStatus, isSelected, router]);
+  // REMOVED: Location redirect check
+  // Address will be required via AddressModal gating instead
 
   // Load saved addresses
   useEffect(() => {
@@ -186,21 +182,8 @@ export default function CheckoutPage() {
     );
   }
 
-  // Location not selected
-  if (!isSelected) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <Card className="max-w-md mx-auto">
-          <CardContent className="py-12">
-            <p className="text-lg text-gray-600 mb-4">Please select a delivery location</p>
-            <Link href="/?selectLocation=true" className="text-primary hover:underline">
-              Select location
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // REMOVED: Location not selected check
+  // Address requirement is handled via AddressModal gating instead
 
   const total = getTotalPrice();
 

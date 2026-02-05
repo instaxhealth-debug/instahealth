@@ -26,20 +26,8 @@ export function CartView() {
     );
   }
 
-  if (!isSelected) {
-    return (
-      <Card className="border-primary/20">
-        <CardContent className="p-12 text-center">
-          <p className="text-muted-foreground mb-4">
-            Please select a delivery location to proceed with checkout
-          </p>
-          <Button asChild className="rounded-full">
-            <Link href="/">Select Location</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  // REMOVED: Location gate - cart should always be viewable
+  // Address will be required at checkout instead
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -145,6 +133,9 @@ export function CartView() {
                 <span>{items[0]?.product.currency || "USD"} {total.toFixed(2)}</span>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Delivery address will be required at checkout
+            </p>
             <Button className="w-full rounded-full" size="lg" asChild>
               <Link href="/checkout">Proceed to Checkout</Link>
             </Button>
