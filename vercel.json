@@ -3,6 +3,12 @@
   "installCommand": "npm ci",
   "framework": "nextjs",
   "regions": ["dub1"],
+  "crons": [
+    {
+      "path": "/api/admin/sla/enforce",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "functions": {
     "app/**": {
       "maxDuration": 10

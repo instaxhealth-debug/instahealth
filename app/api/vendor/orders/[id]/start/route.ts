@@ -1,13 +1,13 @@
 /**
- * POST /api/vendor/orders/[id]/accept
- * 
- * Vendor accepts a pending order.
- * CONCURRENCY SAFE: Uses WHERE guard to prevent race conditions
- * IDEMPOTENT at database level: If 0 rows updated, order was already processed
+ * POST /api/vendor/orders/[id]/start
+ *
+ * Vendor starts fulfillment:
+ * ACCEPTED → IN_PROGRESS
+ *
+ * CONCURRENCY SAFE: Uses WHERE guard to validate transition
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
 import { requireVendor } from '@/lib/auth/requireVendor';
 import { transitionVendorOrder, VendorOrderTransitionError } from '@/lib/fulfillment/vendor-order-machine';
 
@@ -21,36 +21,23 @@ export async function POST(
 
     const result = await transitionVendorOrder({
       vendorOrderId,
-      targetStatus: 'ACCEPTED',
+      targetStatus: 'IN_PROGRESS',
       actorType: 'VENDOR',
       actorId: vendorId,
       vendorId,
     });
 
-    // Update parent order status when accepted
-    try {
-      await checkAndUpdateParentOrderStatus(result.vendorOrder?.orderId as string);
-    } catch (e) {
-      console.error('Failed to update parent order status:', e);
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        already: result.already,
-        vendorOrder: {
-          id: result.vendorOrder?.id,
-          status: result.vendorOrder?.status,
-          acceptedAt: result.vendorOrder?.acceptedAt,
-          itemCount: result.vendorOrder?.items?.length,
-        },
+    return NextResponse.json({
+      success: true,
+      already: result.already,
+      vendorOrder: {
+        id: vendorOrderId,
+        status: 'IN_PROGRESS',
       },
-      { status: 200 }
-    );
+    });
   } catch (error) {
-    console.error('[vendor/accept] Error:', error);
-    
-    // Handle auth errors
+    console.error('[vendor/start] Error:', error);
+
     if (error instanceof VendorOrderTransitionError) {
       if (error.code === 'NOT_FOUND' || error.code === 'UNAUTHORIZED') {
         return NextResponse.json({ error: 'Vendor order not found' }, { status: 404 });
@@ -68,7 +55,7 @@ export async function POST(
         return NextResponse.json({ error: 'Forbidden - user is not a vendor' }, { status: 403 });
       }
     }
-    
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

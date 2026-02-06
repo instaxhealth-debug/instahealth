@@ -73,8 +73,8 @@ export async function GET(
     // Verify vendor owns this order
     if (vendorOrder.vendorId !== vendorId) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
+        { error: 'Vendor order not found' },
+        { status: 404 }
       );
     }
 

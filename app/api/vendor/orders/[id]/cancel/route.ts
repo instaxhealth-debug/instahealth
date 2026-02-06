@@ -10,12 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { issueVendorOrderRefund } from '@/lib/payments/refunds';
-import { logOrderEvent } from '@/lib/fulfillment/order-events';
-import { ActorType } from '@prisma/client';
 import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
 import { requireVendor } from '@/lib/auth/requireVendor';
+import { transitionVendorOrder, VendorOrderTransitionError } from '@/lib/fulfillment/vendor-order-machine';
 
 export async function POST(
   req: NextRequest,
@@ -24,7 +22,7 @@ export async function POST(
   try {
     const vendorOrderId = params.id;
     const body = await req.json();
-    const { reason } = body;
+    const reason = (body?.reason || '').trim();
 
     const { vendorId, userId } = await requireVendor();
 
@@ -35,136 +33,52 @@ export async function POST(
       );
     }
 
-    // Fetch vendor order
-    const vendorOrder = await prisma.vendorOrder.findUnique({
-      where: { id: vendorOrderId },
-      include: {
-        items: {
-          include: {
-            orderItem: true,
-          },
-        },
-        vendor: true,
-        order: true,
-      },
-    });
-
-    if (!vendorOrder) {
-      return NextResponse.json(
-        { error: 'Vendor order not found' },
-        { status: 404 }
-      );
-    }
-
-    // Verify vendor ownership
-    if (vendorOrder.vendorId !== vendorId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-
-    // Can only cancel if ACCEPTED or IN_PROGRESS
-    // Cannot cancel READY_FOR_FULFILLMENT (use reject instead)
-    // Cannot cancel already COMPLETED or CANCELLED
-    if (!['ACCEPTED', 'IN_PROGRESS'].includes(vendorOrder.status)) {
-      return NextResponse.json(
-        {
-          error: `Cannot cancel order in status: ${vendorOrder.status}. Use reject endpoint for READY_FOR_FULFILLMENT orders.`,
-        },
-        { status: 409 }
-      );
-    }
-
-    // UPDATE with WHERE guard
-    const updated = await prisma.vendorOrder.updateMany({
-      where: {
-        id: vendorOrderId,
-        status: {
-          in: ['ACCEPTED', 'IN_PROGRESS'],
-        },
-      },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-        notesInternal: `Cancelled by vendor: ${reason}`,
-        terminalReason: 'VENDOR_CANCELLED',
-        resolutionNotes: `Vendor cancelled after accepting. Reason: ${reason}`,
-      },
-    });
-
-    // If 0 rows updated, another process already updated it
-    if (updated.count === 0) {
-      return NextResponse.json(
-        { error: 'Order was already processed' },
-        { status: 409 }
-      );
-    }
-
-    // Calculate refund amount
-    const refundAmount = vendorOrder.items.reduce(
-      (sum, item) => sum + item.orderItem.lineTotalFils,
-      0
-    );
-
-    // Issue refund (idempotent via Refund table unique constraint)
-    // MVP: Always refund for cancelled-after-accept
-    try {
-      await issueVendorOrderRefund({
-        orderId: vendorOrder.orderId,
-        vendorOrderId,
-        amountFils: refundAmount,
-        reason: `Vendor cancelled after accept: ${reason}`,
-        actorType: ActorType.VENDOR,
-        actorId: vendorId,
-      });
-    } catch (refundError) {
-      console.error('Failed to issue refund:', refundError);
-      // Log failure but continue
-      await logOrderEvent({
-        orderId: vendorOrder.orderId,
-        vendorOrderId,
-        actorType: ActorType.SYSTEM,
-        eventType: 'REFUND_FAILED',
-        data: {
-          amountFils: refundAmount,
-          reason: refundError instanceof Error ? refundError.message : 'Unknown error',
-        },
-      });
-    }
-
-    // Log cancellation event
-    await logOrderEvent({
+    const result = await transitionVendorOrder({
       vendorOrderId,
-      orderId: vendorOrder.orderId,
-      actorType: ActorType.VENDOR,
+      targetStatus: 'CANCELLED',
+      actorType: 'VENDOR',
       actorId: vendorId,
-      eventType: 'VENDOR_CANCELLED_AFTER_ACCEPT',
-      data: {
-        vendorName: vendorOrder.vendor.name,
-        itemCount: vendorOrder.items.length,
-        reason,
-        previousStatus: vendorOrder.status,
-        cancelledAt: new Date().toISOString(),
-      },
+      vendorId,
+      reason: `Vendor cancelled after accept: ${reason}`,
+      terminalReason: 'VENDOR_CANCELLED',
     });
 
-    // Update parent order status
-    try {
-      await checkAndUpdateParentOrderStatus(vendorOrder.orderId);
-    } catch (e) {
-      console.error('Failed to update parent order status:', e);
+    if (!result.already) {
+      const refundAmount = result.vendorOrder?.items?.reduce(
+        (sum: number, item: any) => sum + item.orderItem.lineTotalFils,
+        0
+      ) || 0;
+
+      try {
+        await issueVendorOrderRefund({
+          orderId: result.vendorOrder?.orderId as string,
+          vendorOrderId,
+          amountFils: refundAmount,
+          reason: `Vendor cancelled after accept: ${reason}`,
+          actorType: 'VENDOR',
+          actorId: vendorId,
+        });
+      } catch (refundError) {
+        console.error('Failed to issue refund:', refundError);
+      }
+
+      try {
+        await checkAndUpdateParentOrderStatus(result.vendorOrder?.orderId as string);
+      } catch (e) {
+        console.error('Failed to update parent order status:', e);
+      }
     }
 
     return NextResponse.json(
       {
         success: true,
         message: 'Order cancelled by vendor and refund initiated',
+        already: result.already,
         vendorOrder: {
           id: vendorOrderId,
           status: 'CANCELLED',
-          cancelledAt: new Date().toISOString(),
-          itemCount: vendorOrder.items.length,
+          cancelledAt: result.vendorOrder?.cancelledAt || new Date().toISOString(),
+          itemCount: result.vendorOrder?.items?.length,
         },
       },
       { status: 200 }
@@ -173,6 +87,15 @@ export async function POST(
     console.error('[vendor/cancel] Error:', error);
     
     // Handle auth errors
+    if (error instanceof VendorOrderTransitionError) {
+      if (error.code === 'NOT_FOUND' || error.code === 'UNAUTHORIZED') {
+        return NextResponse.json({ error: 'Vendor order not found' }, { status: 404 });
+      }
+      if (error.code === 'INVALID_TRANSITION' || error.code === 'INVALID_DATA' || error.code === 'CONFLICT') {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+    }
+
     if (error instanceof Error) {
       if (error.message === 'UNAUTHORIZED') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

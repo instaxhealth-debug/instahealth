@@ -56,7 +56,7 @@ export async function GET(
     }
 
     if (vendorOrder.vendorId !== vendorId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ error: "Vendor order not found" }, { status: 404 });
     }
 
     return NextResponse.json({

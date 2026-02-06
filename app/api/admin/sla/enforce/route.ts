@@ -111,8 +111,10 @@ export async function POST(req: NextRequest) {
       result: {
         expiredOrderIds: result.expiredOrderIds,
         cancelledCount: result.cancelledCount,
-        refundCount: result.refundCount,
-        errors: result.errors,
+        processedCount: result.processedCount,
+        skippedCount: result.skippedCount,
+        refundedCount: result.refundCount,
+        failures: result.errors,
       },
       timestamp: new Date().toISOString(),
     });

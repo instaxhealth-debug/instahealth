@@ -14,6 +14,7 @@ interface VendorOrderActionsProps {
   status: VendorOrderStatus;
   canAccept: boolean;
   canReject: boolean;
+  canStart: boolean;
   canComplete: boolean;
 }
 
@@ -22,6 +23,7 @@ export function VendorOrderActions({
   status,
   canAccept,
   canReject,
+  canStart,
   canComplete,
 }: VendorOrderActionsProps) {
   const router = useRouter();
@@ -129,8 +131,37 @@ export function VendorOrderActions({
     }
   };
 
+  const handleStart = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/vendor/orders/${vendorOrderId}/start`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to start order");
+      }
+
+      toast({
+        title: "Order Started",
+        description: "Order moved to In Progress",
+      });
+
+      router.refresh();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Don't show actions if none are available
-  if (!canAccept && !canReject && !canComplete) {
+  if (!canAccept && !canReject && !canStart && !canComplete) {
     return null;
   }
 
@@ -220,6 +251,23 @@ export function VendorOrderActions({
               <CheckCircle className="h-4 w-4 mr-2" />
             )}
             Mark as Completed
+          </Button>
+        )}
+
+        {canStart && (
+          <Button
+            onClick={handleStart}
+            disabled={isLoading}
+            className="w-full"
+            size="lg"
+            variant="default"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4 mr-2" />
+            )}
+            Start Order
           </Button>
         )}
       </CardContent>

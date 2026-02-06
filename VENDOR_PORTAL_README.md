@@ -71,6 +71,47 @@ A complete, production-ready vendor portal where vendors can:
 - `docs/VENDOR_PORTAL_TESTING.md` - Full testing guide
 - `docs/VENDOR_PORTAL_SUMMARY.md` - Implementation details
 
+## 🧩 Vendor Onboarding (Admin)
+
+Use the admin vendors page to create vendor accounts in one step:
+
+1. Go to `/admin/vendors`
+2. Fill in **Name**, **Email**, **Password**
+3. If setting status = `active`, you **must** check **Compliance terms accepted**
+
+This creates:
+- `User` with role = `VENDOR`
+- `Vendor` linked via `Vendor.userId`
+- Compliance timestamps when accepted
+
+## 🛠️ Ops Playbook (Critical)
+
+### SLA Enforcement (Cron)
+- Endpoint: `POST /api/admin/sla/enforce`
+- Header: `x-cron-secret: $CRON_SECRET`
+- Schedule: every 5 minutes (Vercel cron)
+
+### Refund Retry (Failed Refunds)
+- Endpoint: `POST /api/admin/refunds/[refundId]/retry`
+- Header: `x-cron-secret: $CRON_SECRET`
+- Only retries refunds with status = FAILED
+
+### Refund Diagnostics
+- Endpoint: `GET /api/admin/refunds/summary`
+- Header: `x-cron-secret: $CRON_SECRET`
+- Returns counts by status + last 20 failures
+
+### Admin Vendor Order Debug (Impersonate)
+- Endpoint: `GET /api/admin/vendor-orders/[vendorOrderId]/impersonate`
+- Logs OrderEvent: `ADMIN_IMPERSONATE_VENDOR_ORDER_VIEW`
+
+## 🔐 Required Env Vars (Deploy)
+- CRON_SECRET
+- STRIPE_SECRET_KEY
+- STRIPE_WEBHOOK_SECRET
+- NEXTAUTH_SECRET
+- DATABASE_URL
+
 ## 🚀 Features
 
 ### Dashboard (`/vendor`)

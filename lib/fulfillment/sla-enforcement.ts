@@ -1,46 +1,49 @@
 /**
  * SLA Enforcement Job
- * Runs periodically to auto-cancel vendor orders that exceed the acceptance deadline
+ * Runs periodically to auto-reject vendor orders that exceed the acceptance deadline
  * Should run every 1-5 minutes via cron or API endpoint
  *
  * IDEMPOTENT: Safe to run multiple times. Only updates orders with
- * status = READY_FOR_FULFILLMENT and acceptBy < now.
+ * status IN (NEW, READY_FOR_FULFILLMENT) and acceptBy < now.
  */
 
 import { prisma } from '@/lib/prisma';
-import { logOrderEvent } from './order-events';
-import { ActorType } from '@prisma/client';
 import { issueVendorOrderRefund } from '@/lib/payments/refunds';
 import { checkAndUpdateParentOrderStatus } from './parent-status';
+import { transitionVendorOrder, VendorOrderTransitionError } from './vendor-order-machine';
 
 export interface SLAEnforcementResult {
   expiredOrderIds: string[];
   cancelledCount: number;
+  processedCount: number;
+  skippedCount: number;
   refundCount: number;
   errors: any[];
 }
 
 /**
- * Check for expired vendor orders and auto-cancel them
+ * Check for expired vendor orders and auto-reject them
  * This is idempotent - running multiple times is safe
  *
  * Concurrency safe: Uses WHERE guard to only update
- * READY_FOR_FULFILLMENT orders with acceptBy < now
+ * NEW/READY_FOR_FULFILLMENT orders with acceptBy < now
  */
 export async function enforceSLA(): Promise<SLAEnforcementResult> {
   const result: SLAEnforcementResult = {
     expiredOrderIds: [],
     cancelledCount: 0,
+    processedCount: 0,
+    skippedCount: 0,
     refundCount: 0,
     errors: [],
   };
 
   try {
-    // Find all ready-for-fulfillment vendor orders where acceptBy < now
+    // Find all NEW/READY_FOR_FULFILLMENT vendor orders where acceptBy < now
     // This query is safe to run multiple times (only finds expired)
     const expiredVendorOrders = await prisma.vendorOrder.findMany({
       where: {
-        status: 'READY_FOR_FULFILLMENT',
+        status: { in: ['NEW', 'READY_FOR_FULFILLMENT'] },
         acceptBy: {
           lt: new Date(),
         },
@@ -60,56 +63,32 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
 
     for (const vendorOrder of expiredVendorOrders) {
       try {
-        // Update with WHERE guard to ensure still READY_FOR_FULFILLMENT
-        // (prevents race if another process already updated it)
-        const updated = await prisma.vendorOrder.updateMany({
-          where: {
-            id: vendorOrder.id,
-            status: 'READY_FOR_FULFILLMENT', // Guard: only update if still ready
-            acceptBy: {
-              lt: new Date(),
-            },
-          },
-          data: {
-            status: 'CANCELLED',
-            cancelledAt: new Date(),
-            notesInternal: `Auto-cancelled by SLA enforcement at ${new Date().toISOString()}`,
-            terminalReason: 'SLA_EXPIRED',
-            resolutionNotes: `Vendor did not accept order within deadline. AcceptBy: ${vendorOrder.acceptBy.toISOString()}`,
-          },
+        const transition = await transitionVendorOrder({
+          vendorOrderId: vendorOrder.id,
+          targetStatus: 'REJECTED',
+          actorType: 'SYSTEM',
+          actorId: 'system',
+          terminalReason: 'SLA_EXPIRED',
+          reason: `Auto-rejected by SLA enforcement at ${new Date().toISOString()}`,
+          overrideEventType: 'VENDOR_SLA_EXPIRED_AUTO_REJECT',
+          allowExpiredAcceptBy: true,
         });
 
-        // If 0 rows updated, this order was already processed elsewhere
-        if (updated.count === 0) {
-          console.log(`[SLA] Order ${vendorOrder.id} already processed, skipping`);
+        if (transition.already) {
+          result.skippedCount++;
           continue;
         }
 
-        // Log event
-        await logOrderEvent({
-          vendorOrderId: vendorOrder.id,
-          orderId: vendorOrder.orderId,
-          actorType: ActorType.SYSTEM,
-          eventType: 'VENDOR_SLA_EXPIRED',
-          data: {
-            vendorName: vendorOrder.vendor.name,
-            acceptByTime: vendorOrder.acceptBy.toISOString(),
-            expiredAt: new Date().toISOString(),
-            minutesOverdue: Math.floor(
-              (Date.now() - vendorOrder.acceptBy.getTime()) / (1000 * 60)
-            ),
-            itemCount: vendorOrder.items.length,
-          },
-        });
-
         result.expiredOrderIds.push(vendorOrder.id);
         result.cancelledCount++;
+        result.processedCount++;
 
         // Process refund via idempotent refund helper
         try {
           // Calculate refund amount: sum of line totals
           const refundAmount = vendorOrder.items.reduce(
-            (sum, item) => sum + item.orderItem.lineTotalFils,
+            (sum: number, item: { orderItem: { lineTotalFils: number } }) =>
+              sum + item.orderItem.lineTotalFils,
             0
           );
 
@@ -118,7 +97,7 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
             vendorOrderId: vendorOrder.id,
             amountFils: refundAmount,
             reason: 'SLA expired - vendor did not accept in time',
-            actorType: ActorType.SYSTEM,
+            actorType: 'SYSTEM',
           });
 
           result.refundCount++;
@@ -159,6 +138,9 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
           phase: 'cancellation',
           error: error instanceof Error ? error.message : String(error),
         });
+        if (error instanceof VendorOrderTransitionError && error.code === 'CONFLICT') {
+          result.skippedCount++;
+        }
       }
     }
 
@@ -180,7 +162,7 @@ export async function enforceSLA(): Promise<SLAEnforcementResult> {
 export async function getSLAStatus() {
   const pendingOrders = await prisma.vendorOrder.findMany({
     where: {
-      status: 'READY_FOR_FULFILLMENT',
+      status: { in: ['NEW', 'READY_FOR_FULFILLMENT'] },
     },
     include: {
       vendor: true,
@@ -199,7 +181,7 @@ export async function getSLAStatus() {
 
   const now = new Date();
 
-  return pendingOrders.map((vo) => {
+  return pendingOrders.map((vo: any) => {
     const timeUntilExpiry = vo.acceptBy.getTime() - now.getTime();
     const isExpired = timeUntilExpiry < 0;
     const minutesRemaining = Math.ceil(timeUntilExpiry / (1000 * 60));

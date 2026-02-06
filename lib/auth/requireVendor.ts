@@ -6,7 +6,7 @@
  * Must be called in all vendor-facing routes.
  */
 
-import { getServerSession } from '@/lib/auth-server';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 interface VendorAuthResult {
@@ -19,7 +19,7 @@ interface VendorAuthResult {
  * Throws 401 if not authenticated, 403 if user is not linked to a vendor.
  */
 export async function requireVendor(): Promise<VendorAuthResult> {
-  const session = await getServerSession();
+  const session = await auth();
 
   if (!session || !session.user?.email) {
     throw new Error('UNAUTHORIZED');
@@ -42,6 +42,10 @@ export async function requireVendor(): Promise<VendorAuthResult> {
     throw new Error('FORBIDDEN');
   }
 
+  if (vendor.status !== 'active') {
+    throw new Error('FORBIDDEN');
+  }
+
   return { vendorId: vendor.id, userId: user.id };
 }
 
@@ -50,7 +54,7 @@ export async function requireVendor(): Promise<VendorAuthResult> {
  * Uses x-admin-role header (placeholder until NextAuth roles).
  */
 export async function requireAdmin(req: Request): Promise<{ userId: string }> {
-  const session = await getServerSession();
+  const session = await auth();
 
   if (!session || !session.user?.email) {
     throw new Error('UNAUTHORIZED');

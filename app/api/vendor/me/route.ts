@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest) {
     const vendor = await getVendorContext();
     const body = await req.json();
 
-    const { logoUrl, tagline, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
+    let { logoUrl, tagline, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
 
     // Validate logoUrl if provided
     if (logoUrl !== undefined && logoUrl !== null) {
@@ -17,6 +17,9 @@ export async function PATCH(req: NextRequest) {
           { error: validation.error },
           { status: 400 }
         );
+      }
+      if (validation.normalizedUrl) {
+        logoUrl = validation.normalizedUrl;
       }
     }
 

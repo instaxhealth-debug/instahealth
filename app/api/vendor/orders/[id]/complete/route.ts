@@ -1,80 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVendorContext } from "@/lib/vendor-auth";
-import { prisma } from "@/lib/prisma";
-import { VendorOrderStatus } from "@prisma/client";
+import { requireVendor } from "@/lib/auth/requireVendor";
+import { transitionVendorOrder, VendorOrderTransitionError } from "@/lib/fulfillment/vendor-order-machine";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const vendor = await getVendorContext();
     const vendorOrderId = params.id;
+    const { vendorId } = await requireVendor();
 
-    // Fetch and validate vendor order belongs to this vendor
-    const vendorOrder = await prisma.vendorOrder.findUnique({
-      where: { id: vendorOrderId },
-      include: { order: true },
-    });
-
-    if (!vendorOrder || vendorOrder.vendorId !== vendor.vendorId) {
-      return NextResponse.json(
-        { error: "Order not found or access denied" },
-        { status: 404 }
-      );
-    }
-
-    // Validate state transition - can only complete from ACCEPTED or IN_PROGRESS
-    if (
-      vendorOrder.status !== VendorOrderStatus.ACCEPTED &&
-      vendorOrder.status !== VendorOrderStatus.IN_PROGRESS
-    ) {
-      return NextResponse.json(
-        {
-          error: `Cannot complete order with status ${vendorOrder.status}. Must be ACCEPTED or IN_PROGRESS.`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Update vendor order to COMPLETED
-    const updated = await prisma.vendorOrder.update({
-      where: { id: vendorOrderId },
-      data: {
-        status: VendorOrderStatus.COMPLETED,
-        fulfilledAt: new Date(),
-      },
-    });
-
-    // Log OrderEvent
-    await prisma.orderEvent.create({
-      data: {
-        orderId: vendorOrder.orderId,
-        vendorOrderId: vendorOrder.id,
-        actorType: "VENDOR",
-        actorId: vendor.userId,
-        eventType: "VENDOR_FULFILLED",
-        data: {
-          vendorId: vendor.vendorId,
-          vendorName: vendor.vendorName,
-          previousStatus: vendorOrder.status,
-          newStatus: VendorOrderStatus.COMPLETED,
-        },
-      },
-    });
-
-    console.log("[VENDOR_ORDER_COMPLETE] ✓ Order completed", {
+    const result = await transitionVendorOrder({
       vendorOrderId,
-      vendorId: vendor.vendorId,
-      orderId: vendorOrder.orderId,
+      targetStatus: "COMPLETED",
+      actorType: "VENDOR",
+      actorId: vendorId,
+      vendorId,
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({
+      success: true,
+      already: result.already,
+      vendorOrder: {
+        id: vendorOrderId,
+        status: "COMPLETED",
+        fulfilledAt: result.vendorOrder?.fulfilledAt,
+      },
+    });
   } catch (error: any) {
     console.error("[VENDOR_ORDER_COMPLETE] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to complete order" },
-      { status: 500 }
-    );
+    if (error instanceof VendorOrderTransitionError) {
+      if (error.code === "NOT_FOUND" || error.code === "UNAUTHORIZED") {
+        return NextResponse.json({ error: "Vendor order not found" }, { status: 404 });
+      }
+      if (error.code === "INVALID_TRANSITION" || error.code === "INVALID_DATA" || error.code === "CONFLICT") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+    }
+
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (error.message === "FORBIDDEN") {
+        return NextResponse.json({ error: "Forbidden - user is not a vendor" }, { status: 403 });
+      }
+    }
+
+    return NextResponse.json({ error: "Failed to complete order" }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyInviteToken, hashPassword } from '@/lib/auth-utils';
+import { generateSlug, generateUniqueSlug } from '@/lib/utils/slug';
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,12 +86,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create or update vendor record
-    const vendorSlug = application.legalBusinessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    // Prevent duplicate vendor by email
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { email: application.contactEmail },
+    });
+    if (existingVendor) {
+      return NextResponse.json(
+        { error: 'A vendor with this email already exists' },
+        { status: 409 }
+      );
+    }
 
+    const baseSlug = generateSlug(application.legalBusinessName);
+    const vendorSlug = await generateUniqueSlug(baseSlug, async (candidate) => {
+      const existing = await prisma.vendor.findUnique({ where: { slug: candidate } });
+      return !!existing;
+    });
+
+    // Create vendor record (inactive until compliance verified)
     const vendor = await prisma.vendor.create({
       data: {
         name: application.legalBusinessName,
@@ -100,7 +113,9 @@ export async function POST(request: NextRequest) {
         country: application.country,
         legalEntityName: application.legalBusinessName,
         licenseNumber: application.businessRegNumber,
-        status: 'active',
+        status: 'inactive',
+        complianceAccepted: false,
+        complianceAcceptedAt: null,
       },
     });
 

@@ -9,6 +9,7 @@ import { Clock, Package, AlertCircle } from "lucide-react";
 import { VendorOrderStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
+const PAGE_SIZE = 20;
 
 interface PageProps {
   searchParams: { [key: string]: string | string[] | undefined };
@@ -30,6 +31,10 @@ export default async function VendorOrders({ searchParams }: PageProps) {
 
   // Parse filters from URL
   const statusFilter = searchParams.status as VendorOrderStatus | undefined;
+  const query = typeof searchParams.q === "string" ? searchParams.q.trim() : "";
+  const cursor = typeof searchParams.cursor === "string" ? searchParams.cursor : undefined;
+  const direction = searchParams.dir === "prev" ? "prev" : "next";
+  const isPrev = direction === "prev";
 
   // Build query
   const where: any = {
@@ -38,6 +43,14 @@ export default async function VendorOrders({ searchParams }: PageProps) {
 
   if (statusFilter) {
     where.status = statusFilter;
+  }
+
+  if (query) {
+    where.OR = [
+      { orderId: { contains: query, mode: "insensitive" } },
+      { order: { shippingName: { contains: query, mode: "insensitive" } } },
+      { order: { shippingPhone: { contains: query, mode: "insensitive" } } },
+    ];
   }
 
   // Fetch orders with strict vendor scoping
@@ -64,11 +77,18 @@ export default async function VendorOrders({ searchParams }: PageProps) {
         },
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 100, // Limit for performance
+    orderBy: isPrev
+      ? [{ createdAt: "asc" }, { id: "asc" }]
+      : [{ createdAt: "desc" }, { id: "desc" }],
+    take: PAGE_SIZE + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
+
+  const hasMore = vendorOrders.length > PAGE_SIZE;
+  const slicedItems = hasMore ? vendorOrders.slice(0, PAGE_SIZE) : vendorOrders;
+  const pageItems = isPrev ? slicedItems.reverse() : slicedItems;
+  const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : null;
+  const prevCursor = pageItems.length > 0 ? pageItems[0]?.id : null;
 
   const statusCounts = await prisma.vendorOrder.groupBy({
     by: ["status"],
@@ -80,11 +100,37 @@ export default async function VendorOrders({ searchParams }: PageProps) {
     statusCounts.map((s) => [s.status, s._count])
   );
 
+  const buildUrl = (params: Record<string, string | undefined>) => {
+    const qp = new URLSearchParams();
+    if (params.status) qp.set("status", params.status);
+    if (params.q) qp.set("q", params.q);
+    if (params.cursor) qp.set("cursor", params.cursor);
+    if (params.dir) qp.set("dir", params.dir);
+    const queryString = qp.toString();
+    return queryString ? `/vendor/orders?${queryString}` : "/vendor/orders";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Orders</h1>
       </div>
+
+      <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search by order ID, customer name, or phone"
+          className="w-full rounded border px-3 py-2 text-sm"
+        />
+        <div className="flex gap-2">
+          <Button type="submit" size="sm">Search</Button>
+          <Button type="button" size="sm" variant="outline" asChild>
+            <Link href={buildUrl({ status: statusFilter })}>Clear</Link>
+          </Button>
+        </div>
+      </form>
 
       {/* Status Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2">
@@ -93,7 +139,7 @@ export default async function VendorOrders({ searchParams }: PageProps) {
           size="sm"
           asChild
         >
-          <Link href="/vendor/orders">All Orders</Link>
+          <Link href={buildUrl({ q: query })}>All Orders</Link>
         </Button>
         <Button
           variant={
@@ -102,7 +148,7 @@ export default async function VendorOrders({ searchParams }: PageProps) {
           size="sm"
           asChild
         >
-          <Link href="/vendor/orders?status=READY_FOR_FULFILLMENT">
+          <Link href={buildUrl({ status: "READY_FOR_FULFILLMENT", q: query })}>
             Pending ({countsByStatus["READY_FOR_FULFILLMENT"] || 0})
           </Link>
         </Button>
@@ -111,7 +157,7 @@ export default async function VendorOrders({ searchParams }: PageProps) {
           size="sm"
           asChild
         >
-          <Link href="/vendor/orders?status=ACCEPTED">
+          <Link href={buildUrl({ status: "ACCEPTED", q: query })}>
             Accepted ({countsByStatus["ACCEPTED"] || 0})
           </Link>
         </Button>
@@ -120,7 +166,7 @@ export default async function VendorOrders({ searchParams }: PageProps) {
           size="sm"
           asChild
         >
-          <Link href="/vendor/orders?status=IN_PROGRESS">
+          <Link href={buildUrl({ status: "IN_PROGRESS", q: query })}>
             In Progress ({countsByStatus["IN_PROGRESS"] || 0})
           </Link>
         </Button>
@@ -129,7 +175,7 @@ export default async function VendorOrders({ searchParams }: PageProps) {
           size="sm"
           asChild
         >
-          <Link href="/vendor/orders?status=COMPLETED">
+          <Link href={buildUrl({ status: "COMPLETED", q: query })}>
             Completed ({countsByStatus["COMPLETED"] || 0})
           </Link>
         </Button>
@@ -137,15 +183,15 @@ export default async function VendorOrders({ searchParams }: PageProps) {
 
       {/* Orders List */}
       <div className="space-y-4">
-        {vendorOrders.length === 0 ? (
+        {pageItems.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No orders found</p>
+              <p>{query ? "No orders match your search" : "No orders found"}</p>
             </CardContent>
           </Card>
         ) : (
-          vendorOrders.map((vendorOrder) => {
+          pageItems.map((vendorOrder) => {
             const itemCount = vendorOrder.items.length;
             const totalFils = vendorOrder.totalFils;
             const isUrgent =
@@ -208,6 +254,37 @@ export default async function VendorOrders({ searchParams }: PageProps) {
               </Link>
             );
           })
+        )}
+      </div>
+
+      <div className="flex justify-center gap-2 pt-4">
+        {cursor && prevCursor && (
+          <Button asChild variant="outline">
+            <Link
+              href={buildUrl({
+                status: statusFilter,
+                q: query,
+                cursor: prevCursor,
+                dir: "prev",
+              })}
+            >
+              Prev Page
+            </Link>
+          </Button>
+        )}
+        {nextCursor && (
+          <Button asChild variant="outline">
+            <Link
+              href={buildUrl({
+                status: statusFilter,
+                q: query,
+                cursor: nextCursor,
+                dir: "next",
+              })}
+            >
+              Next Page
+            </Link>
+          </Button>
         )}
       </div>
     </div>

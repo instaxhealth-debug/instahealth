@@ -93,8 +93,9 @@ export default async function VendorOrderDetail({
       vendorOrder.status === "NEW") &&
     new Date(vendorOrder.acceptBy) > new Date();
 
-  const canComplete =
-    vendorOrder.status === "ACCEPTED" || vendorOrder.status === "IN_PROGRESS";
+  const canStart = vendorOrder.status === "ACCEPTED";
+
+  const canComplete = vendorOrder.status === "IN_PROGRESS";
 
   return (
     <div className="space-y-6">
@@ -266,6 +267,7 @@ export default async function VendorOrderDetail({
         status={vendorOrder.status}
         canAccept={canAccept}
         canReject={canReject}
+        canStart={canStart}
         canComplete={canComplete}
       />
     </div>

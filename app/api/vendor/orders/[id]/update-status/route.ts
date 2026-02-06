@@ -8,17 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { logOrderEvent } from '@/lib/fulfillment/order-events';
-import { ActorType } from '@prisma/client';
 import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
 import { requireVendor } from '@/lib/auth/requireVendor';
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  READY_FOR_FULFILLMENT: ['ACCEPTED', 'REJECTED'],
-  ACCEPTED: ['IN_PROGRESS'],
-  IN_PROGRESS: ['COMPLETED'],
-};
+import { transitionVendorOrder, VendorOrderTransitionError } from '@/lib/fulfillment/vendor-order-machine';
 
 export async function POST(
   req: NextRequest,
@@ -29,7 +21,7 @@ export async function POST(
     const body = await req.json();
     const { newStatus } = body;
 
-    const { vendorId, userId } = await requireVendor();
+    const { vendorId } = await requireVendor();
 
     if (!newStatus) {
       return NextResponse.json(
@@ -38,106 +30,57 @@ export async function POST(
       );
     }
 
-    // Fetch vendor order
-    const vendorOrder = await prisma.vendorOrder.findUnique({
-      where: { id: vendorOrderId },
-      include: {
-        items: true,
-        vendor: true,
-      },
-    });
+    const validStatuses = [
+      'NEW',
+      'READY_FOR_FULFILLMENT',
+      'ACCEPTED',
+      'IN_PROGRESS',
+      'COMPLETED',
+      'REJECTED',
+      'CANCELLED',
+      'FAILED',
+    ];
 
-    if (!vendorOrder) {
+    if (!validStatuses.includes(newStatus)) {
       return NextResponse.json(
-        { error: 'Vendor order not found' },
-        { status: 404 }
+        { error: 'Invalid status value' },
+        { status: 400 }
       );
     }
 
-    // Verify vendor ownership
-    if (vendorOrder.vendorId !== vendorId) {
+    if (newStatus === 'REJECTED') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
+        { error: 'Use /reject endpoint for rejection (reason required)' },
+        { status: 400 }
       );
     }
 
-    // Validate status transition
-    const allowedTransitions = VALID_TRANSITIONS[vendorOrder.status];
-    if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
-      return NextResponse.json(
-        {
-          error: `Cannot transition from ${vendorOrder.status} to ${newStatus}. Allowed: ${
-            allowedTransitions?.join(', ') || 'none'
-          }`,
-        },
-        { status: 409 }
-      );
-    }
-
-    // UPDATE with WHERE guard to ensure transition is valid
-    // This is concurrency-safe: only updates if current status matches expected
-    const updated = await prisma.vendorOrder.updateMany({
-      where: {
-        id: vendorOrderId,
-        status: vendorOrder.status, // Guard: must still be in current status
-      },
-      data: {
-        status: newStatus,
-        ...(newStatus === 'COMPLETED' && { fulfilledAt: new Date() }),
-      },
-    });
-
-    // If 0 rows updated, another process already updated it
-    if (updated.count === 0) {
-      return NextResponse.json(
-        { error: 'Order was already processed' },
-        { status: 409 }
-      );
-    }
-
-    // Log status change event
-    await logOrderEvent({
+    const result = await transitionVendorOrder({
       vendorOrderId,
-      orderId: vendorOrder.orderId,
-      actorType: ActorType.VENDOR,
+      targetStatus: newStatus,
+      actorType: 'VENDOR',
       actorId: vendorId,
-      eventType: 'VENDOR_STATUS_CHANGED',
-      data: {
-        vendorName: vendorOrder.vendor.name,
-        from: vendorOrder.status,
-        to: newStatus,
-        itemCount: vendorOrder.items.length,
-        timestamp: new Date().toISOString(),
-      },
+      vendorId,
     });
 
-    // If completed, try to update parent order status
     if (newStatus === 'COMPLETED') {
       try {
-        await checkAndUpdateParentOrderStatus(vendorOrder.orderId);
+        await checkAndUpdateParentOrderStatus(result.vendorOrder?.orderId as string);
       } catch (e) {
         console.error('Failed to update parent order status:', e);
       }
     }
 
-    // Return updated vendor order
-    const updated_vo = await prisma.vendorOrder.findUnique({
-      where: { id: vendorOrderId },
-      include: {
-        items: true,
-      },
-    });
-
     return NextResponse.json(
       {
         success: true,
+        already: result.already,
         vendorOrder: {
-          id: updated_vo?.id,
-          status: updated_vo?.status,
-          updatedAt: updated_vo?.updatedAt,
-          fulfilledAt: updated_vo?.fulfilledAt,
-          itemCount: updated_vo?.items.length,
+          id: result.vendorOrder?.id,
+          status: result.vendorOrder?.status,
+          updatedAt: result.vendorOrder?.updatedAt,
+          fulfilledAt: result.vendorOrder?.fulfilledAt,
+          itemCount: result.vendorOrder?.items?.length,
         },
       },
       { status: 200 }
@@ -146,6 +89,15 @@ export async function POST(
     console.error('[vendor/update-status] Error:', error);
     
     // Handle auth errors
+    if (error instanceof VendorOrderTransitionError) {
+      if (error.code === 'NOT_FOUND' || error.code === 'UNAUTHORIZED') {
+        return NextResponse.json({ error: 'Vendor order not found' }, { status: 404 });
+      }
+      if (error.code === 'INVALID_TRANSITION' || error.code === 'INVALID_DATA' || error.code === 'CONFLICT') {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
+    }
+
     if (error instanceof Error) {
       if (error.message === 'UNAUTHORIZED') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

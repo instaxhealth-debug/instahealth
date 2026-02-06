@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
+import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,7 @@ async function createVendor(formData: FormData) {
 
   const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const password = (formData.get("password") as string) || "";
   const status = (formData.get("status") as string) || "active";
   const legalEntityName = (formData.get("legalEntityName") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
@@ -26,14 +28,38 @@ async function createVendor(formData: FormData) {
     throw new Error("Name and email are required");
   }
 
+  if (!isHouseBrand && !password) {
+    throw new Error("Password is required for non-house-brand vendors");
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new Error("A user with this email already exists");
+  }
+
+  const existingVendor = await prisma.vendor.findUnique({ where: { email } });
+  if (existingVendor) {
+    throw new Error("A vendor with this email already exists");
+  }
+
   const baseSlug = generateSlug(name);
   const slug = await generateUniqueSlug(baseSlug, async (candidate) => {
     const existing = await prisma.vendor.findUnique({ where: { slug: candidate } });
     return !!existing;
   });
 
-  // Enforce: vendor cannot be active unless complianceAccepted
-  const finalStatus = status === "active" && !complianceAccepted ? "inactive" : status;
+  // Enforce: vendor cannot be active unless complianceAccepted (except house brand)
+  const finalStatus = status === "active" && !complianceAccepted && !isHouseBrand ? "inactive" : status;
+
+  const user = password
+    ? await prisma.user.create({
+        data: {
+          email,
+          passwordHash: await bcrypt.hash(password, 10),
+          role: "VENDOR",
+        },
+      })
+    : null;
 
   await prisma.vendor.create({
     data: {
@@ -51,6 +77,7 @@ async function createVendor(formData: FormData) {
       rating,
       ratingCount,
       isHouseBrand,
+      userId: user?.id || null,
     },
   });
 
@@ -111,6 +138,16 @@ export default async function VendorsPage() {
               required
               className="w-full rounded border px-3 py-2 text-sm"
               placeholder="vendor@email.com"
+            />
+          </label>
+          <label className="text-sm space-y-1 sm:col-span-1">
+            <span className="block">Password *</span>
+            <input
+              name="password"
+              type="password"
+              required
+              className="w-full rounded border px-3 py-2 text-sm"
+              placeholder="Temporary password"
             />
           </label>
           <label className="text-sm space-y-1 sm:col-span-1">

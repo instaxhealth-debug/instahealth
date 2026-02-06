@@ -90,9 +90,12 @@ export async function getVendorContext(): Promise<VendorContext> {
 /**
  * Validate image URL for vendor settings
  * REJECT: file://, /Users/, local absolute paths
- * ALLOW: https://, http://, /logos/, /images/, relative web paths
+ * ALLOW: https://, http://, /vendors/, /products/, /logos/, /images/
+ * NORMALIZE: full URLs to relative public paths when possible
  */
-export function validateImageUrl(url: string | null | undefined): { valid: boolean; error?: string } {
+export function validateImageUrl(
+  url: string | null | undefined
+): { valid: boolean; error?: string; normalizedUrl?: string } {
   if (!url || url.trim() === "") {
     return { valid: true }; // Empty is allowed (nullable field)
   }
@@ -109,15 +112,26 @@ export function validateImageUrl(url: string | null | undefined): { valid: boole
     return { valid: false, error: "Local file system paths are not allowed. Use web URLs or relative web paths." };
   }
 
-  // Allow https://, http://
-  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
-    return { valid: true };
+  const allowedPrefixes = ["/vendors/", "/products/", "/logos/", "/images/"];
+
+  // Normalize full URLs to relative public paths when possible
+  const fullUrlMatch = trimmed.match(/^https?:\/\/[^/]+(\/.*)$/i);
+  if (fullUrlMatch) {
+    const path = fullUrlMatch[1];
+    if (allowedPrefixes.some((prefix) => path.startsWith(prefix))) {
+      return { valid: true, normalizedUrl: path };
+    }
+    return { valid: true }; // external https URL allowed
   }
 
-  // Allow relative web paths starting with /
-  if (trimmed.startsWith("/")) {
-    return { valid: true };
+  // Allow relative web paths starting with approved prefixes
+  if (allowedPrefixes.some((prefix) => trimmed.startsWith(prefix))) {
+    return { valid: true, normalizedUrl: trimmed };
   }
 
-  return { valid: false, error: "Invalid URL format. Use https:// URLs or relative paths starting with /" };
+  return {
+    valid: false,
+    error:
+      "Invalid URL format. Use https:// URLs or public paths like /vendors/, /products/, /logos/, /images/",
+  };
 }

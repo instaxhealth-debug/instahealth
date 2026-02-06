@@ -8,7 +8,6 @@
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { logOrderEvent } from '@/lib/fulfillment/order-events';
-import { ActorType, RefundStatus } from '@prisma/client';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -20,7 +19,7 @@ export interface IssueRefundInput {
   amountFils: number;
   reason: string;
   actorId?: string;
-  actorType: ActorType;
+  actorType: 'SYSTEM' | 'VENDOR' | 'ADMIN' | 'USER';
 }
 
 /**
@@ -60,9 +59,12 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
   // Compute refund amount if not provided
   let refundAmount = amountFils;
   if (refundAmount === 0) {
-    refundAmount = vendorOrder.items.reduce((sum, item) => {
-      return sum + item.orderItem.lineTotalFils;
-    }, 0);
+    refundAmount = vendorOrder.items.reduce(
+      (sum: number, item: { orderItem: { lineTotalFils: number } }) => {
+        return sum + item.orderItem.lineTotalFils;
+      },
+      0
+    );
   }
 
   // Try to create Refund row (will fail if already exists due to UNIQUE constraint)
@@ -74,7 +76,7 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
         vendorOrderId,
         amountFils: refundAmount,
         reason,
-        status: RefundStatus.PENDING,
+        status: 'PENDING',
       },
     });
   } catch (e: any) {
@@ -85,12 +87,12 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
       });
 
       // If already succeeded, return success
-      if (existingRefund?.status === RefundStatus.SUCCEEDED) {
+      if (existingRefund?.status === 'SUCCEEDED') {
         return existingRefund;
       }
 
       // If failed, allow retry only via admin (not vendor)
-      if (existingRefund?.status === RefundStatus.FAILED) {
+      if (existingRefund?.status === 'FAILED') {
         throw new Error(
           'Refund previously failed; contact admin to retry'
         );
@@ -126,7 +128,7 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
       where: { id: refund.id },
       data: {
         stripeRefundId: stripeRefund.id,
-        status: RefundStatus.SUCCEEDED,
+        status: 'SUCCEEDED',
       },
     });
 
@@ -136,7 +138,7 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
       vendorOrderId,
       actorType,
       actorId,
-      eventType: 'PARTIAL_REFUND_CREATED',
+      eventType: 'REFUND_SUCCEEDED',
       data: {
         amountFils: refundAmount,
         amountAED: (refundAmount / 100).toFixed(2),
@@ -150,19 +152,112 @@ export async function issueVendorOrderRefund(input: IssueRefundInput) {
     // Mark refund as FAILED
     await prisma.refund.update({
       where: { id: refund.id },
-      data: { status: RefundStatus.FAILED },
+      data: { status: 'FAILED' },
     });
 
     // Log failure event
     await logOrderEvent({
       orderId,
       vendorOrderId,
-      actorType: ActorType.SYSTEM,
+      actorType: 'SYSTEM',
       eventType: 'REFUND_FAILED',
       data: {
         amountFils: refundAmount,
         reason: stripeError.message,
         refundId: refund.id,
+      },
+    });
+
+    throw new Error(`Stripe refund failed: ${stripeError.message}`);
+  }
+}
+
+/**
+ * Retry a failed refund by refund ID (admin-only usage).
+ */
+export async function retryRefund(
+  refundId: string,
+  actorType: 'SYSTEM' | 'VENDOR' | 'ADMIN' | 'USER',
+  actorId?: string
+) {
+  const refund = await prisma.refund.findUnique({ where: { id: refundId } });
+  if (!refund) {
+    throw new Error('Refund not found');
+  }
+
+  if (refund.status === 'SUCCEEDED') {
+    return refund;
+  }
+
+  if (refund.status !== 'FAILED') {
+    throw new Error('Refund is not in FAILED status');
+  }
+
+  if (refund.stripeRefundId) {
+    throw new Error('Refund already has a Stripe refund ID; manual review required');
+  }
+
+  const order = await prisma.order.findUniqueOrThrow({ where: { id: refund.orderId } });
+
+  if (!order.stripePaymentIntentId) {
+    throw new Error('Cannot refund order without stripe payment intent ID');
+  }
+
+  try {
+    const stripeRefund = await stripe.refunds.create({
+      payment_intent: order.stripePaymentIntentId as string,
+      amount: refund.amountFils,
+      reason: 'requested_by_customer',
+      metadata: {
+        orderId: refund.orderId,
+        vendorOrderId: refund.vendorOrderId,
+        reason: refund.reason,
+      },
+    }, {
+      idempotencyKey: `refund_retry_${refund.id}`,
+    });
+
+    const updated = await prisma.refund.update({
+      where: { id: refund.id },
+      data: {
+        stripeRefundId: stripeRefund.id,
+        status: 'SUCCEEDED',
+      },
+    });
+
+    await logOrderEvent({
+      orderId: refund.orderId,
+      vendorOrderId: refund.vendorOrderId,
+      actorType,
+      actorId,
+      eventType: 'REFUND_SUCCEEDED',
+      data: {
+        amountFils: refund.amountFils,
+        amountAED: (refund.amountFils / 100).toFixed(2),
+        reason: refund.reason,
+        stripeRefundId: stripeRefund.id,
+        retry: true,
+      },
+    });
+
+    return updated;
+  } catch (stripeError: any) {
+    await prisma.refund.update({
+      where: { id: refund.id },
+      data: { status: 'FAILED' },
+    });
+
+    await logOrderEvent({
+      orderId: refund.orderId,
+      vendorOrderId: refund.vendorOrderId,
+      actorType,
+      actorId,
+      eventType: 'REFUND_FAILED',
+      data: {
+        amountFils: refund.amountFils,
+        reason: stripeError.message,
+        refundId: refund.id,
+        retry: true,
       },
     });
 
