@@ -5,18 +5,58 @@ import { Button } from "@/components/ui/button";
 import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useLocationStore } from "@/lib/store/location-store";
+import { CartSkeleton } from "@/components/cart/CartSkeleton";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export function CartView() {
-  const { items, removeItem, updateQuantity } = useEnhancedCart();
+  const { items, removeItem, updateQuantity, getTotalPrice, isLoading, refreshKey, isLoggedIn } = useEnhancedCart();
   const { address, isSelected } = useLocationStore();
+  const router = useRouter();
+  const { toast } = useToast();
 
-  // Calculate total from items
-  const total = items.reduce((sum: any, item: any) => {
-    const itemTotal = (item.unitPriceFils ? item.unitPriceFils / 100 : item.product?.price || 0) * item.quantity;
-    return sum + itemTotal;
-  }, 0);
+  // Single source of truth for total price from hook
+  const total = getTotalPrice();
+
+  // Handle checkout navigation with debugging
+  const handleProceedToCheckout = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const DEBUG = process.env.NEXT_PUBLIC_DEBUG_CART === "true";
+    
+    if (DEBUG) {
+      console.log("[CART] Proceed to checkout clicked", {
+        pathname: typeof window !== "undefined" ? window.location.pathname : "SSR",
+        itemsCount: items.length,
+        isLoading,
+        isLoggedIn,
+        total
+      });
+    }
+
+    // Check if cart is empty
+    if (items.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Add some items to your cart before proceeding to checkout",
+        variant: "destructive",
+      });
+      if (DEBUG) console.log("[CART] Blocked: cart is empty");
+      return;
+    }
+
+    // Navigate to checkout
+    if (DEBUG) console.log("[CART] Navigating to /checkout");
+    router.push("/checkout");
+  };
+
+  // PERFORMANCE FIX: Show skeleton during initial load
+  if (isLoading && items.length === 0) {
+    return <CartSkeleton />;
+  }
 
   if (items.length === 0) {
     return (
@@ -35,7 +75,7 @@ export function CartView() {
   // Address will be required at checkout instead
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" key={refreshKey}>
       <div className="lg:col-span-2 space-y-4">
         {items.map((item) => {
           // Handle both DB cart items (with unitPriceFils) and local cart items (with product.price)
@@ -151,8 +191,14 @@ export function CartView() {
             <p className="text-xs text-muted-foreground text-center">
               Delivery address will be required at checkout
             </p>
-            <Button className="w-full rounded-full" size="lg" asChild>
-              <Link href="/checkout">Proceed to Checkout</Link>
+            <Button 
+              type="button"
+              className="w-full rounded-full" 
+              size="lg" 
+              onClick={handleProceedToCheckout}
+              disabled={isLoading || items.length === 0}
+            >
+              {isLoading ? "Loading..." : "Proceed to Checkout"}
             </Button>
             <Button variant="outline" className="w-full rounded-full" asChild>
               <Link href="/pepz">Continue Shopping</Link>

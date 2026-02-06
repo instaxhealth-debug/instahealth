@@ -43,9 +43,20 @@ export async function getOrCreateCart(userId: string) {
 
 /**
  * Add item to cart (or update quantity if exists)
+ * FIX: Now requires vendorId (schema change)
  */
 export async function addToCart(userId: string, productId: string, quantity: number = 1, variantId?: string | null) {
   const cart = await getOrCreateCart(userId);
+
+  // FIX: Fetch product to get vendorId
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { vendorId: true },
+  });
+
+  if (!product) {
+    throw new Error(`Product ${productId} not found`);
+  }
 
   const existingItem = await prisma.cartItem.findFirst({
     where: {
@@ -66,8 +77,10 @@ export async function addToCart(userId: string, productId: string, quantity: num
     data: {
       cartId: cart.id,
       productId,
+      vendorId: product.vendorId, // FIX: Include vendorId
       variantId: variantId ?? null,
       quantity,
+      unitPriceFils: 0, // Will be updated by caller or set from product
     },
   });
 }
@@ -99,6 +112,7 @@ export async function removeFromCart(cartItemId: string) {
 
 /**
  * Get cart with products and calculate total
+ * FIX: Now includes vendor data and uses unitPriceFils from cart for price snapshot
  */
 export async function getCartWithProducts(userId: string) {
   const cart = await prisma.cart.findUnique({
@@ -106,11 +120,13 @@ export async function getCartWithProducts(userId: string) {
     include: {
       items: {
         include: {
-          cart: {
-            select: {
-              id: true,
+          product: {
+            include: {
+              vendor: true,
             },
           },
+          vendor: true, // FIX: Include vendor relation
+          variant: true, // FIX: Include variant relation directly
         },
       },
     },
@@ -120,44 +136,24 @@ export async function getCartWithProducts(userId: string) {
     return null;
   }
 
-  // Get product details for each item
-  const itemsWithProducts = await Promise.all(
-    cart.items.map(async (item: any) => {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId },
-        include: {
-          vendor: true,
-          variants: item.variantId
-            ? {
-                where: { id: item.variantId },
-              }
-            : false,
-        },
-      });
+  // Filter out ghost items (items with null product or invalid variant)
+  const validItems = cart.items.filter((item: any) => {
+    const isGhost = !item.product || (item.variantId && !item.variant);
+    if (isGhost) {
+      console.warn(`[getCartWithProducts] Ghost item detected:`, { itemId: item.id, productId: item.productId, variantId: item.variantId });
+    }
+    return !isGhost;
+  });
 
-      // Get variant if present
-      const variant = item.variantId && product?.variants?.[0]
-        ? product.variants[0]
-        : null;
-
-      return {
-        ...item,
-        product,
-        variant,
-      };
-    })
-  );
-
-  // Calculate totals in fils (use variant price if available)
-  const subtotalFils = itemsWithProducts.reduce((sum: number, item: any) => {
-    if (!item.product) return sum;
-    const priceFils = item.variant?.priceFils || item.product.priceFils;
-    return sum + priceFils * item.quantity;
+  // Calculate totals in fils using unitPriceFils (price snapshot from cart item)
+  const subtotalFils = validItems.reduce((sum: number, item: any) => {
+    // Use unitPriceFils from cart item (snapshot at time of add)
+    return sum + item.unitPriceFils * item.quantity;
   }, 0);
 
   return {
     cart,
-    items: itemsWithProducts,
+    items: validItems,
     subtotalFils,
     totalFils: subtotalFils, // Add delivery logic later
   };

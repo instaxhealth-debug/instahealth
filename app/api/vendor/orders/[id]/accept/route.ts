@@ -8,10 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getVendorContext } from '@/lib/vendor-auth';
 import { logOrderEvent } from '@/lib/fulfillment/order-events';
 import { ActorType } from '@prisma/client';
 import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
-import { requireVendor } from '@/lib/auth/requireVendor';
 
 export async function POST(
   req: NextRequest,
@@ -20,7 +20,8 @@ export async function POST(
   try {
     const vendorOrderId = params.id;
 
-    const { vendorId, userId } = await requireVendor();
+    const vendor = await getVendorContext();
+    const { vendorId, userId } = { vendorId: vendor.vendorId, userId: vendor.userId };
 
     // Fetch order with guard conditions
     const vendorOrder = await prisma.vendorOrder.findUnique({

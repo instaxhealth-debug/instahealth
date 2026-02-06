@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { Home, ClipboardList, ShoppingCart, User } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { HeaderSearch } from "./HeaderSearch";
 import { HeaderNavItem } from "./HeaderNavItem";
+import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useCartStore } from "@/lib/store/cart-store";
 import type { LocationOption } from "@/lib/location";
 
@@ -16,7 +18,13 @@ interface HeaderProps {
 
 export function Header({ initialLocation: _initialLocation, locations: _locations }: HeaderProps) {
   const { data: session } = useSession();
-  const totalItems = useCartStore((state) => state.getTotalItems());
+  const { getTotalItems } = useEnhancedCart();
+  
+  // Subscribe directly to Zustand cart state for real-time updates
+  const localCartItems = useCartStore((state) => state.items);
+  
+  // Compute total items whenever cart or session changes
+  const totalItems = getTotalItems();
 
   return (
     <header className="sticky top-0 z-50 w-full hidden md:block">

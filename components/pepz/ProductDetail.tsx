@@ -70,7 +70,9 @@ export function ProductDetail({ slug }: ProductDetailProps) {
   const handleAddToCart = async () => {
     if (!product) return;
     try {
-      await addItem(product.id, product.shopifyVariantId, quantity);
+      // Note: shopifyVariantId is a Shopify ID, not our DB ProductVariant.id
+      // For products without variants in our DB, use undefined/null for variantId
+      await addItem(product.id, undefined, quantity);
       toast({
         title: "Added to cart",
         description: `${quantity} x ${product.name} added to your cart`,
@@ -88,7 +90,9 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     if (!product) return;
     // Add to cart first, then redirect
     try {
-      await addItem(product.id, product.shopifyVariantId, quantity);
+      // Note: shopifyVariantId is a Shopify ID, not our DB ProductVariant.id
+      // For products without variants in our DB, use undefined/null for variantId
+      await addItem(product.id, undefined, quantity);
       window.location.href = `/checkout?product=${product.id}&quantity=${quantity}`;
     } catch (error) {
       toast({

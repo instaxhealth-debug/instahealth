@@ -7,7 +7,6 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "./providers";
-import { LocationBootstrap } from "@/components/location/LocationBootstrap";
 import { logDatabaseConnection } from "@/lib/db/guardrail";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -26,15 +25,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // RootLayout is now DB-free
-  // Location data will be loaded client-side via LocationBootstrap
-  // Fallback empty state provided to Header components
+  // Location data loaded on-demand by components that need it
 
   return (
     <html lang="en">
       <body className={inter.className}>
         <Providers>
-          {/* Location Bootstrap - loads locations client-side */}
-          <LocationBootstrap />
+          {/* PERFORMANCE FIX: Removed LocationBootstrap - was making unused duplicate API calls */}
           
           {/* Desktop Header - hidden on mobile */}
           <Header initialLocation={null} locations={[]} />

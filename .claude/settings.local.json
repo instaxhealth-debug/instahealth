@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lighthouse http://localhost:3000/marketplace/labs --output=json --output=html --output-path=docs/performance-audits/marketplace --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
+      "Bash(lighthouse http://localhost:3000/cart --output=json --output=html --output-path=docs/performance-audits/cart --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
+      "Bash(curl -s http://localhost:3000/cart -I)",
+      "Bash(curl -s http://localhost:3000 -I)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill -9)",
+      "Bash(lighthouse http://localhost:3000/cart --output=json --output-path=docs/performance-audits/cart-after.report.json --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
+      "Bash(awk '{print \"\"\"\"✓ Cart audit complete (AFTER fixes):\"\"\"\", $5}')",
+      "Bash(node -e \"\nconst fs = require(''fs'');\nconst before = JSON.parse(fs.readFileSync(''docs/performance-audits/cart.report.json'', ''utf8''));\nconst after = JSON.parse(fs.readFileSync(''docs/performance-audits/cart-after.report.json'', ''utf8''));\n\nfunction compare(data, label) {\n  const m = data.audits;\n  const requests = m[''network-requests'']?.details?.items || [];\n  \n  return {\n    label,\n    score: (data.categories.performance.score * 100).toFixed(0),\n    lcp: m[''largest-contentful-paint''].numericValue,\n    tbt: m[''total-blocking-time''].numericValue,\n    requests: requests.length,\n    transfer: m[''total-byte-weight''].numericValue,\n  };\n}\n\nconst beforeMetrics = compare(before, ''BEFORE'');\nconst afterMetrics = compare(after, ''AFTER'');\n\nconsole.log(''========== CART PAGE: BEFORE VS AFTER ==========\\n'');\nconsole.log(''Performance Score:'');\nconsole.log(''  Before:'', beforeMetrics.score);\nconsole.log(''  After: '', afterMetrics.score);\nconsole.log(''  Change:'', (afterMetrics.score - beforeMetrics.score > 0 ? ''+'' : '''') + (afterMetrics.score - beforeMetrics.score));\nconsole.log('''');\nconsole.log(''LCP (Largest Contentful Paint):'');\nconsole.log(''  Before:'', (beforeMetrics.lcp / 1000).toFixed(2) + ''s'');\nconsole.log(''  After: '', (afterMetrics.lcp / 1000).toFixed(2) + ''s'');\nconsole.log(''  Change:'', ((afterMetrics.lcp - beforeMetrics.lcp) / 1000).toFixed(2) + ''s'', ''('' + ((afterMetrics.lcp / beforeMetrics.lcp - 1) * 100).toFixed(1) + ''%)'');\nconsole.log('''');\nconsole.log(''TBT (Total Blocking Time):'');\nconsole.log(''  Before:'', beforeMetrics.tbt.toFixed(0) + ''ms'');\nconsole.log(''  After: '', afterMetrics.tbt.toFixed(0) + ''ms'');\nconsole.log(''  Change:'', (afterMetrics.tbt - beforeMetrics.tbt).toFixed(0) + ''ms'', ''('' + ((afterMetrics.tbt / beforeMetrics.tbt - 1) * 100).toFixed(1) + ''%)'');\nconsole.log('''');\nconsole.log(''Network Requests:'');\nconsole.log(''  Before:'', beforeMetrics.requests);\nconsole.log(''  After: '', afterMetrics.requests);\nconsole.log(''  Change:'', (afterMetrics.requests - beforeMetrics.requests));\nconsole.log('''');\nconsole.log(''Total Transfer Size:'');\nconsole.log(''  Before:'', (beforeMetrics.transfer / 1024).toFixed(0) + '' KB'');\nconsole.log(''  After: '', (afterMetrics.transfer / 1024).toFixed(0) + '' KB'');\nconsole.log(''  Change:'', ((afterMetrics.transfer - beforeMetrics.transfer) / 1024).toFixed(0) + '' KB'', ''('' + ((afterMetrics.transfer / beforeMetrics.transfer - 1) * 100).toFixed(1) + ''%)'');\n\")"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm"
+  ]
+}

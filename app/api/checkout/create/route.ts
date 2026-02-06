@@ -193,22 +193,37 @@ export async function POST(req: NextRequest) {
         totalFils: cartData?.totalFils || 0,
       });
     }
-    
+
     // FIX: Ensure cart has items before proceeding
-    if (!cartData || cartData.items.length === 0) {
+    if (!cartData) {
       if (DEBUG) {
         // Debug: Check if cart exists in DB
         const dbCart = await prisma.cart.findUnique({
           where: { userId: user.id },
           include: { items: true },
         });
-        console.log("[CHECKOUT:CREATE] DB Cart check:", {
+        console.log("[CHECKOUT:CREATE] ✗ Cart not found. DB Cart check:", {
           exists: !!dbCart,
           items: dbCart?.items.length || 0,
         });
       }
-      console.log("[CHECKOUT:CREATE] ✗ Rejected: Cart is empty");
-      return NextResponse.json({ error: "Cart is empty", code: "EMPTY_CART" }, { status: 400 });
+      return NextResponse.json({ error: "Cart not found", code: "CART_NOT_FOUND" }, { status: 400 });
+    }
+
+    if (cartData.items.length === 0) {
+      if (DEBUG) {
+        // Debug: Check raw cart items before filtering
+        const dbCart = await prisma.cart.findUnique({
+          where: { userId: user.id },
+          include: { items: { include: { product: true, variant: true } } },
+        });
+        console.log("[CHECKOUT:CREATE] ✗ Cart empty after filtering. Raw cart:", {
+          totalItems: dbCart?.items.length || 0,
+          ghostItems: dbCart?.items.filter((i: any) => !i.product || (i.variantId && !i.variant)).length || 0,
+        });
+      }
+      console.log("[CHECKOUT:CREATE] ✗ Rejected: Cart is empty after filtering");
+      return NextResponse.json({ error: "Cart is empty", code: "EMPTY_CART_FILTERED" }, { status: 400 });
     }
 
     const { items, subtotalFils, totalFils } = cartData;

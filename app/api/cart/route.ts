@@ -7,7 +7,10 @@ export async function GET(req: NextRequest) {
   try {
     const session = await auth();
 
+    if (DEBUG) console.log("[API:CART:GET] Session:", { userId: session?.user?.id, email: session?.user?.email });
+
     if (!session?.user?.id) {
+      if (DEBUG) console.log("[API:CART:GET] ✗ Unauthorized - no session");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -27,11 +30,14 @@ export async function GET(req: NextRequest) {
     });
 
     if (!cart) {
+      if (DEBUG) console.log("[API:CART:GET] ✗ Cart not found for user:", session.user.id);
       return NextResponse.json(
         { error: "Cart not found" },
         { status: 404 }
       );
     }
+
+    if (DEBUG) console.log("[API:CART:GET] Cart identity:", { userId: cart.userId, cartId: cart.id, locationId: cart.locationId, status: cart.status, totalItems: cart.items.length });
 
     // FIX: Filter out ghost items (items with null product or orphaned variants)
     const validItems = cart.items.filter(item => {
@@ -42,8 +48,12 @@ export async function GET(req: NextRequest) {
       return !isGhost;
     });
     
-    if (DEBUG && validItems.length < cart.items.length) {
-      console.log("[API:CART:GET] Filtered ghost items:", { total: cart.items.length, valid: validItems.length, dropped: cart.items.length - validItems.length });
+    const droppedGhostItems = cart.items.length - validItems.length;
+    if (DEBUG) {
+      console.log("[API:CART:GET] Ghost item analysis:", { total: cart.items.length, valid: validItems.length, droppedGhostItems });
+      if (droppedGhostItems > 0) {
+        console.warn("[API:CART:GET] ⚠️  WARNING: Dropped", droppedGhostItems, "ghost items from response (client may have stale cache)");
+      }
     }
 
     return NextResponse.json({ ...cart, items: validItems });
@@ -192,18 +202,27 @@ export async function POST(req: NextRequest) {
           include: { variants: true },
         });
 
+        if (!product) {
+          if (DEBUG) console.log("[API:CART:POST] ✗ Product not found during create:", productId);
+          return NextResponse.json(
+            { error: "Product not found", code: "INVALID_PRODUCT" },
+            { status: 400 }
+          );
+        }
+
         const variant = normalizedVariantId
-          ? product?.variants.find((v) => v.id === normalizedVariantId)
+          ? product.variants.find((v) => v.id === normalizedVariantId)
           : null;
 
-        if (DEBUG) console.log("[API:CART:POST] Creating new item:", { productId, variantId: normalizedVariantId, qty: quantity });
+        if (DEBUG) console.log("[API:CART:POST] Creating new item:", { productId, vendorId: product.vendorId, variantId: normalizedVariantId, qty: quantity });
         await prisma.cartItem.create({
           data: {
             cartId: cart.id,
             productId,
+            vendorId: product.vendorId, // FIX: Store vendorId for correct checkout flow
             variantId: normalizedVariantId ?? null,
             quantity,
-            unitPriceFils: variant?.priceFils || product?.priceFils || 0,
+            unitPriceFils: variant?.priceFils || product.priceFils || 0,
           },
         });
       }
@@ -221,7 +240,23 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (DEBUG) console.log("[API:CART:POST] ✓ Returning cart:", { cartId: updatedCart?.id, itemCount: updatedCart?.items.length });
+    if (DEBUG) {
+      console.log("[API:CART:POST] ✓ Operation complete:", { 
+        action, 
+        cartId: updatedCart?.id, 
+        itemCount: updatedCart?.items.length,
+        userId: session.user.id,
+        locationId: updatedCart?.locationId,
+        items: updatedCart?.items.map(i => ({ 
+          id: i.id, 
+          productId: i.productId, 
+          variantId: i.variantId, 
+          qty: i.quantity,
+          hasProduct: !!i.product,
+          hasVariant: i.variantId ? !!i.variant : 'N/A'
+        }))
+      });
+    }
     return NextResponse.json(updatedCart);
   } catch (error) {
     console.error("[CART POST]", error);
