@@ -1,14 +1,24 @@
 import Link from "next/link";
-import { Settings, LogOut, ShoppingBag, Briefcase } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getVendorContext } from "@/lib/vendor-auth";
+import { VendorNav } from "./VendorNav";
+import { SignOutButton } from "./SignOutButton";
+import { headers } from "next/headers";
 
 export default async function VendorLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const requestHeaders = headers();
+  const isPublicRoute = requestHeaders.get("x-public-route") === "1";
+
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
   const vendor = await getVendorContext();
 
   return (
@@ -25,22 +35,7 @@ export default async function VendorLayout({
               <Link href="/vendor" className="font-bold text-xl">
                 {vendor.vendorName}
               </Link>
-              <nav className="hidden md:flex items-center gap-4">
-                <Link
-                  href="/vendor/orders"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                >
-                  <ShoppingBag className="h-4 w-4" />
-                  Orders
-                </Link>
-                <Link
-                  href="/vendor/settings"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                >
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </Link>
-              </nav>
+              <VendorNav />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground hidden lg:inline">
@@ -49,36 +44,11 @@ export default async function VendorLayout({
               <Button size="sm" asChild>
                 <Link href="/vendor">Dashboard</Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/api/auth/signout">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </Link>
-              </Button>
+              <SignOutButton />
             </div>
           </div>
         </div>
       </header>
-
-      {/* Mobile Navigation */}
-      <nav className="md:hidden border-b border-border/50 bg-card">
-        <div className="container mx-auto px-4 py-2 flex items-center gap-4">
-          <Link
-            href="/vendor/orders"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-          >
-            <ShoppingBag className="h-4 w-4" />
-            Orders
-          </Link>
-          <Link
-            href="/vendor/settings"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </Link>
-        </div>
-      </nav>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">{children}</main>

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logMarketplaceEvent } from "@/lib/marketplace-events";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -95,6 +96,8 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    let validatedProduct: { id: string; vendorId: string } | null = null;
+
     // FIX: Validate product exists before attempting add/update
     if (action !== "remove") {
       const product = await prisma.product.findUnique({ where: { id: productId } });
@@ -105,6 +108,8 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      validatedProduct = { id: product.id, vendorId: product.vendorId };
       
       // FIX: If variantId provided, validate it exists and belongs to this product
       if (normalizedVariantId) {
@@ -225,6 +230,18 @@ export async function POST(req: NextRequest) {
             unitPriceFils: variant?.priceFils || product.priceFils || 0,
           },
         });
+      }
+    }
+
+    if (action === "add" && validatedProduct) {
+      try {
+        await logMarketplaceEvent({
+          productId: validatedProduct.id,
+          vendorId: validatedProduct.vendorId,
+          eventType: "ADD_TO_CART",
+        });
+      } catch (error) {
+        console.error("[API:CART:POST] Failed to log add-to-cart event", error);
       }
     }
 

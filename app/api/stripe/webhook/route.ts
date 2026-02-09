@@ -6,6 +6,7 @@ import { createVendorOrders } from '@/lib/fulfillment/vendor-orders';
 import { clearCart } from '@/lib/cart';
 import { logOrderEvent } from '@/lib/fulfillment/order-events';
 import { checkAndUpdateParentOrderStatus } from '@/lib/fulfillment/parent-status';
+import { logMarketplaceEvent } from '@/lib/marketplace-events';
 import { ActorType } from '@prisma/client';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
         where: metadataOrderId
           ? { id: metadataOrderId }
           : { stripeCheckoutSessionId: session.id },
+        include: {
+          items: true,
+        },
       });
 
       if (!order) {
@@ -96,6 +100,22 @@ export async function POST(req: NextRequest) {
           stripePaymentIntentId: session.payment_intent,
         },
       });
+
+      if (order.items?.length) {
+        try {
+          await Promise.all(
+            order.items.map((item) =>
+              logMarketplaceEvent({
+                productId: item.productId,
+                vendorId: item.vendorId,
+                eventType: 'PURCHASE',
+              })
+            )
+          );
+        } catch (error) {
+          console.error('[STRIPE:WEBHOOK] Failed to log purchase events', error);
+        }
+      }
 
       console.log('Order marked as PAID:', order.id);
 

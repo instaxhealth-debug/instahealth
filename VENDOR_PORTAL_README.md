@@ -101,6 +101,25 @@ This creates:
 - Header: `x-cron-secret: $CRON_SECRET`
 - Returns counts by status + last 20 failures
 
+## Post-migration checks
+
+1) Run backfill:
+  - npm run backfill:vendorCategories
+
+2) Verify permissions:
+  - Vendor with allowedCategories ["peptides"] cannot create "iv_drips" (expect 403)
+  - Vendor cannot edit another vendor's product (expect 404)
+
+3) Verify Calendly:
+  - Create service item, set calendlyUrl, publish
+  - Confirm customer-facing "Book" redirects
+
+4) Verify live publish:
+  - Publish/unpublish reflects immediately on:
+    - /marketplace/[category]
+    - /marketplace/[category]/[vendor]
+    - /product/[handle]
+
 ### Admin Vendor Order Debug (Impersonate)
 - Endpoint: `GET /api/admin/vendor-orders/[vendorOrderId]/impersonate`
 - Logs OrderEvent: `ADMIN_IMPERSONATE_VENDOR_ORDER_VIEW`
@@ -239,6 +258,37 @@ IN_PROGRESS → COMPLETED  (vendor)
 ```
 
 All other transitions are rejected server-side.
+
+## ✅ PRODUCTION LAUNCH CHECKLIST
+
+### Required Vercel Production Env Vars
+- NEXTAUTH_URL=https://instahealth.ae
+- NEXT_PUBLIC_BASE_URL=https://instahealth.ae
+- EMAIL_FROM=info@instahealth.ae
+- RESEND_API_KEY=...
+- DATABASE_URL=... (Neon prod)
+- DIRECT_URL=... (Neon direct prod)
+- NEXTAUTH_SECRET=...
+- CRON_SECRET=...
+- ADMIN_EMAIL=...
+- VENDOR_APPLY_TO=... (admin inbox)
+
+### Production Test Steps (Non-Dev Friendly)
+1) Submit application on https://instahealth.ae/vendor/apply
+2) Confirm VendorApplication row appears in https://instahealth.ae/admin/vendor-applications
+3) Approve in https://instahealth.ae/admin/vendor-applications
+4) Confirm invite email arrives and link domain is instahealth.ae
+5) Open link, set password, confirm invite usedAt is set
+6) Login as vendor, confirm /vendor loads
+7) Forgot password works and sends email with correct domain
+8) Vendor cannot access other vendor data (expect 404)
+
+### Deployment Verification Commands
+```bash
+npx prisma migrate deploy
+npx prisma generate
+npm run build
+```
 
 ## 📚 Documentation
 

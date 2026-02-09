@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
+import { normalizeCategory } from "@/lib/vendor-categories";
 import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,11 @@ async function createVendor(formData: FormData) {
   const ratingCount = formData.get("ratingCount") ? parseInt(formData.get("ratingCount") as string) : null;
   const isHouseBrand = formData.get("isHouseBrand") === "on";
   const complianceAccepted = formData.get("complianceAccepted") === "on";
+  const allowedCategoriesRaw = (formData.get("allowedCategories") as string) || "";
+  const allowedCategories = allowedCategoriesRaw
+    .split(",")
+    .map((value) => normalizeCategory(value.trim()))
+    .filter(Boolean);
 
   if (!name || !email) {
     throw new Error("Name and email are required");
@@ -78,6 +84,7 @@ async function createVendor(formData: FormData) {
       ratingCount,
       isHouseBrand,
       userId: user?.id || null,
+      allowedCategories,
     },
   });
 
@@ -178,6 +185,17 @@ export default async function VendorsPage() {
             />
             <p className="text-xs text-gray-500">
               Use a public path like /logos/pepz.png
+            </p>
+          </div>
+          <div className="sm:col-span-3 space-y-1">
+            <label className="text-sm font-medium">Allowed Categories</label>
+            <input
+              name="allowedCategories"
+              placeholder="peptides, supplements, iv-drips"
+              className="w-full rounded border px-3 py-2"
+            />
+            <p className="text-xs text-gray-500">
+              Comma-separated category slugs. Leave empty to allow all.
             </p>
           </div>
           <div className="sm:col-span-2 space-y-1">

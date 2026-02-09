@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,21 @@ import { Input } from '@/components/ui/input';
 
 export default function VendorLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const activated = searchParams?.get('activated') === '1';
+  const reset = searchParams?.get('reset') === '1';
+
+  useEffect(() => {
+    const prefillEmail = searchParams?.get('email');
+    if (prefillEmail && !email) {
+      setEmail(prefillEmail);
+    }
+  }, [searchParams, email]);
 
   // Redirect if already logged in as vendor
   useEffect(() => {
@@ -95,6 +105,16 @@ export default function VendorLoginPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {activated && (
+            <div className="mb-4 p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
+              Account activated. Please log in.
+            </div>
+          )}
+          {reset && (
+            <div className="mb-4 p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
+              Password reset successful. Please log in.
+            </div>
+          )}
           {error && (
             <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
               {error}
@@ -142,6 +162,11 @@ export default function VendorLoginPage() {
           </form>
 
           <div className="mt-4">
+            <div className="mb-4 text-center text-sm text-gray-600">
+              <Link href="/forgot-password" className="text-[#41a59b] hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <Button
               variant="outline"
               className="w-full"

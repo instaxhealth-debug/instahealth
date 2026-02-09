@@ -28,6 +28,7 @@ export interface Offering {
   availabilityText?: string; // e.g., "Delivery today", "Next available: Tomorrow"
   image?: string;
   slug: string;
+  calendlyUrl?: string;
   
   // Shopify integration (for products)
   shopifyProductId?: string;

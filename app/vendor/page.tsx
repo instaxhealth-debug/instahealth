@@ -6,7 +6,33 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ShoppingBag, Package, CheckCircle, Clock, ArrowUpRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { VendorOrderStatus } from "@prisma/client";
+type VendorOrderStatus =
+  | "NEW"
+  | "READY_FOR_FULFILLMENT"
+  | "ACCEPTED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "FAILED";
+
+type PendingOrderRow = {
+  id: string;
+  status: VendorOrderStatus;
+  totalFils: number;
+  createdAt: Date;
+  acceptBy: Date | null;
+  _count: { items: number };
+};
+
+type AcceptedOrderRow = {
+  id: string;
+  status: VendorOrderStatus;
+  totalFils: number;
+  createdAt: Date;
+  updatedAt: Date;
+  _count: { items: number };
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +88,7 @@ export default async function VendorDashboard() {
       },
       orderBy: [{ acceptBy: "asc" }, { createdAt: "asc" }],
       take: 20,
-    }),
+    }) as Promise<PendingOrderRow[]>,
     prisma.vendorOrder.findMany({
       where: {
         vendorId: vendor.vendorId,
@@ -78,7 +104,7 @@ export default async function VendorDashboard() {
       },
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       take: 20,
-    }),
+    }) as Promise<AcceptedOrderRow[]>,
   ]);
 
   const STATUS_COLORS: Record<VendorOrderStatus, string> = {
@@ -159,16 +185,22 @@ export default async function VendorDashboard() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <Button asChild className="w-full justify-start">
+              <Link href="/vendor/products/new">
+                <Package className="mr-2 h-4 w-4" />
+                Add New Product
+              </Link>
+            </Button>
             <Button asChild className="w-full justify-start" variant="outline">
-              <Link href="/vendor/orders?status=READY_FOR_FULFILLMENT">
-                <Clock className="mr-2 h-4 w-4" />
-                View Pending Orders
+              <Link href="/vendor/products">
+                <Package className="mr-2 h-4 w-4" />
+                Manage Products
               </Link>
             </Button>
             <Button asChild className="w-full justify-start" variant="outline">
               <Link href="/vendor/orders">
                 <ShoppingBag className="mr-2 h-4 w-4" />
-                All Orders
+                View Orders
               </Link>
             </Button>
             <Button asChild className="w-full justify-start" variant="outline">
@@ -219,7 +251,7 @@ export default async function VendorDashboard() {
                   No pending orders right now.
                 </p>
               ) : (
-                pendingList.map((order) => {
+                pendingList.map((order: PendingOrderRow) => {
                   const acceptByDate = order.acceptBy ? new Date(order.acceptBy) : null;
                   const isExpired = acceptByDate ? acceptByDate < new Date() : false;
                   return (
@@ -285,7 +317,7 @@ export default async function VendorDashboard() {
                   No accepted or in-progress orders.
                 </p>
               ) : (
-                acceptedList.map((order) => (
+                acceptedList.map((order: AcceptedOrderRow) => (
                   <div
                     key={order.id}
                     className="flex flex-col gap-2 rounded-lg border border-border/60 p-3"

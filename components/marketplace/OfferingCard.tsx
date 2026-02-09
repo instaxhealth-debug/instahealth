@@ -4,11 +4,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Calendar } from "lucide-react";
+import { ShoppingCart, Calendar, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
 import type { Offering } from "@/types/offering";
+import { isValidCalendlyUrl } from "@/lib/vendor-categories";
 
 interface OfferingCardProps {
   offering: Offering;
@@ -22,25 +23,27 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (process.env.NEXT_PUBLIC_DEBUG_CART === "true") {
-      console.warn("[CART:OFFERING_CARD] Cart not supported - OfferingCard uses mock IDs. Use ProductCard instead.");
+
+    try {
+      await addItem(offering.id, undefined, 1);
+      toast({
+        title: "Added to cart",
+        description: `${offering.name} added to your cart`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
     }
-    toast({
-      title: "Coming soon",
-      description: "Shopping will be available soon. Visit the shop to add items to your cart.",
-      variant: "default",
-    });
   };
 
   const getRoute = () => {
     if (offering.type === "product") {
       return `/product/${offering.slug}`;
-    } else if (offering.type === "service") {
-      return `/ivz/services/${offering.slug}`;
-    } else {
-      return `/bloodz/tests/${offering.slug}`;
     }
+    return `/marketplace/book/${offering.slug}`;
   };
 
   const stockStatus = offering.stockStatus
@@ -51,6 +54,12 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
       : { label: "Out of stock", variant: "destructive" as const }
     : { label: "In stock", variant: "default" as const };
 
+  const hasValidCalendly =
+    offering.type !== "product" &&
+    !!offering.calendlyUrl &&
+    isValidCalendlyUrl(offering.calendlyUrl);
+  const route = offering.type === "product" ? getRoute() : hasValidCalendly ? getRoute() : "#";
+
   return (
     <Card
       className={cn(
@@ -58,7 +67,15 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
         className
       )}
     >
-      <Link href={getRoute()}>
+      <Link
+        href={route}
+        onClick={(event) => {
+          if (route === "#") {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden bg-muted">
             {offering.image && 
@@ -139,14 +156,24 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
               <Button
                 className="w-full rounded-full mt-1.5 bg-primary hover:bg-primary/90 text-white font-semibold h-8 text-xs"
                 size="sm"
+                disabled={!hasValidCalendly}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  if (!hasValidCalendly) return;
                   window.location.href = getRoute();
                 }}
               >
-                <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                {offering.type === "service" ? "Book Now" : "Book Test"}
+                {hasValidCalendly ? (
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                ) : (
+                  <Ban className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                {hasValidCalendly
+                  ? offering.type === "service"
+                    ? "Book Now"
+                    : "Book Test"
+                  : "Unavailable"}
               </Button>
             )}
           </div>

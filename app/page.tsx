@@ -5,15 +5,23 @@ import { PopularNow } from "@/components/home/PopularNow";
 import { MostBooked } from "@/components/home/MostBooked";
 import { FeaturedSection } from "@/components/home/FeaturedSection";
 import { getProductsFromPrisma } from "@/lib/api/products";
+import { getMostBooked, getPopularNow } from "@/lib/marketplace-rankings";
+import { prismaProductToOffering } from "@/lib/marketplace-offerings";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 60; // Cache for 60 seconds
+export const revalidate = 0;
 
 export default async function HomePage() {
-  // Fetch products server-side
-  const products = await getProductsFromPrisma();
+  const [products, popularNow, mostBooked] = await Promise.all([
+    getProductsFromPrisma(),
+    getPopularNow(10),
+    getMostBooked(10),
+  ]);
+
+  const popularOfferings = popularNow.map(prismaProductToOffering);
+  const mostBookedOfferings = mostBooked.map(prismaProductToOffering);
 
   return (
     <div className="flex flex-col">
@@ -33,8 +41,8 @@ export default async function HomePage() {
         </div>
         <PromoBanner />
         <AvailableNow />
-        <PopularNow products={products} />
-        <MostBooked />
+        <PopularNow offerings={popularOfferings} />
+        <MostBooked offerings={mostBookedOfferings} />
         <FeaturedSection products={products.slice(0, 4)} />
       </div>
     </div>

@@ -179,6 +179,35 @@ export async function sendVendorInviteEmail(
 }
 
 /**
+ * Send password reset email
+ */
+export async function sendPasswordResetEmail(
+  userEmail: string,
+  resetLink: string
+): Promise<EmailResponse> {
+  const html = `
+    <h2>Reset your InstaHealth password</h2>
+    <p>We received a request to reset your password.</p>
+    <p>Click the link below to set a new password:</p>
+    <p style="margin: 20px 0;">
+      <a href="${escapeHtml(resetLink)}" style="background: #41a59b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+        Reset Password
+      </a>
+    </p>
+    <p><strong>This link expires in 1 hour.</strong></p>
+    <p>If you didn't request a password reset, you can ignore this email.</p>
+    <hr />
+    <p style="font-size: 12px; color: #666;">InstaHealth - Health & Wellness Marketplace</p>
+  `;
+
+  return sendEmail({
+    to: userEmail,
+    subject: "Reset your InstaHealth password",
+    html,
+  });
+}
+
+/**
  * Utility to escape HTML
  */
 function escapeHtml(text: string): string {

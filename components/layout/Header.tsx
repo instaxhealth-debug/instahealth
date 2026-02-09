@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, ClipboardList, ShoppingCart, User } from "lucide-react";
+import { Home, ClipboardList, ShoppingCart, User, Briefcase } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
@@ -19,6 +19,8 @@ interface HeaderProps {
 export function Header({ initialLocation: _initialLocation, locations: _locations }: HeaderProps) {
   const { data: session } = useSession();
   const { getTotalItems } = useEnhancedCart();
+
+  const isVendor = session?.user?.role === "VENDOR";
   
   // Subscribe directly to Zustand cart state for real-time updates
   const localCartItems = useCartStore((state) => state.items);
@@ -48,39 +50,49 @@ export function Header({ initialLocation: _initialLocation, locations: _location
 
             {/* RIGHT CLUSTER: Nav Icons (ordered left-to-right) */}
             <div className="flex items-center justify-end gap-4 xl:gap-5 flex-shrink-0">
-              {/* 1. Account (logged in) or Login (logged out) */}
-              {session ? (
+              {isVendor ? (
                 <HeaderNavItem
-                  icon={User}
-                  label="Account"
-                  href="/my-account/personal-details"
+                  icon={Briefcase}
+                  label="Vendor Dashboard"
+                  href="/vendor"
                 />
               ) : (
-                <HeaderNavItem
-                  icon={User}
-                  label="Login"
-                  href="/login"
-                />
+                <>
+                  {/* 1. Account (logged in) or Login (logged out) */}
+                  {session ? (
+                    <HeaderNavItem
+                      icon={User}
+                      label="Account"
+                      href="/my-account/personal-details"
+                    />
+                  ) : (
+                    <HeaderNavItem
+                      icon={User}
+                      label="Login"
+                      href="/login"
+                    />
+                  )}
+                  {/* 2. My Basket */}
+                  <HeaderNavItem
+                    icon={ShoppingCart}
+                    label="My Basket"
+                    href="/cart"
+                    badge={totalItems}
+                  />
+                  {/* 3. My Orders */}
+                  <HeaderNavItem
+                    icon={ClipboardList}
+                    label="My Orders"
+                    href="/orders"
+                  />
+                  {/* 4. Marketplace */}
+                  <HeaderNavItem
+                    icon={Home}
+                    label="Marketplace"
+                    href="/marketplace"
+                  />
+                </>
               )}
-              {/* 2. My Basket */}
-              <HeaderNavItem
-                icon={ShoppingCart}
-                label="My Basket"
-                href="/cart"
-                badge={totalItems}
-              />
-              {/* 3. My Orders */}
-              <HeaderNavItem
-                icon={ClipboardList}
-                label="My Orders"
-                href="/orders"
-              />
-              {/* 4. Marketplace */}
-              <HeaderNavItem
-                icon={Home}
-                label="Marketplace"
-                href="/marketplace"
-              />
             </div>
           </div>
 
@@ -95,24 +107,34 @@ export function Header({ initialLocation: _initialLocation, locations: _location
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <HeaderNavItem
-                icon={ShoppingCart}
-                label="Cart"
-                href="/cart"
-                badge={totalItems}
-              />
-              {session ? (
+              {isVendor ? (
                 <HeaderNavItem
-                  icon={User}
-                  label="Account"
-                  href="/my-account/personal-details"
+                  icon={Briefcase}
+                  label="Dashboard"
+                  href="/vendor"
                 />
               ) : (
-                <HeaderNavItem
-                  icon={User}
-                  label="Login"
-                  href="/login"
-                />
+                <>
+                  <HeaderNavItem
+                    icon={ShoppingCart}
+                    label="Cart"
+                    href="/cart"
+                    badge={totalItems}
+                  />
+                  {session ? (
+                    <HeaderNavItem
+                      icon={User}
+                      label="Account"
+                      href="/my-account/personal-details"
+                    />
+                  ) : (
+                    <HeaderNavItem
+                      icon={User}
+                      label="Login"
+                      href="/login"
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>

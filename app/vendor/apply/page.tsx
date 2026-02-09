@@ -12,7 +12,6 @@ export default function VendorApplyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [submittedEmail, setSubmittedEmail] = useState('');
 
   const [formData, setFormData] = useState({
     // Business identity
@@ -167,7 +166,6 @@ export default function VendorApplyPage() {
       }
 
       setSuccess(true);
-      setSubmittedEmail(formData.contactEmail);
       setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
@@ -189,7 +187,7 @@ export default function VendorApplyPage() {
               Thank you for applying to become a vendor on InstaHealth.
             </p>
             <p className="text-sm text-green-600">
-              We have sent a confirmation to <strong>{submittedEmail}</strong>
+              Your application has been received. Our team will review it within 24–48 hours.
             </p>
             <p className="text-gray-700">
               Our team will review your application within 24–48 hours and contact you via your preferred method.
@@ -289,13 +287,13 @@ export default function VendorApplyPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Business Registration Number (ABN/License) *
+                    Trade License Number *
                   </label>
                   <Input
                     name="businessRegNumber"
                     value={formData.businessRegNumber}
                     onChange={handleInputChange}
-                    placeholder="e.g., ABN or Trade License number"
+                    placeholder="e.g., Dubai Trade License number"
                     required
                   />
                 </div>
@@ -492,7 +490,6 @@ export default function VendorApplyPage() {
                   >
                     <option value="">Select fulfillment type</option>
                     <option value="Vendor delivers">Vendor delivers/ships</option>
-                    <option value="InstaHealth delivers">InstaHealth delivers (future)</option>
                     <option value="Clinic appointments">Clinic appointment fulfillment</option>
                   </select>
                 </div>

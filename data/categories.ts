@@ -70,4 +70,11 @@ export const categories: CategoryItem[] = [
     image: "/haircarelogo.png",
     description: "Hair wellness products",
   },
+  {
+    id: "pets",
+    name: "Pets",
+    marketplaceRoute: "/marketplace/pets",
+    image: "/category-icons/Pets.png",
+    description: "Pet health and wellness",
+  },
 ];

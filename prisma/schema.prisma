@@ -91,11 +91,30 @@ enum RefundStatus {
   FAILED
 }
 
+enum MarketplaceEventType {
+  VIEW
+  ADD_TO_CART
+  BOOK_CLICK
+  PURCHASE
+}
+
 enum ActorType {
   SYSTEM
   USER
   VENDOR
   ADMIN
+}
+
+enum VendorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConfirmationEmailStatus {
+  PENDING
+  SENT
+  FAILED
 }
 
 // NextAuth adapter models
@@ -177,6 +196,7 @@ model Vendor {
   slug      String      @unique
   email     String?     @unique
   userId    String?     @unique  // Link to User for auth (vendor portal access)
+  allowedCategories String[]
   status    String      @default("active")
   verified  Boolean     @default(false)  // Replaces complianceAccepted for search
   legalEntityName String?
@@ -224,6 +244,7 @@ model Product {
   category    String
   priceFils   Int
   imageUrl    String?
+  calendlyUrl String?
   inStock     Boolean         @default(true)
   inventoryStatus String      @default("in_stock")  // in_stock, low, out
   active      Boolean         @default(true)
@@ -257,6 +278,16 @@ model ProductVariant {
   cartItems   CartItem[]
 
   @@index([productId])
+}
+
+model MarketplaceEvent {
+  id        String              @id @default(cuid())
+  productId String
+  vendorId  String
+  eventType MarketplaceEventType
+  createdAt DateTime            @default(now())
+
+  @@index([createdAt])
 }
 
 model Location {
@@ -495,7 +526,7 @@ model OrderEvent {
 
 model VendorApplication {
   id                 String   @id @default(cuid())
-  status             String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status             VendorApplicationStatus   @default(PENDING)
 
   // Business identity
   legalBusinessName  String
@@ -535,6 +566,10 @@ model VendorApplication {
   // Metadata
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  confirmationEmailStatus ConfirmationEmailStatus @default(PENDING)
+  confirmationEmailMessageId String?
+  confirmationEmailError String?
+  confirmationEmailSentAt DateTime?
   approvedAt         DateTime?
   approvedBy         String?
   notes              String?
@@ -545,27 +580,39 @@ model VendorApplication {
   approvedVendorId   String?  @unique
   approvedVendor     Vendor?  @relation(fields: [approvedVendorId], references: [id], onDelete: SetNull)
 
-  // Invite tokens for this application
-  inviteTokens       InviteToken[]
 
   @@index([status])
   @@index([createdAt])
   @@index([contactEmail])
 }
 
-model InviteToken {
-  id                  String   @id @default(cuid())
-  vendorApplicationId String
-  vendorApplication   VendorApplication @relation(fields: [vendorApplicationId], references: [id], onDelete: Cascade)
+model VendorInvite {
+  id            String   @id @default(cuid())
+  email         String
+  applicationId String?
+  vendorId      String?
+  tokenHash     String   @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  emailStatus   ConfirmationEmailStatus @default(PENDING)
+  emailMessageId String?
+  emailError    String?
+  emailSentAt   DateTime?
+  createdAt     DateTime @default(now())
 
-  tokenHash           String   @unique
-  email               String
+  @@index([email])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([applicationId])
+}
 
-  expiresAt           DateTime
-  usedAt              DateTime?
-  createdVendorId     String?
-
-  createdAt           DateTime @default(now())
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
 
   @@index([email])
   @@index([expiresAt])

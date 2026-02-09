@@ -2,6 +2,7 @@ import { OfferingCard } from "@/components/marketplace/OfferingCard";
 import { prisma } from "@/lib/prisma";
 import { getSelectedLocationId } from "@/lib/location";
 import type { Offering } from "@/types/offering";
+import { isServiceCategory } from "@/lib/vendor-categories";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 
@@ -11,6 +12,7 @@ export const revalidate = 0;
 const categoryMap: Record<string, string> = {
   "blood-tests": "blood-tests",
   "iv-drips": "iv-drips",
+  clinics: "clinics",
   supplements: "supplements",
   peptides: "peptides",
   hormones: "hormones",
@@ -30,22 +32,25 @@ function prismaProductToOffering(product: {
   imageUrl: string | null;
   inStock: boolean;
   active: boolean;
+  calendlyUrl: string | null;
   vendor: {
     id: string;
     name: string;
   };
 }): Offering {
+  const isService = isServiceCategory(product.category);
   return {
     id: product.id,
     vendorId: product.vendor.id,
-    type: "product",
+    type: isService ? "service" : "product",
     name: product.name,
     shortDescription: product.description || "",
     price: product.priceFils / 100,
     currency: "AED",
-    stockStatus: product.inStock ? "in_stock" : "out_of_stock",
+    stockStatus: isService ? undefined : product.inStock ? "in_stock" : "out_of_stock",
     image: product.imageUrl || undefined,
     slug: product.slug,
+    calendlyUrl: product.calendlyUrl || undefined,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -79,13 +84,16 @@ export default async function MarketplaceVendorPage({
   // Get selected location from cookie/user/fallback
   const selectedLocationId = await getSelectedLocationId();
 
+  const isService = isServiceCategory(canonicalCategory);
+
   // Products are shown if:
   // 1) isGlobal = true (explicitly marked as available everywhere)
   // 2) ProductLocation row matches selected location
   const products = await prisma.product.findMany({
     where: {
       active: true,
-      inStock: true,
+      published: true,
+      ...(isService ? {} : { inStock: true }),
       vendorId: vendorId,
       category: canonicalCategory, // Exact canonical slug match
       OR: [

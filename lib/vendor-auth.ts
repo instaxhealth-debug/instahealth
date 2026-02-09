@@ -14,6 +14,7 @@ export interface VendorContext {
   vendorName: string;
   role: string;
   email: string;
+  allowedCategories: string[];
 }
 
 /**
@@ -56,6 +57,7 @@ export async function getVendorContext(): Promise<VendorContext> {
       name: true,
       status: true,
       verified: true,
+      allowedCategories: true,
     },
   });
 
@@ -84,6 +86,7 @@ export async function getVendorContext(): Promise<VendorContext> {
     vendorName: vendor.name,
     role: userRole,
     email: userEmail,
+    allowedCategories: vendor.allowedCategories || [],
   };
 }
 

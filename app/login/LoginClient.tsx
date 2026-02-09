@@ -20,6 +20,8 @@ export default function LoginClient() {
 
   const callbackUrl = useMemo(() => searchParams?.get("callbackUrl"), [searchParams]);
   const oauthError = useMemo(() => searchParams?.get("error"), [searchParams]);
+  const reset = useMemo(() => searchParams?.get("reset") === "1", [searchParams]);
+  const prefillEmail = useMemo(() => searchParams?.get("email"), [searchParams]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -37,6 +39,12 @@ export default function LoginClient() {
       );
     }
   }, [oauthError]);
+
+  useEffect(() => {
+    if (prefillEmail && !email) {
+      setEmail(prefillEmail);
+    }
+  }, [prefillEmail, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +134,11 @@ export default function LoginClient() {
 
           {/* Email/Password Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {reset && (
+              <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
+                Password reset successful. Please log in.
+              </div>
+            )}
             {error && (
               <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                 {error}
@@ -168,6 +181,11 @@ export default function LoginClient() {
             </Button>
           </form>
           <div className="mt-6 space-y-3 border-t pt-4">
+            <div className="text-center text-sm text-gray-600">
+              <Link href="/forgot-password" className="text-[#41a59b] font-medium hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             {/* Vendor Login Link */}
             <div className="text-center text-sm text-gray-600">
               Are you a vendor?{" "}

@@ -23,6 +23,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/my-account/personal-details", request.url), { status: 307 });
   }
 
+  if (pathname.startsWith("/vendor/activate")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-public-route", "1");
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
   // For now, don't gate routes in middleware to avoid Edge/Prisma issues
   // Let server components handle auth checks instead
   return NextResponse.next();

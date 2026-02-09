@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateInviteToken } from '@/lib/auth-utils';
 import { sendVendorInviteEmail } from '@/lib/email';
+import { createHash, randomUUID } from 'crypto';
+import { getBaseUrl, redactToken } from '@/lib/url';
 
 export async function POST(request: NextRequest) {
   try {
+    const requestId = randomUUID();
     // Check authentication and admin role
     const session = await auth();
     
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { applicationId, vendorEmail, vendorName, vendorSlug } = body;
+    const { applicationId } = body;
 
     if (!applicationId) {
       return NextResponse.json(
@@ -57,21 +59,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate invite token
-    const { token, hash } = generateInviteToken();
+    const rawToken = randomUUID();
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
 
-    // Create or update invite token record
-    const inviteToken = await prisma.inviteToken.create({
+    const inviteToken = await prisma.vendorInvite.create({
       data: {
-        vendorApplicationId: application.id,
-        tokenHash: hash,
+        applicationId: application.id,
         email: application.contactEmail,
+        tokenHash,
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours
       },
     });
 
     // Generate invite link
-    const inviteLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/vendor/accept-invite?token=${token}`;
+    const baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor/invite" });
+    const inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
 
     // Send invite email
     const emailResult = await sendVendorInviteEmail(
@@ -80,7 +82,27 @@ export async function POST(request: NextRequest) {
       inviteLink
     );
 
+    console.log('[VENDOR_INVITE_EMAIL]', {
+      requestId,
+      applicationId: application.id,
+      inviteId: inviteToken.id,
+      email: inviteToken.email,
+      emailSuccess: emailResult.success,
+      emailError: emailResult.error,
+      emailMessageId: emailResult.messageId || null,
+      adminUserId: user.id,
+      baseUrl,
+      inviteLink: redactToken(inviteLink),
+    });
+
     if (!emailResult.success) {
+      console.error('[VENDOR_INVITE]', {
+        requestId,
+        applicationId: application.id,
+        email: application.contactEmail,
+        emailSuccess: false,
+        emailError: emailResult.error,
+      });
       return NextResponse.json(
         { error: 'Failed to send invite email' },
         { status: 500 }
@@ -98,12 +120,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log('[VENDOR_INVITE]', {
+      requestId,
+      applicationId: application.id,
+      inviteId: inviteToken.id,
+      email: inviteToken.email,
+      emailSuccess: true,
+      adminUserId: user.id,
+      baseUrl,
+      inviteLink: redactToken(inviteLink),
+    });
+
+    const isProd = process.env.NODE_ENV === "production";
+
     return NextResponse.json(
       {
         success: true,
         message: 'Invite sent successfully',
         inviteId: inviteToken.id,
         email: inviteToken.email,
+        requestId,
+        ...(isProd ? {} : { inviteLink }),
       },
       { status: 201 }
     );

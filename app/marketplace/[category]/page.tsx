@@ -3,6 +3,7 @@ import { VendorShopCard } from "@/components/marketplace/VendorShopCard";
 import { prisma } from "@/lib/prisma";
 import { getSelectedLocationId } from "@/lib/location";
 import { auth } from "@/lib/auth";
+import { isServiceCategory } from "@/lib/vendor-categories";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
@@ -14,6 +15,7 @@ export const revalidate = 0;
 const categoryMap: Record<string, string> = {
   "blood-tests": "blood-tests",
   "iv-drips": "iv-drips",
+  clinics: "clinics",
   "supplements": "supplements",
   "peptides": "peptides",
   "hormones": "hormones",
@@ -50,6 +52,14 @@ const categoryConfig: Record<
       { id: "recovery", label: "Recovery" },
       { id: "beauty", label: "Beauty" },
       { id: "immunity", label: "Immunity" },
+    ],
+  },
+  clinics: {
+    title: "Clinics",
+    tabs: [
+      { id: "all", label: "All" },
+      { id: "general", label: "General" },
+      { id: "specialist", label: "Specialist" },
     ],
   },
   "supplements": {
@@ -126,6 +136,7 @@ export default async function MarketplaceCategoryPage({
   const categorySlug = params.category;
   const config = categoryConfig[categorySlug];
   const canonicalCategory = categoryMap[categorySlug];
+  const isService = canonicalCategory ? isServiceCategory(canonicalCategory) : false;
 
   if (!config || !canonicalCategory) {
     notFound();
@@ -148,7 +159,8 @@ export default async function MarketplaceCategoryPage({
     where: {
       category: canonicalCategory,
       active: true,
-      inStock: true,
+      published: true,
+      ...(isService ? {} : { inStock: true }),
     },
   });
   console.log(`[${categorySlug}] activeProductsInCategory:`, activeProductsInCategory);
@@ -158,7 +170,8 @@ export default async function MarketplaceCategoryPage({
     where: {
       category: canonicalCategory,
       active: true,
-      inStock: true,
+      published: true,
+      ...(isService ? {} : { inStock: true }),
       isGlobal: true,
     },
   });
@@ -171,7 +184,8 @@ export default async function MarketplaceCategoryPage({
       products: {
         some: {
           active: true,
-          inStock: true,
+          published: true,
+          ...(isService ? {} : { inStock: true }),
           category: canonicalCategory,
           OR: [
             { isGlobal: true },
@@ -192,7 +206,8 @@ export default async function MarketplaceCategoryPage({
       products: {
         where: {
           active: true,
-          inStock: true,
+          published: true,
+          ...(isService ? {} : { inStock: true }),
           category: canonicalCategory,
           OR: [
             { isGlobal: true },

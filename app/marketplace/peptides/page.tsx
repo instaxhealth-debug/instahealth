@@ -176,6 +176,7 @@ export default async function PeptidesMarketplacePage({
       products: {
         some: {
           active: true,
+          published: true,
           inStock: true,
           category: "peptides",
           OR: [
@@ -191,6 +192,7 @@ export default async function PeptidesMarketplacePage({
       products: {
         where: {
           active: true,
+          published: true,
           inStock: true,
           category: "peptides",
           OR: [
