@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/admin/sla/enforce",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "functions": {
