@@ -178,7 +178,16 @@ export async function transitionVendorOrder(options: TransitionOptions) {
   });
 
   if (updated.count === 0) {
-    const latest = await prisma.vendorOrder.findUnique({ where: { id: vendorOrderId } });
+    const latest = await prisma.vendorOrder.findUnique({
+      where: { id: vendorOrderId },
+      include: {
+        items: {
+          include: {
+            orderItem: true,
+          },
+        },
+      },
+    });
     if (latest?.status === targetStatus) {
       return { already: true, vendorOrder: latest };
     }

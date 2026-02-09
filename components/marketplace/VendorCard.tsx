@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Star, MapPin, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Vendor } from "@/types/vendor";
@@ -54,11 +55,11 @@ export function VendorCard({ vendor, className, showOfferingsCount, offeringsCou
         {normalizedLogo && (
           <div className="flex-shrink-0">
             <div className="relative h-16 w-16 md:h-20 md:w-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-              <img
+              <Image
                 src={normalizedLogo}
                 alt={`${vendor.name} logo`}
-                width={20}
-                height={20}
+                width={64}
+                height={64}
                 className="h-full w-full object-contain bg-white"
                 onError={() => {
                   console.warn("[VendorLogoError]", vendor.name, normalizedLogo);

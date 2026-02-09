@@ -1,7 +1,7 @@
 import { isServiceCategory, normalizeCategory } from "@/lib/vendor-categories";
 import type { Offering } from "@/types/offering";
 
-interface MarketplaceProduct {
+export interface MarketplaceProduct {
   id: string;
   vendorId: string;
   name: string;

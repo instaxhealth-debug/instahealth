@@ -6,7 +6,7 @@ import { MostBooked } from "@/components/home/MostBooked";
 import { FeaturedSection } from "@/components/home/FeaturedSection";
 import { getProductsFromPrisma } from "@/lib/api/products";
 import { getMostBooked, getPopularNow } from "@/lib/marketplace-rankings";
-import { prismaProductToOffering } from "@/lib/marketplace-offerings";
+import { prismaProductToOffering, type MarketplaceProduct } from "@/lib/marketplace-offerings";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
@@ -20,8 +20,12 @@ export default async function HomePage() {
     getMostBooked(10),
   ]);
 
-  const popularOfferings = popularNow.map(prismaProductToOffering);
-  const mostBookedOfferings = mostBooked.map(prismaProductToOffering);
+  const popularOfferings = popularNow
+    .filter(Boolean)
+    .map((item) => prismaProductToOffering(item as MarketplaceProduct));
+  const mostBookedOfferings = mostBooked
+    .filter(Boolean)
+    .map((item) => prismaProductToOffering(item as MarketplaceProduct));
 
   return (
     <div className="flex flex-col">
