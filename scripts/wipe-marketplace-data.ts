@@ -45,25 +45,40 @@ async function main() {
   console.log('\n🗑️  Starting marketplace data wipe...\n');
 
   try {
-    // Step 1: Delete all products (this will cascade to variants, cart items, etc.)
-    console.log('[1/4] Deleting all products...');
+    // Step 1: Delete all product locations
+    console.log('[1/7] Deleting all product locations...');
+    const deletedProductLocations = await prisma.productLocation.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedProductLocations.count} product locations`);
+
+    // Step 2: Delete all product variants
+    console.log('[2/7] Deleting all product variants...');
+    const deletedVariants = await prisma.productVariant.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedVariants.count} product variants`);
+
+    // Step 3: Delete all marketplace events
+    console.log('[3/7] Deleting all marketplace events...');
+    const deletedEvents = await prisma.marketplaceEvent.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedEvents.count} marketplace events`);
+
+    // Step 4: Delete all products
+    console.log('[4/7] Deleting all products...');
     const deletedProducts = await prisma.product.deleteMany({});
     console.log(`   ✅ Deleted ${deletedProducts.count} products`);
 
-    // Step 2: Delete all vendors (this will cascade to products if any remain)
-    console.log('[2/4] Deleting all vendors...');
-    const deletedVendors = await prisma.vendor.deleteMany({});
-    console.log(`   ✅ Deleted ${deletedVendors.count} vendors`);
-
-    // Step 3: Delete all vendor applications
-    console.log('[3/4] Deleting all vendor applications...');
+    // Step 5: Delete all vendor applications
+    console.log('[5/7] Deleting all vendor applications...');
     const deletedApplications = await prisma.vendorApplication.deleteMany({});
     console.log(`   ✅ Deleted ${deletedApplications.count} vendor applications`);
 
-    // Step 4: Delete all vendor invites
-    console.log('[4/4] Deleting all vendor invites...');
+    // Step 6: Delete all vendor invites
+    console.log('[6/7] Deleting all vendor invites...');
     const deletedInvites = await prisma.vendorInvite.deleteMany({});
     console.log(`   ✅ Deleted ${deletedInvites.count} vendor invites`);
+
+    // Step 7: Delete all vendors
+    console.log('[7/7] Deleting all vendors...');
+    const deletedVendors = await prisma.vendor.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedVendors.count} vendors`);
 
     console.log('\n✅ Marketplace data wipe complete!\n');
     console.log('Next steps:');

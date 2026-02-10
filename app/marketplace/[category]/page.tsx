@@ -144,6 +144,7 @@ export default async function MarketplaceCategoryPage({
 
   const selectedLocationId = await getSelectedLocationId();
   const session = await auth();
+  const showDebug = process.env.NODE_ENV !== "production" && session?.user?.role === "ADMIN";
 
   // DEBUG: Log query params
   console.log(`[${categorySlug}] selectedLocationId`, selectedLocationId);
@@ -270,7 +271,7 @@ export default async function MarketplaceCategoryPage({
               This category requires: active vendors with in-stock products assigned to your location (or marked as global).
             </p>
 
-            {session?.user?.role === "ADMIN" && (
+            {showDebug && (
               <div className="mt-6 rounded border border-amber-300 bg-white p-4 text-left text-xs space-y-2">
                 <div className="font-semibold text-amber-900">📋 Debug Info (Admin Only)</div>
                 <div className="text-amber-800 space-y-1">

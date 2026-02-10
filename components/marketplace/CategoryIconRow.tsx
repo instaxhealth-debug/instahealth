@@ -4,18 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES = [
-  { slug: "blood-tests", label: "Blood Tests", icon: "/category-icons/blood-tests.png" },
-  { slug: "peptides", label: "Peptides", icon: "/category-icons/peptides.png" },
-  { slug: "iv-drips", label: "IV Drips", icon: "/category-icons/iv-drips.png" },
-  { slug: "supplements", label: "Supplements", icon: "/category-icons/supplements.png" },
-  { slug: "hormones", label: "Hormones", icon: "/category-icons/hormones.png" },
-  { slug: "consultations", label: "Consultations", icon: "/category-icons/consultations.png" },
-  { slug: "insurance", label: "Insurance", icon: "/category-icons/insurance.png" },
-  { slug: "skincare", label: "Skincare", icon: "/category-icons/skincare.png" },
-  { slug: "haircare", label: "Haircare", icon: "/category-icons/haircare.png" },
-];
+import { MARKETPLACE_CATEGORIES } from "@/lib/constants/marketplaceCategories";
 
 export function CategoryIconRow() {
   const params = useParams();
@@ -23,7 +12,7 @@ export function CategoryIconRow() {
 
   return (
     <div className="overflow-x-auto flex gap-4 px-4 py-3 bg-white border-b scrollbar-hide lg:justify-center">
-      {CATEGORIES.map((cat) => {
+      {MARKETPLACE_CATEGORIES.map((cat) => {
         const isActive = activeCategory === cat.slug;
         return (
           <Link

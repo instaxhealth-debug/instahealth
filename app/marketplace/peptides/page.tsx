@@ -17,7 +17,9 @@ async function AdminDebugPanel({
   selectedLocationId: string | null;
   session: Session | null;
 }) {
-  if (!session?.user || session.user.role !== "ADMIN") {
+  const showDebug = process.env.NODE_ENV !== "production" && session?.user?.role === "ADMIN";
+
+  if (!showDebug) {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-8 text-center space-y-4">
         <div className="text-lg font-semibold text-amber-900">No peptide vendors available</div>
