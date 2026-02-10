@@ -50,7 +50,16 @@ export async function POST(
     revalidateMarketplace(updated.category, updated.vendorId);
 
     return NextResponse.json({ id: updated.id });
-  } catch (error) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error: any) {
+    console.error("[POST /api/vendor/products/[id]/unpublish] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
+    return NextResponse.json({ error: "Failed to unpublish" }, { status: 500 });
   }
 }

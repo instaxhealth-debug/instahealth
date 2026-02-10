@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { isServiceCategory, normalizeCategory, PRODUCT_CATEGORIES, SERVICE_CATEGORIES } from "@/lib/vendor-categories";
+import Image from "next/image";
 
 interface VariantForm {
   id?: string;
@@ -61,6 +62,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categoryOptions = useMemo(() => {
     if (vendor.allowedCategories?.length) {
@@ -89,6 +93,67 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
 
   const updateForm = (updates: Partial<ProductFormData>) =>
     setForm((prev) => ({ ...prev, ...updates }));
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a JPG, PNG, WEBP, or GIF image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/vendor/uploads/image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Upload failed");
+      }
+
+      const data = await res.json();
+      updateForm({ imageUrl: data.url });
+
+      toast({
+        title: "Uploaded",
+        description: "Image uploaded successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleAddVariant = () => {
     setVariants((prev) => [
@@ -250,13 +315,61 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input
-                id="imageUrl"
-                value={form.imageUrl}
-                onChange={(e) => updateForm({ imageUrl: e.target.value })}
-                placeholder="https://... or /products/..."
-              />
+              <Label>Product Image</Label>
+
+              {form.imageUrl && (
+                <div className="relative w-32 h-32 border rounded overflow-hidden">
+                  <Image
+                    src={form.imageUrl}
+                    alt="Product preview"
+                    fill
+                    className="object-cover"
+                    unoptimized={form.imageUrl.startsWith("/")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateForm({ imageUrl: "" })}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? "Uploading..." : "Upload Image"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                >
+                  {showUrlInput ? "Hide URL input" : "Use URL instead"}
+                </Button>
+              </div>
+
+              {showUrlInput && (
+                <Input
+                  id="imageUrl"
+                  value={form.imageUrl}
+                  onChange={(e) => updateForm({ imageUrl: e.target.value })}
+                  placeholder="https://... or /products/..."
+                />
+              )}
             </div>
           </div>
 

@@ -9,6 +9,8 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
       // Cloudflare R2 (if used later)
       { protocol: 'https', hostname: '*.r2.dev' },
+      // Vercel Blob for vendor uploads
+      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
     ],
   },
   env: {

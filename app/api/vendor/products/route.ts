@@ -34,8 +34,17 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ products });
-  } catch (error) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error: any) {
+    console.error("[GET /api/vendor/products] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -127,6 +136,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: product.id });
   } catch (error: any) {
+    console.error("[POST /api/vendor/products] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
     return NextResponse.json({ error: error.message || "Failed to create item" }, { status: 500 });
   }
 }

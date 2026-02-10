@@ -27,8 +27,17 @@ export async function GET(
     }
 
     return NextResponse.json({ product });
-  } catch (error) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error: any) {
+    console.error("[GET /api/vendor/products/[id]] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -156,6 +165,15 @@ export async function PATCH(
 
     return NextResponse.json({ id: updated.id });
   } catch (error: any) {
+    console.error("[PATCH /api/vendor/products/[id]] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
     return NextResponse.json({ error: error.message || "Failed to update item" }, { status: 500 });
   }
 }
