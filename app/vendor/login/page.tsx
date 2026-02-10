@@ -101,7 +101,7 @@ export default function VendorLoginPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">
-            Vendor Login
+            Vendor Sign In
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -167,12 +167,8 @@ export default function VendorLoginPage() {
                 Forgot password?
               </Link>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push('/vendor/apply')}
-            >
-              Become a Vendor
+            <Button variant="outline" className="w-full" asChild>
+              <Link href="/vendor/apply">Create account</Link>
             </Button>
           </div>
 

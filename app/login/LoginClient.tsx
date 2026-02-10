@@ -189,9 +189,13 @@ export default function LoginClient() {
             {/* Vendor Login Link */}
             <div className="text-center text-sm text-gray-600">
               Are you a vendor?{" "}
-              <Link href="/vendor/login" className="text-[#41a59b] font-medium hover:underline">
+              <button
+                type="button"
+                className="text-[#41a59b] font-medium hover:underline"
+                onClick={() => router.push("/vendor/login")}
+              >
                 Vendor login
-              </Link>
+              </button>
             </div>
 
             {/* Customer Registration Link */}

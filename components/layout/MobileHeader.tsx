@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { User } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 
 interface MobileHeaderProps {
   initialLocation: unknown;
@@ -13,6 +14,25 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ initialLocation: _initialLocation, locations: _locations }: MobileHeaderProps) {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith("/admin");
+
+  if (isAdminRoute) {
+    return (
+      <div className="md:hidden">
+        <div className="bg-[#41a59b] border-b border-[#41a59b]/15 px-4 pt-4 pb-4">
+          <div className="flex items-center justify-end">
+            <Link
+              href="/admin"
+              className="text-white text-[14px] font-semibold hover:opacity-80 transition-colors"
+            >
+              Admin Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="md:hidden">

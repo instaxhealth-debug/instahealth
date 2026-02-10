@@ -53,6 +53,12 @@ export default async function AdminDashboardPage() {
         >
           Manage Products
         </Link>
+        <Link
+          href="/admin/vendor-applications"
+          className="rounded border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+        >
+          Vendor Applications
+        </Link>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

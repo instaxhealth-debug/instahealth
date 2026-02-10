@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Home, ClipboardList, ShoppingCart, User, Briefcase } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
@@ -19,14 +20,35 @@ interface HeaderProps {
 export function Header({ initialLocation: _initialLocation, locations: _locations }: HeaderProps) {
   const { data: session } = useSession();
   const { getTotalItems } = useEnhancedCart();
+  const pathname = usePathname();
 
   const isVendor = session?.user?.role === "VENDOR";
+  const isAdminRoute = pathname?.startsWith("/admin");
   
   // Subscribe directly to Zustand cart state for real-time updates
   const localCartItems = useCartStore((state) => state.items);
   
   // Compute total items whenever cart or session changes
   const totalItems = getTotalItems();
+
+  if (isAdminRoute) {
+    return (
+      <header className="sticky top-0 z-50 w-full hidden md:block">
+        <div className="w-full bg-[#41a59b] h-24">
+          <div className="mx-auto w-full max-w-[1600px] px-2 lg:px-6 h-full">
+            <div className="flex items-center justify-end h-full">
+              <Link
+                href="/admin"
+                className="text-white text-[14px] font-semibold hover:opacity-80 transition-colors"
+              >
+                Admin Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full hidden md:block">
