@@ -162,10 +162,19 @@ export async function POST(request: NextRequest) {
       data: {
         emailStatus: emailResult.success ? "SENT" : "FAILED",
         emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.error || null,
+        emailError: emailResult.success ? null : emailResult.error || null,
         emailSentAt: emailResult.success ? new Date() : null,
       },
     });
+
+    if (emailResult.success) {
+      await prisma.vendorApplication.update({
+        where: { id: application.id },
+        data: {
+          notes: `Invite sent to ${application.contactEmail}`,
+        },
+      });
+    }
 
     console.log("[VENDOR_INVITE]", {
       requestId,

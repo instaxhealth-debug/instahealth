@@ -4,6 +4,7 @@ import { requireVendor } from "@/lib/auth/requireVendor";
 import { isServiceCategory, isValidCalendlyUrl, normalizeCategory } from "@/lib/vendor-categories";
 import { slugify } from "@/lib/slugify";
 import { revalidatePath, revalidateTag } from "next/cache";
+import crypto from "crypto";
 
 function revalidateMarketplace(category: string, vendorId: string) {
   revalidateTag("products");
@@ -49,12 +50,37 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
   try {
     const { vendorId } = await requireVendor();
     const body = await request.json();
 
-    if (!body?.name || !body?.category) {
-      return NextResponse.json({ error: "Name and category are required" }, { status: 400 });
+    const fieldErrors: Record<string, string[]> = {};
+
+    if (!body?.name || String(body.name).trim().length === 0) {
+      fieldErrors.name = ["Name is required"];
+    }
+
+    if (!body?.category || String(body.category).trim().length === 0) {
+      fieldErrors.category = ["Category is required"];
+    }
+
+    const priceFils = Number(body?.priceFils);
+    if (Number.isNaN(priceFils)) {
+      fieldErrors.priceFils = ["Price is required"];
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          requestId,
+          message: "Validation failed",
+          fieldErrors,
+        },
+        { status: 400 }
+      );
     }
 
     const vendor = await prisma.vendor.findUnique({
@@ -63,7 +89,15 @@ export async function POST(request: Request) {
     });
 
     if (!vendor) {
-      return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "NOT_FOUND",
+          requestId,
+          message: "Vendor not found",
+        },
+        { status: 404 }
+      );
     }
 
     const normalizedCategory = normalizeCategory(body.category);
@@ -71,7 +105,16 @@ export async function POST(request: Request) {
     const normalizedAllowed = vendor.allowedCategories.map((category: string) => normalizeCategory(category));
 
     if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedCategory)) {
-      return NextResponse.json({ error: "Category not allowed" }, { status: 403 });
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "FORBIDDEN",
+          requestId,
+          message: "Category not allowed",
+          fieldErrors: { category: ["Category not allowed"] },
+        },
+        { status: 403 }
+      );
     }
 
     const isService = isServiceCategory(normalizedCategory);
@@ -79,19 +122,55 @@ export async function POST(request: Request) {
 
     if (isService) {
       if (calendlyUrl && !isValidCalendlyUrl(calendlyUrl)) {
-        return NextResponse.json({ error: "Calendly URL must start with https://calendly.com/" }, { status: 400 });
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "VALIDATION_ERROR",
+            requestId,
+            message: "Calendly URL must start with https://calendly.com/",
+            fieldErrors: { calendlyUrl: ["Calendly URL must start with https://calendly.com/"] },
+          },
+          { status: 400 }
+        );
       }
       if (body.active && !calendlyUrl) {
-        return NextResponse.json({ error: "Active services require a Calendly URL" }, { status: 400 });
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "VALIDATION_ERROR",
+            requestId,
+            message: "Active services require a Calendly URL",
+            fieldErrors: { calendlyUrl: ["Active services require a Calendly URL"] },
+          },
+          { status: 400 }
+        );
       }
       if (body.variants?.length) {
-        return NextResponse.json({ error: "Service items cannot have variants" }, { status: 400 });
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "VALIDATION_ERROR",
+            requestId,
+            message: "Service items cannot have variants",
+            fieldErrors: { variants: ["Service items cannot have variants"] },
+          },
+          { status: 400 }
+        );
       }
     }
 
     const baseSlug = slugify(body.name);
     if (!baseSlug) {
-      return NextResponse.json({ error: "Invalid product name" }, { status: 400 });
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          requestId,
+          message: "Invalid product name",
+          fieldErrors: { name: ["Invalid product name"] },
+        },
+        { status: 400 }
+      );
     }
 
     let slug = baseSlug;
@@ -134,17 +213,31 @@ export async function POST(request: Request) {
 
     revalidateMarketplace(product.category, product.vendorId);
 
-    return NextResponse.json({ id: product.id });
+    return NextResponse.json({ ok: true, id: product.id, requestId });
   } catch (error: any) {
     console.error("[POST /api/vendor/products] Error:", error);
 
     if (error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, code: "UNAUTHORIZED", requestId, message: "Unauthorized" },
+        { status: 401 }
+      );
     }
     if (error.message === "FORBIDDEN") {
-      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+      return NextResponse.json(
+        { ok: false, code: "FORBIDDEN", requestId, message: "Forbidden - No vendor account" },
+        { status: 403 }
+      );
     }
 
-    return NextResponse.json({ error: error.message || "Failed to create item" }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "INTERNAL_ERROR",
+        requestId,
+        message: error.message || "Failed to create item",
+      },
+      { status: 500 }
+    );
   }
 }

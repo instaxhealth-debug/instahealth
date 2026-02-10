@@ -65,6 +65,8 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   const categoryOptions = useMemo(() => {
     if (vendor.allowedCategories?.length) {
@@ -206,6 +208,8 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
 
   const submit = async (overrides?: Partial<ProductFormData>) => {
     setIsSaving(true);
+    setFormError(null);
+    setFieldErrors({});
     try {
       const payload = buildPayload(overrides);
       const res = await fetch(product ? `/api/vendor/products/${product.id}` : "/api/vendor/products", {
@@ -215,8 +219,13 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to save item");
+        const error = await res.json().catch(() => ({}));
+        if (error?.fieldErrors) {
+          setFieldErrors(error.fieldErrors);
+        }
+        const requestId = error?.requestId ? ` (requestId: ${error.requestId})` : "";
+        const message = error?.message || error?.error || "Failed to save item";
+        throw new Error(`Publish failed: ${message}${requestId}`);
       }
 
       const data = await res.json();
@@ -231,6 +240,7 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
         router.refresh();
       }
     } catch (error: any) {
+      setFormError(error.message || "Failed to save item");
       toast({
         title: "Error",
         description: error.message,
@@ -281,6 +291,11 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
           <CardTitle>{product ? "Edit Item" : "New Item"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {formError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {formError}
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
@@ -289,6 +304,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                 value={form.name}
                 onChange={(e) => updateForm({ name: e.target.value })}
               />
+              {fieldErrors.name && (
+                <p className="text-xs text-red-600">{fieldErrors.name.join(", ")}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
@@ -304,6 +322,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                   </option>
                 ))}
               </select>
+              {fieldErrors.category && (
+                <p className="text-xs text-red-600">{fieldErrors.category.join(", ")}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="price">Base price (AED)</Label>
@@ -313,6 +334,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                 onChange={(e) => updateForm({ priceAED: e.target.value })}
                 placeholder="0.00"
               />
+              {fieldErrors.priceFils && (
+                <p className="text-xs text-red-600">{fieldErrors.priceFils.join(", ")}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Product Image</Label>
@@ -370,6 +394,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                   placeholder="https://... or /products/..."
                 />
               )}
+              {fieldErrors.imageUrl && (
+                <p className="text-xs text-red-600">{fieldErrors.imageUrl.join(", ")}</p>
+              )}
             </div>
           </div>
 
@@ -403,6 +430,9 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                   onChange={(e) => updateForm({ calendlyUrl: e.target.value })}
                   placeholder="https://calendly.com/your-link"
                 />
+                {fieldErrors.calendlyUrl && (
+                  <p className="text-xs text-red-600">{fieldErrors.calendlyUrl.join(", ")}</p>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <div>

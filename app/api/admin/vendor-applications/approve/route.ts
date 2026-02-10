@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       data: {
         emailStatus: emailResult.success ? "SENT" : "FAILED",
         emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.error ? emailResult.error.substring(0, 500) : null,
+        emailError: emailResult.success ? null : emailResult.error ? emailResult.error.substring(0, 500) : null,
         emailSentAt: emailResult.success ? new Date() : null,
       },
     });
