@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { sendVendorInviteEmail } from "@/lib/email";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
 import { createHash, randomUUID } from "crypto";
-import { getBaseUrl, redactToken } from "@/lib/url";
+import { getBaseUrl, redactToken, isValidProductionBaseUrl } from "@/lib/url";
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
@@ -110,7 +110,33 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/invite" });
+    const baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/invite", allowBadBaseUrl: true });
+    const isProd = process.env.NODE_ENV === "production";
+    const isValidBaseUrl = !isProd || isValidProductionBaseUrl(baseUrl);
+
+    if (!isValidBaseUrl) {
+      const errorMessage = "Invalid baseUrl for production email links";
+      await prisma.vendorInvite.update({
+        where: { id: invite.id },
+        data: {
+          emailStatus: "FAILED",
+          emailError: errorMessage,
+          emailSentAt: null,
+        },
+      });
+
+      console.error("[VENDOR_INVITE_EMAIL_INVALID_BASEURL]", {
+        requestId,
+        applicationId: application.id,
+        inviteId: invite.id,
+        baseUrl,
+      });
+
+      return NextResponse.json(
+        { ok: true, inviteId: invite.id, requestId, inviteEmailStatus: "FAILED" },
+        { status: 200 }
+      );
+    }
     const inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
 
     const emailResult = await sendVendorInviteEmail(
@@ -161,8 +187,6 @@ export async function POST(request: NextRequest) {
         { status: 502 }
       );
     }
-
-    const isProd = process.env.NODE_ENV === "production";
 
     return NextResponse.json(
       { success: true, inviteId: invite.id, requestId, ...(isProd ? {} : { inviteLink }) },

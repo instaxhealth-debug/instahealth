@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { sendVendorInviteEmail } from "@/lib/email";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
 import { createHash, randomUUID } from "crypto";
-import { getBaseUrl } from "@/lib/url";
+import { getBaseUrl, isValidProductionBaseUrl } from "@/lib/url";
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
@@ -177,16 +177,11 @@ export async function POST(request: NextRequest) {
     let emailResult: { success: boolean; error?: string; messageId?: string };
 
     try {
-      baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/approve" });
+      baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/approve", allowBadBaseUrl: true });
 
-      // Production safety check
       const environment = process.env.NODE_ENV || 'unknown';
-      if (environment === 'production') {
-        if (!process.env.NEXT_PUBLIC_BASE_URL) {
-          throw new Error('NEXT_PUBLIC_BASE_URL missing in production');
-        } else if (!process.env.NEXT_PUBLIC_BASE_URL.startsWith('https://instahealth.ae')) {
-          throw new Error(`Invalid production base URL: ${process.env.NEXT_PUBLIC_BASE_URL}`);
-        }
+      if (environment === 'production' && !isValidProductionBaseUrl(baseUrl)) {
+        throw new Error('Invalid baseUrl for production email links');
       }
 
       inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
