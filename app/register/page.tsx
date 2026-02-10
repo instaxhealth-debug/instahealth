@@ -190,11 +190,19 @@ export default function RegisterPage() {
               {isLoading ? "Creating account..." : success ? "Signing in..." : "Create Account"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link href="/login" className="text-[#41a59b] hover:underline">
-              Sign in
-            </Link>
+          <div className="mt-4 space-y-2 text-center text-sm text-gray-600">
+            <div>
+              Already have an account?{" "}
+              <Link href="/login" className="text-[#41a59b] hover:underline">
+                Sign in
+              </Link>
+            </div>
+            <div>
+              Are you a vendor?{" "}
+              <Link href="/vendor/apply" className="text-[#41a59b] hover:underline">
+                Apply here
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/vendor/login",
+  "/vendor/apply",
+  "/vendor/activate",
+];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -13,6 +25,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Debug logging (dev only)
+  if (process.env.NODE_ENV === "development") {
+    const isPublic = PUBLIC_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route + "/")
+    );
+    console.log(
+      `[MIDDLEWARE] path=${pathname} isPublic=${isPublic} action=next`
+    );
+  }
+
   // Redirect legacy /account/* routes to /my-account/*
   if (pathname.startsWith("/account/")) {
     const newPathname = pathname.replace(/^\/account/, "/my-account");
@@ -23,7 +45,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/my-account/personal-details", request.url), { status: 307 });
   }
 
-  if (pathname.startsWith("/vendor/activate")) {
+  // Mark vendor auth routes as public (for any downstream middleware or handlers)
+  if (pathname.startsWith("/vendor/activate") || pathname.startsWith("/vendor/login") || pathname.startsWith("/vendor/apply")) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-public-route", "1");
     return NextResponse.next({
