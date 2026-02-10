@@ -538,6 +538,7 @@ model VendorApplication {
   website            String?
   businessCategory   String
   businessDescription String
+  logoUrl            String?  // Logo uploaded during application
 
   // Contact person
   contactFullName    String
@@ -553,6 +554,7 @@ model VendorApplication {
   deliveryTimeframe  String
   hasProductImages   Boolean  @default(false)
   complianceDocs     String[] @default([])
+  selectedCategories String[] @default([]) // Categories vendor wants to sell in
 
   // Products
   productDescription String

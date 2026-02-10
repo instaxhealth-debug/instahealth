@@ -20,7 +20,8 @@
     "seed:vendors": "tsx scripts/seed-vendors.ts",
     "seed:products": "tsx scripts/seed-products.ts",
     "seed:all": "npm run seed:locations && npm run seed:vendors && npm run seed:products",
-    "algolia:config": "tsx scripts/algolia-config.ts"
+    "algolia:config": "tsx scripts/algolia-config.ts",
+    "wipe-marketplace": "tsx scripts/wipe-marketplace-data.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

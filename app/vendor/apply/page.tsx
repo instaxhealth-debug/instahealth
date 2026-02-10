@@ -3,15 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { upload } from '@vercel/blob/client';
 
 export default function VendorApplyPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [formData, setFormData] = useState({
     // Business identity
@@ -24,6 +29,8 @@ export default function VendorApplyPage() {
     website: '',
     businessCategory: '',
     businessDescription: '',
+    logoUrl: '',
+    selectedCategories: [] as string[],
 
     // Contact person
     contactFullName: '',
@@ -54,7 +61,7 @@ export default function VendorApplyPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target as any;
-    
+
     if (type === 'checkbox') {
       const { checked } = e.target as HTMLInputElement;
       if (name === 'complianceDocs') {
@@ -64,6 +71,13 @@ export default function VendorApplyPage() {
             ? [...prev.complianceDocs, value]
             : prev.complianceDocs.filter((doc) => doc !== value),
         }));
+      } else if (name === 'selectedCategories') {
+        setFormData((prev) => ({
+          ...prev,
+          selectedCategories: checked
+            ? [...prev.selectedCategories, value]
+            : prev.selectedCategories.filter((cat) => cat !== value),
+        }));
       } else {
         setFormData((prev) => ({ ...prev, [name]: checked }));
       }
@@ -72,7 +86,49 @@ export default function VendorApplyPage() {
     }
   };
 
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Logo must be an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo file size must be less than 5MB');
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setError('');
+
+    // Upload to Vercel Blob immediately
+    try {
+      setUploadingLogo(true);
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload/vendor-logo',
+      });
+
+      setFormData((prev) => ({ ...prev, logoUrl: blob.url }));
+      setUploadingLogo(false);
+    } catch (err) {
+      setError('Failed to upload logo. Please try again.');
+      setUploadingLogo(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+    }
+  };
+
   const validateForm = (): boolean => {
+    if (!formData.logoUrl) {
+      setError('Vendor logo is required - please upload your company logo');
+      return false;
+    }
     if (!formData.legalBusinessName.trim()) {
       setError('Legal business name is required');
       return false;
@@ -95,6 +151,10 @@ export default function VendorApplyPage() {
     }
     if (!formData.businessDescription.trim()) {
       setError('Business description is required');
+      return false;
+    }
+    if (formData.selectedCategories.length === 0) {
+      setError('Please select at least one marketplace category');
       return false;
     }
     if (!formData.contactFullName.trim()) {
@@ -159,16 +219,29 @@ export default function VendorApplyPage() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        setError(result.error || 'Application submission failed');
+      // Check for errors (either non-2xx status OR ok: false)
+      if (!response.ok || result.ok === false) {
+        const code = result.code || 'UNKNOWN';
+        const message = result.message || result.error || 'Application submission failed';
+        const requestId = result.requestId || 'N/A';
+
+        setError(`Submit failed: ${code} (requestId: ${requestId}) - ${message}`);
         setLoading(false);
         return;
+      }
+
+      // Success - check if confirmation email failed
+      if (result.confirmationEmailStatus === 'FAILED') {
+        console.warn('Application created but confirmation email failed', {
+          requestId: result.requestId,
+          applicationId: result.applicationId,
+        });
       }
 
       setSuccess(true);
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setError(`Network error: ${err instanceof Error ? err.message : 'Unknown error occurred'}`);
       setLoading(false);
     }
   };
@@ -358,6 +431,57 @@ export default function VendorApplyPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#41a59b]"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Company Logo * {uploadingLogo && <span className="text-xs text-gray-500">(Uploading...)</span>}
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#41a59b]"
+                      disabled={uploadingLogo}
+                      required
+                    />
+                    {logoPreview && (
+                      <div className="mt-2 p-4 border border-gray-200 rounded-md bg-gray-50">
+                        <p className="text-xs text-gray-600 mb-2">Logo preview:</p>
+                        <Image
+                          src={logoPreview}
+                          alt="Logo preview"
+                          width={200}
+                          height={80}
+                          className="h-20 w-auto object-contain"
+                        />
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">Upload your company logo (PNG, JPG, or SVG, max 5MB)</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Marketplace Categories * (Select all that apply)
+                  </label>
+                  <div className="space-y-2">
+                    {['blood-tests', 'iv-drips', 'clinics', 'supplements', 'peptides', 'hormones', 'consultations', 'skincare', 'haircare'].map((cat) => (
+                      <label key={cat} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="selectedCategories"
+                          value={cat}
+                          checked={formData.selectedCategories.includes(cat)}
+                          onChange={handleInputChange}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm capitalize">{cat.replace('-', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Your vendor card will appear in these marketplace categories</p>
                 </div>
               </div>
             </fieldset>

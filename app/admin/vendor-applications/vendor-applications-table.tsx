@@ -44,12 +44,28 @@ export function VendorApplicationsTable({
         }
       );
 
-      if (!response.ok) {
-        const result = await response.json();
-        alert(result.error || "Action failed");
+      const result = await response.json();
+
+      // Check for errors (either non-2xx status OR ok: false)
+      if (!response.ok || result.ok === false) {
+        const code = result.code || 'UNKNOWN';
+        const message = result.message || result.error || 'Action failed';
+        const requestId = result.requestId || 'N/A';
+
+        alert(`${action} failed: ${code} (requestId: ${requestId}) - ${message}`);
       } else {
+        // Success - check if email failed (for approve action)
+        if (action === 'approve' && result.inviteEmailStatus === 'FAILED') {
+          alert(
+            `Approved successfully!\n\n` +
+            `However, invite email FAILED (requestId: ${result.requestId || 'N/A'}).\n` +
+            `Use "Send invite email" button to retry.`
+          );
+        }
         router.refresh();
       }
+    } catch (err) {
+      alert(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoadingId(null);
     }

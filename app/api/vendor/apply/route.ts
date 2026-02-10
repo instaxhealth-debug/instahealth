@@ -8,8 +8,6 @@ export async function POST(request: NextRequest) {
   const requestId = randomUUID();
   try {
     const body = await request.json();
-    const applicantEmail = typeof body?.contactEmail === 'string' ? body.contactEmail : '';
-    const host = request.headers.get('host') || 'unknown';
     const environment = process.env.NODE_ENV || 'unknown';
 
     const allowedFulfillmentTypes = new Set([
@@ -41,7 +39,13 @@ export async function POST(request: NextRequest) {
     for (const field of requiredFields) {
       if (body[field] === undefined || body[field] === null || body[field] === '') {
         return NextResponse.json(
-          { error: `Missing required field: ${field}`, requestId, applicationId: null },
+          {
+            ok: false,
+            code: 'VALIDATION_ERROR',
+            message: `Missing required field: ${field}`,
+            requestId,
+            applicationId: null
+          },
           { status: 400 }
         );
       }
@@ -49,14 +53,26 @@ export async function POST(request: NextRequest) {
 
     if (typeof body.businessRegNumber !== 'string' || !body.businessRegNumber.trim()) {
       return NextResponse.json(
-        { error: 'Business registration number is required', requestId, applicationId: null },
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Business registration number is required',
+          requestId,
+          applicationId: null
+        },
         { status: 400 }
       );
     }
 
     if (!allowedFulfillmentTypes.has(body.fulfillmentType)) {
       return NextResponse.json(
-        { error: 'Invalid fulfillment type', requestId, applicationId: null },
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid fulfillment type',
+          requestId,
+          applicationId: null
+        },
         { status: 400 }
       );
     }
@@ -64,7 +80,13 @@ export async function POST(request: NextRequest) {
     // Validate email format
     if (!body.contactEmail.includes('@')) {
       return NextResponse.json(
-        { error: 'Invalid email address', requestId, applicationId: null },
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid email address',
+          requestId,
+          applicationId: null
+        },
         { status: 400 }
       );
     }
@@ -74,6 +96,34 @@ export async function POST(request: NextRequest) {
                       request.headers.get('x-real-ip') || 
                       'Unknown';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
+
+    // Validate logo URL
+    if (!body.logoUrl || typeof body.logoUrl !== 'string') {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Vendor logo is required',
+          requestId,
+          applicationId: null
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate selectedCategories
+    if (!Array.isArray(body.selectedCategories) || body.selectedCategories.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'At least one marketplace category must be selected',
+          requestId,
+          applicationId: null
+        },
+        { status: 400 }
+      );
+    }
 
     // Create vendor application in database
     const application = await prisma.vendorApplication.create({
@@ -87,6 +137,8 @@ export async function POST(request: NextRequest) {
         website: body.website || null,
         businessCategory: body.businessCategory,
         businessDescription: body.businessDescription,
+        logoUrl: body.logoUrl,
+        selectedCategories: body.selectedCategories,
         contactFullName: body.contactFullName,
         contactRole: body.contactRole,
         contactEmail: body.contactEmail,
@@ -110,7 +162,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Send confirmation email to applicant
-    const applicantEmailAttempted = true;
     const applicantEmailResult = await sendVendorApplicationEmail(
       body.contactEmail,
       body.legalBusinessName,
@@ -120,11 +171,43 @@ export async function POST(request: NextRequest) {
     const applicantEmailError = applicantEmailResult.error;
     const applicantEmailMessageId = applicantEmailResult.messageId;
 
-    // Send admin notification
-    const baseUrl = getBaseUrl({ requestId, route: "/api/vendor/apply" });
+    // Validate base URL for email
+    let baseUrl: string;
+    try {
+      baseUrl = getBaseUrl({ requestId, route: "/api/vendor/apply" });
+
+      // Production safety check
+      if (environment === 'production') {
+        if (!process.env.NEXT_PUBLIC_BASE_URL) {
+          console.error('[VENDOR_APPLY_ERROR]', {
+            requestId,
+            errName: 'BAD_ENV',
+            errMessage: 'NEXT_PUBLIC_BASE_URL missing in production',
+            applicationId: application.id,
+          });
+        } else if (!process.env.NEXT_PUBLIC_BASE_URL.startsWith('https://instahealth.ae')) {
+          console.error('[VENDOR_APPLY_ERROR]', {
+            requestId,
+            errName: 'BAD_ENV',
+            errMessage: `Invalid production base URL: ${process.env.NEXT_PUBLIC_BASE_URL}`,
+            applicationId: application.id,
+          });
+        }
+      }
+    } catch (error: any) {
+      baseUrl = 'https://instahealth.ae'; // Fallback
+      console.error('[VENDOR_APPLY_ERROR]', {
+        requestId,
+        errName: 'BAD_ENV',
+        errMessage: `getBaseUrl failed: ${error.message}`,
+        applicationId: application.id,
+      });
+    }
+
     const dashboardUrl = `${baseUrl}/admin/vendor-applications/${application.id}`;
-    
-    const adminEmailResult = await sendAdminApplicationNotification(
+
+    // Send admin notification (fire and forget)
+    await sendAdminApplicationNotification(
       body.contactFullName,
       body.legalBusinessName,
       body.businessCategory,
@@ -146,31 +229,59 @@ export async function POST(request: NextRequest) {
 
     console.log('[VENDOR_APPLY]', {
       requestId,
-      environment,
-      host,
-      baseUrl,
-      applicantEmail,
       applicationId: application.id,
-      resendAttempted: applicantEmailAttempted,
-      resendResult: applicantEmailSuccess ? 'success' : 'failure',
-      resendErrorMessage: applicantEmailError || null,
-      resendMessageId: applicantEmailMessageId || null,
+      confirmationEmailStatus: applicantEmailSuccess ? 'SENT' : 'FAILED',
+      emailError: applicantEmailError ? applicantEmailError.substring(0, 200) : null,
     });
 
     return NextResponse.json(
       {
-        success: true,
+        ok: true,
         applicationId: application.id,
-        message: 'Application submitted successfully',
         requestId,
+        confirmationEmailStatus: applicantEmailSuccess ? 'SENT' : 'FAILED',
       },
-      { status: 201 }
+      { status: 200 }
     );
-  } catch (error) {
-    console.error('Vendor application error:', error);
+  } catch (error: any) {
+    const errorName = error?.name || 'UnknownError';
+    const errorMessage = error?.message || 'Unknown error occurred';
+    const errorStack = error?.stack || '';
+
+    console.error('[VENDOR_APPLY_ERROR]', {
+      requestId,
+      errName: errorName,
+      errMessage: errorMessage,
+      errStack: errorStack,
+    });
+
+    // Determine error code
+    let code = 'UNKNOWN';
+    let statusCode = 500;
+    let safeMessage = 'Failed to submit application';
+
+    if (errorMessage.includes('Prisma') || errorMessage.includes('database')) {
+      code = 'DB_ERROR';
+      safeMessage = 'Database error occurred';
+    } else if (errorMessage.includes('unauthorized') || errorMessage.includes('auth')) {
+      code = 'UNAUTHORIZED';
+      statusCode = 401;
+      safeMessage = 'Unauthorized';
+    } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+      code = 'VALIDATION_ERROR';
+      statusCode = 400;
+      safeMessage = errorMessage; // Validation errors are safe to show
+    }
+
     return NextResponse.json(
-      { error: 'Failed to submit application', requestId, applicationId: null },
-      { status: 500 }
+      {
+        ok: false,
+        code,
+        message: safeMessage,
+        requestId,
+        applicationId: null
+      },
+      { status: statusCode }
     );
   }
 }

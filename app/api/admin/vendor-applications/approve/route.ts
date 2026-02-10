@@ -4,19 +4,25 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { sendVendorInviteEmail } from "@/lib/email";
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
 import { createHash, randomUUID } from "crypto";
-import { getBaseUrl, redactToken } from "@/lib/url";
+import { getBaseUrl } from "@/lib/url";
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
+  let applicationId: string | undefined;
 
   try {
     const session = await requireAdmin();
     const body = await request.json();
-    const { applicationId } = body;
+    applicationId = body.applicationId;
 
     if (!applicationId) {
       return NextResponse.json(
-        { error: "applicationId is required" },
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "applicationId is required",
+          requestId
+        },
         { status: 400 }
       );
     }
@@ -27,14 +33,24 @@ export async function POST(request: NextRequest) {
 
     if (!application) {
       return NextResponse.json(
-        { error: "Application not found" },
-        { status: 404 }
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "Application not found",
+          requestId
+        },
+        { status: 400 }
       );
     }
 
     if (application.status !== "PENDING") {
       return NextResponse.json(
-        { error: "Application must be in PENDING status" },
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: "Application must be in PENDING status",
+          requestId
+        },
         { status: 400 }
       );
     }
@@ -60,8 +76,13 @@ export async function POST(request: NextRequest) {
     } else if (vendorUser.role !== "VENDOR") {
       if (vendorUser.role === "ADMIN") {
         return NextResponse.json(
-          { error: "Contact email belongs to an admin account" },
-          { status: 400 }
+          {
+            ok: false,
+            code: "FORBIDDEN",
+            message: "Contact email belongs to an admin account",
+            requestId
+          },
+          { status: 403 }
         );
       }
       vendorUser = await prisma.user.update({
@@ -91,7 +112,8 @@ export async function POST(request: NextRequest) {
           legalEntityName: application.legalBusinessName,
           country: application.country,
           licenseNumber: application.businessRegNumber,
-          allowedCategories: [],
+          logoUrl: application.logoUrl || null,
+          allowedCategories: application.selectedCategories || [],
         },
       });
     } else if (!vendor.userId) {
@@ -100,54 +122,19 @@ export async function POST(request: NextRequest) {
         data: {
           userId: vendorUser.id,
           status: "active",
+          logoUrl: application.logoUrl || vendor.logoUrl,
+          allowedCategories: application.selectedCategories && application.selectedCategories.length > 0
+            ? application.selectedCategories
+            : vendor.allowedCategories,
         },
       });
     }
 
+    // CRITICAL: Update DB first in transaction, THEN attempt email
     const rawToken = randomUUID();
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
 
-    const inviteToken = await prisma.vendorInvite.create({
-      data: {
-        applicationId: application.id,
-        vendorId: vendor.id,
-        tokenHash,
-        email: application.contactEmail,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
-
-    const baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/approve" });
-    const inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
-
-    const emailResult = await sendVendorInviteEmail(
-      application.contactEmail,
-      application.legalBusinessName,
-      inviteLink
-    );
-
-    console.log("[VENDOR_INVITE_EMAIL]", {
-      requestId,
-      applicationId: application.id,
-      inviteId: inviteToken.id,
-      email: application.contactEmail,
-      emailSuccess: emailResult.success,
-      emailError: emailResult.error,
-      emailMessageId: emailResult.messageId || null,
-      baseUrl,
-      inviteLink: redactToken(inviteLink),
-    });
-
-    await prisma.vendorInvite.update({
-      where: { id: inviteToken.id },
-      data: {
-        emailStatus: emailResult.success ? "SENT" : "FAILED",
-        emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.error || null,
-        emailSentAt: emailResult.success ? new Date() : null,
-      },
-    });
-
+    // Step 1: DB transaction - create invite and approve application
     const conflictingApproval = await prisma.vendorApplication.findFirst({
       where: {
         approvedVendorId: vendor.id,
@@ -156,64 +143,150 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
+    const inviteToken = await prisma.$transaction(async (tx) => {
+      // Create invite with PENDING email status
+      const invite = await tx.vendorInvite.create({
+        data: {
+          applicationId: application.id,
+          vendorId: vendor.id,
+          tokenHash,
+          email: application.contactEmail,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          emailStatus: "PENDING",
+        },
+      });
+
+      // Update application status to APPROVED
+      await tx.vendorApplication.update({
+        where: { id: application.id },
+        data: {
+          status: "APPROVED",
+          approvedAt: new Date(),
+          approvedBy: adminUserId,
+          ...(conflictingApproval ? {} : { approvedVendorId: vendor.id }),
+          notes: `Approved by ${adminUserId}`,
+        },
+      });
+
+      return invite;
+    });
+
+    // Step 2: Attempt email (this can fail without affecting approval)
+    let baseUrl: string;
+    let inviteLink: string;
+    let emailResult: { success: boolean; error?: string; messageId?: string };
+
+    try {
+      baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/approve" });
+
+      // Production safety check
+      const environment = process.env.NODE_ENV || 'unknown';
+      if (environment === 'production') {
+        if (!process.env.NEXT_PUBLIC_BASE_URL) {
+          throw new Error('NEXT_PUBLIC_BASE_URL missing in production');
+        } else if (!process.env.NEXT_PUBLIC_BASE_URL.startsWith('https://instahealth.ae')) {
+          throw new Error(`Invalid production base URL: ${process.env.NEXT_PUBLIC_BASE_URL}`);
+        }
+      }
+
+      inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
+
+      emailResult = await sendVendorInviteEmail(
+        application.contactEmail,
+        application.legalBusinessName,
+        inviteLink
+      );
+    } catch (error: any) {
+      // Email failed - record it but don't fail the approval
+      emailResult = {
+        success: false,
+        error: (error?.message || 'Unknown email error').substring(0, 500),
+      };
+      baseUrl = 'https://instahealth.ae'; // Fallback for logging
+      inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
+    }
+
+    // Step 3: Update invite with email result
+    await prisma.vendorInvite.update({
+      where: { id: inviteToken.id },
+      data: {
+        emailStatus: emailResult.success ? "SENT" : "FAILED",
+        emailMessageId: emailResult.messageId || null,
+        emailError: emailResult.error ? emailResult.error.substring(0, 500) : null,
+        emailSentAt: emailResult.success ? new Date() : null,
+      },
+    });
+
+    // Update application notes with email result
     await prisma.vendorApplication.update({
       where: { id: application.id },
       data: {
-        status: "APPROVED",
-        approvedAt: new Date(),
-        approvedBy: adminUserId,
-        ...(conflictingApproval ? {} : { approvedVendorId: vendor.id }),
         notes: emailResult.success
-          ? `Invite sent to ${application.contactEmail}`
-          : `Invite email failed: ${emailResult.error || "unknown error"}`,
+          ? `Approved by ${adminUserId}. Invite sent to ${application.contactEmail}`
+          : `Approved by ${adminUserId}. Invite email FAILED: ${emailResult.error || "unknown error"}`,
       },
     });
 
     console.log("[VENDOR_APPROVE]", {
       requestId,
       applicationId: application.id,
-      contactEmail: application.contactEmail,
-      vendorId: vendor.id,
-      userId: vendorUser.id,
       inviteId: inviteToken.id,
-      emailSuccess: emailResult.success,
-      emailError: emailResult.error,
-      baseUrl,
-      inviteLink: redactToken(inviteLink),
+      vendorId: vendor.id,
+      inviteEmailStatus: emailResult.success ? "SENT" : "FAILED",
+      emailError: emailResult.error ? emailResult.error.substring(0, 200) : null,
     });
 
-    if (!emailResult.success) {
-      return NextResponse.json(
-        {
-          error: "Failed to send invite email",
-          requestId,
-          applicationId: application.id,
-          inviteId: inviteToken.id,
-        },
-        { status: 502 }
-      );
-    }
-
-    const isProd = process.env.NODE_ENV === "production";
-
+    // IMPORTANT: Always return 200 even if email failed
+    // Application is APPROVED, email failure is secondary
     return NextResponse.json(
       {
-        success: true,
+        ok: true,
         inviteId: inviteToken.id,
         applicationId: application.id,
         requestId,
-        ...(isProd ? {} : { inviteLink }),
+        inviteEmailStatus: emailResult.success ? "SENT" : "FAILED",
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error: any) {
+    const errorName = error?.name || 'UnknownError';
+    const errorMessage = error?.message || 'Unknown error occurred';
+    const errorStack = error?.stack || '';
+
+    console.error('[ADMIN_APPROVE_ERROR]', {
+      requestId,
+      applicationId: applicationId || 'unknown',
+      errName: errorName,
+      errMessage: errorMessage,
+      errStack: errorStack,
+    });
+
+    // Determine error code
+    let code = 'UNKNOWN';
+    let statusCode = 500;
+    let safeMessage = 'Failed to approve application';
+
     if (error.message?.includes("redirect")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      code = 'UNAUTHORIZED';
+      statusCode = 401;
+      safeMessage = 'Unauthorized';
+    } else if (errorMessage.includes('Prisma') || errorMessage.includes('database')) {
+      code = 'DB_ERROR';
+      safeMessage = 'Database error occurred';
+    } else if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('required')) {
+      code = 'VALIDATION_ERROR';
+      statusCode = 400;
+      safeMessage = 'Validation error occurred';
     }
-    console.error("[VENDOR_APPROVE] Error:", error);
+
     return NextResponse.json(
-      { error: "Failed to approve application", requestId },
-      { status: 500 }
+      {
+        ok: false,
+        code,
+        message: safeMessage,
+        requestId,
+      },
+      { status: statusCode }
     );
   }
 }
