@@ -45,38 +45,63 @@ async function main() {
   console.log('\n🗑️  Starting marketplace data wipe...\n');
 
   try {
-    // Step 1: Delete all product locations
-    console.log('[1/7] Deleting all product locations...');
+    // Step 1: Delete all cart items
+    console.log('[1/12] Deleting all cart items...');
+    const deletedCartItems = await prisma.cartItem.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedCartItems.count} cart items`);
+
+    // Step 2: Delete all vendor order items
+    console.log('[2/12] Deleting all vendor order items...');
+    const deletedVendorOrderItems = await prisma.vendorOrderItem.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedVendorOrderItems.count} vendor order items`);
+
+    // Step 3: Delete all order items
+    console.log('[3/12] Deleting all order items...');
+    const deletedOrderItems = await prisma.orderItem.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedOrderItems.count} order items`);
+
+    // Step 4: Delete all vendor orders
+    console.log('[4/12] Deleting all vendor orders...');
+    const deletedVendorOrders = await prisma.vendorOrder.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedVendorOrders.count} vendor orders`);
+
+    // Step 5: Delete all vendor payouts
+    console.log('[5/12] Deleting all vendor payouts...');
+    const deletedVendorPayouts = await prisma.vendorPayout.deleteMany({});
+    console.log(`   ✅ Deleted ${deletedVendorPayouts.count} vendor payouts`);
+
+    // Step 6: Delete all product locations
+    console.log('[6/12] Deleting all product locations...');
     const deletedProductLocations = await prisma.productLocation.deleteMany({});
     console.log(`   ✅ Deleted ${deletedProductLocations.count} product locations`);
 
-    // Step 2: Delete all product variants
-    console.log('[2/7] Deleting all product variants...');
+    // Step 7: Delete all product variants
+    console.log('[7/12] Deleting all product variants...');
     const deletedVariants = await prisma.productVariant.deleteMany({});
     console.log(`   ✅ Deleted ${deletedVariants.count} product variants`);
 
-    // Step 3: Delete all marketplace events
-    console.log('[3/7] Deleting all marketplace events...');
+    // Step 8: Delete all marketplace events
+    console.log('[8/12] Deleting all marketplace events...');
     const deletedEvents = await prisma.marketplaceEvent.deleteMany({});
     console.log(`   ✅ Deleted ${deletedEvents.count} marketplace events`);
 
-    // Step 4: Delete all products
-    console.log('[4/7] Deleting all products...');
+    // Step 9: Delete all products
+    console.log('[9/12] Deleting all products...');
     const deletedProducts = await prisma.product.deleteMany({});
     console.log(`   ✅ Deleted ${deletedProducts.count} products`);
 
-    // Step 5: Delete all vendor applications
-    console.log('[5/7] Deleting all vendor applications...');
+    // Step 10: Delete all vendor applications
+    console.log('[10/12] Deleting all vendor applications...');
     const deletedApplications = await prisma.vendorApplication.deleteMany({});
     console.log(`   ✅ Deleted ${deletedApplications.count} vendor applications`);
 
-    // Step 6: Delete all vendor invites
-    console.log('[6/7] Deleting all vendor invites...');
+    // Step 11: Delete all vendor invites
+    console.log('[11/12] Deleting all vendor invites...');
     const deletedInvites = await prisma.vendorInvite.deleteMany({});
     console.log(`   ✅ Deleted ${deletedInvites.count} vendor invites`);
 
-    // Step 7: Delete all vendors
-    console.log('[7/7] Deleting all vendors...');
+    // Step 12: Delete all vendors
+    console.log('[12/12] Deleting all vendors...');
     const deletedVendors = await prisma.vendor.deleteMany({});
     console.log(`   ✅ Deleted ${deletedVendors.count} vendors`);
 

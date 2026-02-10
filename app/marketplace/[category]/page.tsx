@@ -222,6 +222,13 @@ export default async function MarketplaceCategoryPage({
     },
   });
 
+  if (process.env.NODE_ENV !== "production") {
+    const hasMockSource = vendors.some((v: any) => v?.source === "mock");
+    if (hasMockSource) {
+      throw new Error("Marketplace vendors must come from Prisma only (mock source detected).");
+    }
+  }
+
   console.log(`[${categorySlug}] vendors found:`, vendors.length);
   
   // DEBUG: Log vendor details for logo resolution
