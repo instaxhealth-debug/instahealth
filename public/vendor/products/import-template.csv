@@ -1,0 +1,3 @@
+sku,name,category,priceAED,description,imageUrl,tags,published,active,inStock,isGlobal,bookingUrl
+EXAMPLE-001,Example Product,peptides,99.00,High-quality peptide supplement,,peptide supplement,true,true,true,false,
+EXAMPLE-002,Example Consultation,consultations,250.00,Expert medical consultation,,consultation medical,true,true,true,false,https://calendly.com/example/consultation

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { isServiceCategory } from "@/lib/vendor-categories";
+import { ProductImportModal } from "./ProductImportModal";
 type ProductRow = {
   id: string;
   name: string;
@@ -70,9 +71,12 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold">Products & Services</h1>
           <p className="text-muted-foreground">Manage your catalog and availability</p>
         </div>
-        <Button asChild>
-          <Link href="/vendor/products/new">Add item</Link>
-        </Button>
+        <div className="flex gap-2">
+          <ProductImportModal />
+          <Button asChild>
+            <Link href="/vendor/products/new">Add item</Link>
+          </Button>
+        </div>
       </div>
 
       <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-center">

@@ -238,6 +238,7 @@ model Product {
   id          String          @id @default(cuid())
   vendorId    String
   vendor      Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  sku         String?
   name        String
   slug        String          @unique
   description String?
@@ -260,6 +261,7 @@ model Product {
 
   @@index([vendorId])
   @@index([isGlobal])
+  @@unique([vendorId, sku])
 }
 
 model ProductVariant {
