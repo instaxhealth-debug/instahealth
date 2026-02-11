@@ -178,24 +178,11 @@ export default async function MarketplaceCategoryPage({
   });
   console.log(`[${categorySlug}] globalProducts:`, globalProducts);
 
-  // Fetch vendors with products in this category
+  // Fetch vendors allowed in this category (vendor-driven, not product-driven)
   const vendors = await prisma.vendor.findMany({
     where: {
       status: "active",
-      products: {
-        some: {
-          active: true,
-          published: true,
-          ...(isService ? {} : { inStock: true }),
-          category: canonicalCategory,
-          OR: [
-            { isGlobal: true },
-            ...(selectedLocationId
-              ? [{ locations: { some: { locationId: selectedLocationId } } }]
-              : []),
-          ],
-        },
-      },
+      allowedCategories: { has: canonicalCategory },
     },
     orderBy: [
       { isHouseBrand: "desc" },
@@ -239,6 +226,7 @@ export default async function MarketplaceCategoryPage({
   // Build vendor shop data
   const vendorShops = vendors.map((vendor) => {
     const products = vendor.products;
+    const productCount = products.length;
     let minPrice = Infinity;
 
     for (const product of products) {
@@ -254,7 +242,7 @@ export default async function MarketplaceCategoryPage({
       rating: vendor.rating || null,
       ratingCount: vendor.ratingCount || null,
       isHouseBrand: vendor.isHouseBrand || false,
-      productCount: products.length,
+      productCount,
       minPriceFils: minPrice === Infinity ? 0 : minPrice,
     };
   });

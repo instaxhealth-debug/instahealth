@@ -220,7 +220,9 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
           <p className="text-muted-foreground mb-2">{vendor.tagline}</p>
         )}
         <p className="text-muted-foreground">
-          {storefrontProducts.length} {storefrontProducts.length === 1 ? 'product' : 'products'} available in {selectedLocation?.name || "your location"}
+          {storefrontProducts.length > 0
+            ? `${storefrontProducts.length} ${storefrontProducts.length === 1 ? 'product' : 'products'} available in ${selectedLocation?.name || "your location"}`
+            : "Products coming soon"}
         </p>
       </div>
 
@@ -229,38 +231,14 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
       {vendor.slug === "mydoctorhealthcare" ? (
         <WhatsAppCTAButton />
       ) : storefrontProducts.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center space-y-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-12 text-center space-y-3">
+          <div className="text-4xl">🛍️</div>
           <div className="text-lg font-semibold text-slate-900">
-            No {categoryTitle} available from {vendor.name}
+            Products coming soon
           </div>
-          <p className="text-sm text-slate-600 max-w-md mx-auto">
-            This vendor doesn&apos;t have any products in this category for {selectedLocation?.name || "your location"}.
+          <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            {vendor.name} is preparing their {categoryTitle.toLowerCase()} catalog. Check back soon!
           </p>
-
-          {/* Admin-only diagnostics */}
-          {session?.user?.role === "ADMIN" && (
-            <div className="mt-6 rounded border border-amber-300 bg-white p-4 text-left text-xs space-y-2">
-              <div className="font-semibold text-amber-900">📋 Debug Info (Admin Only)</div>
-              <div className="text-amber-800 space-y-1">
-                <div>Vendor: {vendor.name} (slug: {params.vendorSlug})</div>
-                <div>Category: {canonicalCategory} (slug: {categorySlug})</div>
-                <div>Selected Location: {selectedLocation?.name || "NULL"} (ID: {selectedLocationId || "❌ NULL"})</div>
-                <div>Total products for vendor: {totalProductsForVendor}</div>
-                <div>Active+InStock for vendor: {activeInStockForVendor}</div>
-                <div>Active+InStock+Category for vendor: {activeInStockCategoryForVendor}</div>
-                <div>After location filter: {products.length}</div>
-                <div className="pt-2">
-                  <div className="font-semibold">Possible issues:</div>
-                  <ul className="list-disc ml-4 mt-1">
-                    <li>Products exist but isGlobal=false AND no ProductLocation rows for this location</li>
-                    <li>Products are in wrong category (check product.category field)</li>
-                    <li>Products are active=false or inStock=false</li>
-                    <li>Check <Link href="/admin/health" className="underline text-blue-600">Admin Health Dashboard</Link></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Back to category */}
           <div className="pt-4">
