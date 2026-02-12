@@ -48,6 +48,27 @@ interface ImportResult {
 
 type State = "initial" | "uploading" | "preview" | "importing" | "complete";
 
+function dedupeRowErrors(
+  errors: Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }>
+): Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }> {
+  const map = new Map<number, { rowNumber: number; sku?: string | null; name?: string | null; messages: string[] }>();
+  for (const err of errors) {
+    const existing = map.get(err.rowNumber);
+    if (existing) {
+      existing.messages.push(err.message);
+    } else {
+      map.set(err.rowNumber, { rowNumber: err.rowNumber, sku: err.sku, name: err.name, messages: [err.message] });
+    }
+  }
+  return Array.from(map.values()).map((v) => ({
+    rowNumber: v.rowNumber,
+    sku: v.sku,
+    name: v.name,
+    message: v.messages.join("; "),
+  }));
+}
+
+
 export function ProductImportModal() {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<State>("initial");
@@ -411,8 +432,9 @@ export function ProductImportModal() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      const dedupedRows = dedupeRowErrors(result.rowErrors);
                       const header = "rowNumber,sku,name,message";
-                      const lines = result.rowErrors.map((e) => {
+                      const lines = dedupedRows.map((e) => {
                         const values = [
                           String(e.rowNumber),
                           e.sku ?? "",
@@ -436,8 +458,9 @@ export function ProductImportModal() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
+                      const dedupedRows = dedupeRowErrors(result.rowErrors);
                       const header = "rowNumber,sku,name,message";
-                      const lines = result.rowErrors.map((e) => {
+                      const lines = dedupedRows.map((e) => {
                         const values = [
                           String(e.rowNumber),
                           e.sku ?? "",
@@ -472,7 +495,7 @@ export function ProductImportModal() {
                       </tr>
                     </thead>
                     <tbody>
-                      {result.rowErrors.map((e, i) => (
+                      {dedupeRowErrors(result.rowErrors).map((e, i) => (
                         <tr key={`${e.rowNumber}-${i}`} className="border-t">
                           <td className="py-1 pr-2 text-muted-foreground">{e.rowNumber}</td>
                           <td className="py-1 pr-2">{e.sku || "-"}</td>

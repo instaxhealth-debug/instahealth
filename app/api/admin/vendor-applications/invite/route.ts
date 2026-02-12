@@ -145,26 +145,22 @@ export async function POST(request: NextRequest) {
       inviteLink
     );
 
-    console.log("[VENDOR_INVITE_EMAIL]", {
-      requestId,
-      applicationId: application.id,
-      inviteId: invite.id,
-      email: application.contactEmail,
-      emailSuccess: emailResult.success,
-      emailError: emailResult.error,
-      emailMessageId: emailResult.messageId || null,
-      baseUrl,
-      inviteLink: redactToken(inviteLink),
-    });
-
     await prisma.vendorInvite.update({
       where: { id: invite.id },
       data: {
         emailStatus: emailResult.success ? "SENT" : "FAILED",
-        emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.success ? null : emailResult.error || null,
+        emailMessageId: emailResult.success ? (emailResult.messageId || null) : null,
+        emailError: emailResult.success ? null : (emailResult.error || "Unknown error"),
         emailSentAt: emailResult.success ? new Date() : null,
       },
+    });
+
+    console.log("[VENDOR_INVITE_EMAIL]", {
+      requestId,
+      inviteId: invite.id,
+      status: emailResult.success ? "SENT" : "FAILED",
+      emailMessageId: emailResult.messageId || null,
+      emailError: emailResult.error || null,
     });
 
     if (emailResult.success) {
