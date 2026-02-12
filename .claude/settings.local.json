@@ -14,7 +14,9 @@
       "Bash(npm run build)",
       "Bash(npx prisma migrate dev --name add_logo_and_categories_to_vendor_application --create-only)",
       "Bash(npx prisma migrate deploy)",
-      "Bash(cat package.json)"
+      "Bash(cat package.json)",
+      "Bash(npx prisma:*)",
+      "Bash(git status:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

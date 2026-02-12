@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,11 +40,10 @@ interface PreviewData {
 interface ImportResult {
   ok: boolean;
   requestId: string;
-  created: number;
-  updated: number;
-  skipped: number;
-  failed: number;
-  errors: Array<{ row: number; message: string }>;
+  createdCount: number;
+  updatedCount: number;
+  failedCount: number;
+  rowErrors: Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }>;
 }
 
 type State = "initial" | "uploading" | "preview" | "importing" | "complete";
@@ -59,6 +59,7 @@ export function ProductImportModal() {
   const [previewId, setPreviewId] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   function reset() {
     setState("initial");
@@ -144,7 +145,7 @@ export function ProductImportModal() {
       if (res.status >= 500) {
         toast({
           title: "Import failed",
-          description: "Server error — please re-upload and try again.",
+          description: "Server error — please re-upload.",
           variant: "destructive",
         });
         reset();
@@ -158,7 +159,7 @@ export function ProductImportModal() {
         if (data.code === "PREVIEW_OUTDATED") {
           toast({
             title: "Preview outdated",
-            description: "Something changed since preview. Please re-upload the file.",
+            description: "Preview outdated — please re-upload.",
             variant: "destructive",
           });
           reset();
@@ -169,17 +170,29 @@ export function ProductImportModal() {
         return;
       }
 
-      setResult(data);
-      setState("complete");
-      toast({
-        title: "Import complete",
-        description: `Created ${data.created}, updated ${data.updated} products`,
-      });
+      const hasFailures = data.failedCount > 0;
+      if (hasFailures) {
+        setResult(data);
+        setState("complete");
+        toast({
+          title: "Imported with warnings",
+          description: `Imported with warnings: ${data.createdCount} created, ${data.updatedCount} updated, ${data.failedCount} failed`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Import complete",
+          description: `Imported ${data.createdCount + data.updatedCount} products`,
+        });
+        reset();
+        setOpen(false);
+      }
+      router.refresh();
     } catch {
       // Network error or timeout — force re-preview
       toast({
         title: "Import failed",
-        description: "Request timed out or network error — please re-upload and try again.",
+        description: "Server error — please re-upload.",
         variant: "destructive",
       });
       reset();
@@ -387,17 +400,89 @@ export function ProductImportModal() {
               <h3 className="text-lg font-semibold">Import Complete</h3>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Created" value={result.created} className="bg-green-50 text-green-700" />
-              <StatCard label="Updated" value={result.updated} className="bg-blue-50 text-blue-700" />
-              <StatCard label="Failed" value={result.failed + result.skipped} className="bg-red-50 text-red-700" />
+              <StatCard label="Created" value={result.createdCount} className="bg-green-50 text-green-700" />
+              <StatCard label="Updated" value={result.updatedCount} className="bg-blue-50 text-blue-700" />
+              <StatCard label="Failed" value={result.failedCount} className="bg-red-50 text-red-700" />
             </div>
-            {result.errors.length > 0 && (
-              <div className="border rounded-lg p-3 max-h-[150px] overflow-y-auto text-xs space-y-1">
-                {result.errors.slice(0, 20).map((e, i) => (
-                  <div key={i} className="text-red-600">
-                    Row {e.row}: {e.message}
-                  </div>
-                ))}
+            {result.rowErrors.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const header = "rowNumber,sku,name,message";
+                      const lines = result.rowErrors.map((e) => {
+                        const values = [
+                          String(e.rowNumber),
+                          e.sku ?? "",
+                          e.name ?? "",
+                          e.message,
+                        ];
+                        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+                      });
+                      const text = [header, ...lines].join("\n");
+                      try {
+                        await navigator.clipboard.writeText(text);
+                        toast({ title: "Copied failed rows" });
+                      } catch {
+                        toast({ title: "Copy failed", description: "Please try again.", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    Copy failed rows
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const header = "rowNumber,sku,name,message";
+                      const lines = result.rowErrors.map((e) => {
+                        const values = [
+                          String(e.rowNumber),
+                          e.sku ?? "",
+                          e.name ?? "",
+                          e.message,
+                        ];
+                        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+                      });
+                      const text = [header, ...lines].join("\n");
+                      const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "failed-rows.csv";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Download failed rows
+                  </Button>
+                </div>
+                <div className="border rounded-lg p-3 max-h-[200px] overflow-y-auto text-xs">
+                  <table className="w-full text-left">
+                    <thead className="text-muted-foreground">
+                      <tr>
+                        <th className="py-1 pr-2">Row</th>
+                        <th className="py-1 pr-2">SKU</th>
+                        <th className="py-1 pr-2">Name</th>
+                        <th className="py-1">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.rowErrors.map((e, i) => (
+                        <tr key={`${e.rowNumber}-${i}`} className="border-t">
+                          <td className="py-1 pr-2 text-muted-foreground">{e.rowNumber}</td>
+                          <td className="py-1 pr-2">{e.sku || "-"}</td>
+                          <td className="py-1 pr-2">{e.name || "-"}</td>
+                          <td className="py-1 text-red-600">{e.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
