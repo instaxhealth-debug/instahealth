@@ -26,41 +26,175 @@ export const CATEGORY_DISPLAY_NAMES: Record<CategorySlug, string> = {
   [CATEGORY_SLUGS.HAIRCARE]: "Haircare",
 };
 
-// Normalize any category input to canonical slug
+// Canonical category registry with aliases vendors might use in CSV files
+const CATEGORY_ALIASES: Record<CategorySlug, string[]> = {
+  [CATEGORY_SLUGS.PEPTIDES]: [
+    "injectable peptides", "peptide", "injections", "research peptides",
+    "peptide therapy", "peptide shots", "peptide injections",
+  ],
+  [CATEGORY_SLUGS.BLOOD_TESTS]: [
+    "blood test", "lab tests", "lab test", "pathology", "labs",
+    "blood work", "bloodwork", "laboratory tests", "diagnostics",
+  ],
+  [CATEGORY_SLUGS.IV_DRIPS]: [
+    "iv drip", "iv therapy", "iv treatments", "iv infusion", "iv infusions",
+    "drip therapy", "vitamin drip", "vitamin drips",
+  ],
+  [CATEGORY_SLUGS.SUPPLEMENTS]: [
+    "supplement", "vitamins", "vitamin", "nutraceuticals", "nutritional supplements",
+  ],
+  [CATEGORY_SLUGS.HORMONES]: [
+    "hormone", "hormone therapy", "hrt", "hormone replacement",
+    "hormone treatment", "trt", "testosterone",
+  ],
+  [CATEGORY_SLUGS.CONSULTATIONS]: [
+    "consultation", "doctor consultation", "medical consultation",
+    "telehealth", "telemedicine", "virtual consultation", "appointments",
+  ],
+  [CATEGORY_SLUGS.INSURANCE]: [
+    "health insurance", "medical insurance", "coverage", "insurance plans",
+  ],
+  [CATEGORY_SLUGS.SKINCARE]: [
+    "skin care", "skin", "dermatology", "skin treatment", "skin treatments",
+    "facial", "facials",
+  ],
+  [CATEGORY_SLUGS.HAIRCARE]: [
+    "hair care", "hair", "hair treatment", "hair treatments",
+    "hair loss", "hair restoration",
+  ],
+};
+
+// Build a lookup map from all aliases (normalized) → slug
+const ALIAS_LOOKUP: Map<string, CategorySlug> = new Map();
+for (const [slug, aliases] of Object.entries(CATEGORY_ALIASES)) {
+  // Add the slug itself and its display name
+  ALIAS_LOOKUP.set(slug, slug as CategorySlug);
+  const displayName = CATEGORY_DISPLAY_NAMES[slug as CategorySlug];
+  if (displayName) {
+    ALIAS_LOOKUP.set(normalizeCategoryInput(displayName), slug as CategorySlug);
+  }
+  for (const alias of aliases) {
+    ALIAS_LOOKUP.set(normalizeCategoryInput(alias), slug as CategorySlug);
+  }
+}
+
+/** Normalize raw input: trim, lowercase, collapse whitespace, strip punctuation */
+export function normalizeCategoryInput(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[_\-]+/g, " ")
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export type MappingReason = "SLUG" | "ALIAS" | "TOKEN_MATCH" | "BULK_ASSIGNED" | "BULK_ASSIGNED_AUTO_SINGLE" | "MISSING";
+export type MappingConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+export type CategoryMapResult =
+  | { slug: CategorySlug; matched: true; reason: MappingReason; confidence: MappingConfidence }
+  | { slug: null; matched: false; error: string; ambiguousSlugs?: CategorySlug[] };
+
+// Build token sets for each category (for safe token matching)
+const CATEGORY_TOKEN_SETS: Map<CategorySlug, Set<string>> = new Map();
+for (const [slug, aliases] of Object.entries(CATEGORY_ALIASES)) {
+  const tokenSet = new Set<string>();
+  // Add slug tokens (e.g., "blood-tests" → ["blood", "tests"])
+  for (const t of normalizeCategoryInput(slug).split(" ")) tokenSet.add(t);
+  // Add display name tokens
+  const displayName = CATEGORY_DISPLAY_NAMES[slug as CategorySlug];
+  if (displayName) {
+    for (const t of normalizeCategoryInput(displayName).split(" ")) tokenSet.add(t);
+  }
+  // Add alias tokens
+  for (const alias of aliases) {
+    for (const t of normalizeCategoryInput(alias).split(" ")) tokenSet.add(t);
+  }
+  CATEGORY_TOKEN_SETS.set(slug as CategorySlug, tokenSet);
+}
+
+/**
+ * Map a raw category string (from CSV or user input) to a canonical slug.
+ * Priority: (1) direct slug match, (2) exact alias match, (3) safe token match.
+ * Token match requires >=2 matching tokens AND unambiguous (only 1 category qualifies).
+ */
+export function mapCategoryToSlug(input: string): CategoryMapResult {
+  if (!input || !input.trim()) {
+    return { slug: null, matched: false, error: "Category is empty" };
+  }
+
+  const normalized = normalizeCategoryInput(input);
+
+  // 1. Direct slug match (e.g., "peptides", "blood-tests")
+  const asSlug = input.trim().toLowerCase().replace(/[_\s]+/g, "-");
+  if (isValidCategorySlug(asSlug)) {
+    return { slug: asSlug, matched: true, reason: "SLUG", confidence: "HIGH" };
+  }
+
+  // 2. Alias lookup (exact normalized match)
+  const aliasMatch = ALIAS_LOOKUP.get(normalized);
+  if (aliasMatch) {
+    return { slug: aliasMatch, matched: true, reason: "ALIAS", confidence: "HIGH" };
+  }
+
+  // 3. Safe token-based match: requires >=2 token overlap AND unambiguous
+  const inputTokens = normalized.split(" ").filter((t) => t.length > 1); // skip single-char tokens
+  if (inputTokens.length >= 2) {
+    const candidates: { slug: CategorySlug; matchCount: number }[] = [];
+    for (const [slug, tokenSet] of CATEGORY_TOKEN_SETS.entries()) {
+      const matchCount = inputTokens.filter((t) => tokenSet.has(t)).length;
+      if (matchCount >= 2) {
+        candidates.push({ slug, matchCount });
+      }
+    }
+
+    if (candidates.length === 1) {
+      return { slug: candidates[0].slug, matched: true, reason: "TOKEN_MATCH", confidence: "MEDIUM" };
+    }
+    if (candidates.length > 1) {
+      // Ambiguous — multiple categories matched
+      return {
+        slug: null,
+        matched: false,
+        error: `Ambiguous category '${input.trim()}'`,
+        ambiguousSlugs: candidates.map((c) => c.slug),
+      };
+    }
+  }
+
+  return {
+    slug: null,
+    matched: false,
+    error: `Unknown category '${input.trim()}'`,
+  };
+}
+
+/** Format allowed categories as "slug (Label)" for error messages */
+export function formatAllowedCategories(slugs: string[]): string {
+  return slugs
+    .map((s) => `${s} (${CATEGORY_DISPLAY_NAMES[s as CategorySlug] || s})`)
+    .join(", ");
+}
+
+// Normalize any category input to canonical slug (legacy compat — prefers mapCategoryToSlug)
 export function normalizeCategory(input: string): CategorySlug {
-  const normalized = input
+  const result = mapCategoryToSlug(input);
+  if (result.matched) return result.slug;
+
+  // Fallback: slugify and try direct match
+  const slugified = input
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+  if (isValidCategorySlug(slugified)) return slugified;
 
-  // Map common variations to canonical slugs
-  const mapping: Record<string, CategorySlug> = {
-    "blood-tests": CATEGORY_SLUGS.BLOOD_TESTS,
-    "blood-test": CATEGORY_SLUGS.BLOOD_TESTS,
-    "blood tests": CATEGORY_SLUGS.BLOOD_TESTS,
-    "blood test": CATEGORY_SLUGS.BLOOD_TESTS,
-    "iv-drips": CATEGORY_SLUGS.IV_DRIPS,
-    "iv-drip": CATEGORY_SLUGS.IV_DRIPS,
-    "iv drips": CATEGORY_SLUGS.IV_DRIPS,
-    "iv drip": CATEGORY_SLUGS.IV_DRIPS,
-    supplements: CATEGORY_SLUGS.SUPPLEMENTS,
-    supplement: CATEGORY_SLUGS.SUPPLEMENTS,
-    peptides: CATEGORY_SLUGS.PEPTIDES,
-    peptide: CATEGORY_SLUGS.PEPTIDES,
-    hormones: CATEGORY_SLUGS.HORMONES,
-    hormone: CATEGORY_SLUGS.HORMONES,
-    consultations: CATEGORY_SLUGS.CONSULTATIONS,
-    consultation: CATEGORY_SLUGS.CONSULTATIONS,
-    insurance: CATEGORY_SLUGS.INSURANCE,
-    skincare: CATEGORY_SLUGS.SKINCARE,
-    "skin care": CATEGORY_SLUGS.SKINCARE,
-    haircare: CATEGORY_SLUGS.HAIRCARE,
-    "hair care": CATEGORY_SLUGS.HAIRCARE,
-  };
-
-  return mapping[normalized] || CATEGORY_SLUGS.BLOOD_TESTS; // Default fallback
+  return CATEGORY_SLUGS.BLOOD_TESTS; // Default fallback
 }
+
+// TODO: future enhancement — support tags/subCategory for sublabels like "Injectable Peptides"
+// These should map to category=peptides with a tag "injectable" rather than creating new categories.
 
 // Validate category slug is canonical
 export function isValidCategorySlug(slug: string): slug is CategorySlug {

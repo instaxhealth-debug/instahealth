@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/auth/requireVendor";
 import { isServiceCategory, isValidCalendlyUrl, normalizeCategory } from "@/lib/vendor-categories";
+import { isValidCategorySlug, formatAllowedCategories, CATEGORY_SLUGS } from "@/lib/utils/category";
 import { slugify } from "@/lib/slugify";
 import { revalidatePath, revalidateTag } from "next/cache";
 import crypto from "crypto";
@@ -102,6 +103,20 @@ export async function POST(request: Request) {
 
     const normalizedCategory = normalizeCategory(body.category);
 
+    // Enforce canonical slug — reject unknown categories
+    if (!isValidCategorySlug(normalizedCategory)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          requestId,
+          message: `Unknown category '${body.category}'. Allowed: ${formatAllowedCategories(vendor.allowedCategories.length > 0 ? vendor.allowedCategories : Object.values(CATEGORY_SLUGS))}`,
+          fieldErrors: { category: [`Unknown category '${body.category}'`] },
+        },
+        { status: 400 }
+      );
+    }
+
     const normalizedAllowed = vendor.allowedCategories.map((category: string) => normalizeCategory(category));
 
     if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedCategory)) {
@@ -110,8 +125,8 @@ export async function POST(request: Request) {
           ok: false,
           code: "FORBIDDEN",
           requestId,
-          message: "Category not allowed",
-          fieldErrors: { category: ["Category not allowed"] },
+          message: `Category '${normalizedCategory}' is not allowed for your vendor. Allowed: ${formatAllowedCategories(vendor.allowedCategories)}`,
+          fieldErrors: { category: ["Category not allowed for your vendor"] },
         },
         { status: 403 }
       );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,13 +12,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, Download, AlertCircle, CheckCircle2, Info } from "lucide-react";
 
 interface PreviewRow {
   rowIndex: number;
   isValid: boolean;
   errors: string[];
   action: "create" | "update";
+  rawCategory: string;
+  mappedCategorySlug: string | null;
+  mappingReason: string | null;
+  mappingConfidence: string | null;
+  missingCategory: boolean;
   data: { sku?: string; name: string; category: string; priceFils: number };
 }
 
@@ -26,6 +31,7 @@ interface PreviewData {
   totalRows: number;
   validRows: number;
   invalidRows: number;
+  missingCategoryCount: number;
   counts: { willCreate: number; willUpdate: number };
   rows: PreviewRow[];
 }
@@ -48,6 +54,9 @@ export function ProductImportModal() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [allowedCategories, setAllowedCategories] = useState<string[]>([]);
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [previewId, setPreviewId] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -56,8 +65,22 @@ export function ProductImportModal() {
     setFile(null);
     setPreview(null);
     setResult(null);
+    setBulkCategory("");
+    setPreviewId("");
     if (inputRef.current) inputRef.current.value = "";
   }
+
+  const fetchPreview = useCallback(async (f: File, bulkCat?: string) => {
+    const formData = new FormData();
+    formData.append("file", f);
+    if (bulkCat) formData.append("bulkCategory", bulkCat);
+
+    const res = await fetch("/api/vendor/products/import/preview", {
+      method: "POST",
+      body: formData,
+    });
+    return res.json();
+  }, []);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -67,14 +90,7 @@ export function ProductImportModal() {
     setState("uploading");
 
     try {
-      const formData = new FormData();
-      formData.append("file", f);
-
-      const res = await fetch("/api/vendor/products/import/preview", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
+      const data = await fetchPreview(f);
 
       if (!data.ok) {
         toast({ title: "Preview failed", description: data.message, variant: "destructive" });
@@ -82,11 +98,30 @@ export function ProductImportModal() {
         return;
       }
 
+      setAllowedCategories(data.allowedCategories || []);
+      setPreviewId(data.previewId || "");
       setPreview(data.preview);
       setState("preview");
     } catch {
       toast({ title: "Network error", description: "Failed to upload file", variant: "destructive" });
       reset();
+    }
+  }
+
+  async function handleBulkCategoryChange(value: string) {
+    setBulkCategory(value);
+    if (!file || !value) return;
+
+    setState("uploading");
+    try {
+      const data = await fetchPreview(file, value);
+      if (data.ok) {
+        setPreview(data.preview);
+        setPreviewId(data.previewId || "");
+      }
+      setState("preview");
+    } catch {
+      setState("preview");
     }
   }
 
@@ -97,6 +132,8 @@ export function ProductImportModal() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (bulkCategory) formData.append("bulkCategory", bulkCategory);
+      if (previewId) formData.append("previewId", previewId);
 
       const res = await fetch("/api/vendor/products/import/commit", {
         method: "POST",
@@ -131,6 +168,9 @@ export function ProductImportModal() {
     }, 200);
   }
 
+  const hasMissingCategories = (preview?.missingCategoryCount ?? 0) > 0;
+  const onlyMissingCategoryErrors = preview && preview.invalidRows > 0 && hasMissingCategories;
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else setOpen(true); }}>
       <DialogTrigger asChild>
@@ -147,6 +187,17 @@ export function ProductImportModal() {
             Upload a CSV file to bulk create or update products by SKU.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Allowed categories info */}
+        {allowedCategories.length > 0 && state !== "complete" && (
+          <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              <strong>Allowed categories:</strong>{" "}
+              {allowedCategories.join(", ")}
+            </span>
+          </div>
+        )}
 
         {/* INITIAL */}
         {state === "initial" && (
@@ -196,6 +247,34 @@ export function ProductImportModal() {
               />
             </div>
 
+            {/* Bulk assign category dropdown */}
+            {onlyMissingCategoryErrors && allowedCategories.length > 1 && (
+              <div className="flex items-center gap-3 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-amber-700 font-medium mb-1">
+                    {preview.missingCategoryCount} row{preview.missingCategoryCount > 1 ? "s" : ""} missing category
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="bulk-category" className="text-xs text-amber-700">
+                      Assign to all:
+                    </label>
+                    <select
+                      id="bulk-category"
+                      value={bulkCategory}
+                      onChange={(e) => handleBulkCategoryChange(e.target.value)}
+                      className="text-xs border rounded px-2 py-1 bg-white"
+                    >
+                      <option value="">Select category...</option>
+                      {allowedCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-[280px] overflow-y-auto">
                 <table className="w-full text-sm">
@@ -205,6 +284,7 @@ export function ProductImportModal() {
                       <th className="px-3 py-2 text-left w-12" />
                       <th className="px-3 py-2 text-left w-16">Action</th>
                       <th className="px-3 py-2 text-left">Name</th>
+                      <th className="px-3 py-2 text-left">Category</th>
                       <th className="px-3 py-2 text-left">Errors</th>
                     </tr>
                   </thead>
@@ -230,7 +310,24 @@ export function ProductImportModal() {
                             {row.action}
                           </span>
                         </td>
-                        <td className="px-3 py-2 truncate max-w-[180px]">{row.data.name}</td>
+                        <td className="px-3 py-2 truncate max-w-[140px]">{row.data.name}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {row.mappedCategorySlug ? (
+                            <span className="text-green-700">
+                              {row.mappedCategorySlug}
+                              {row.mappingConfidence === "MEDIUM" && (
+                                <span className="text-amber-600 ml-1" title={`Matched via ${row.mappingReason}`}>~</span>
+                              )}
+                            </span>
+                          ) : row.missingCategory ? (
+                            <span className="text-amber-600 italic">missing</span>
+                          ) : null}
+                          {row.rawCategory && row.mappedCategorySlug && row.rawCategory !== row.mappedCategorySlug && (
+                            <span className="text-muted-foreground ml-1">
+                              ← {row.rawCategory}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-red-600 text-xs">{row.errors.join("; ")}</td>
                       </tr>
                     ))}

@@ -3,12 +3,25 @@ import { requireVendor } from "@/lib/auth/requireVendor";
 import { prisma } from "@/lib/prisma";
 import { parseProductCsv } from "@/lib/csv-parser";
 import { validateProductRow } from "@/lib/import-validator";
+import { isValidCategorySlug, formatAllowedCategories } from "@/lib/utils/category";
 import { slugify } from "@/lib/slugify";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const BATCH_SIZE = 50;
+const IMPORT_SCHEMA_VERSION = 1;
+
+/** Must match preview route's computePreviewId exactly */
+function computePreviewId(
+  fileContentHash: string,
+  vendorId: string,
+  allowedCategories: string[],
+  bulkCategory: string,
+): string {
+  const payload = [fileContentHash, vendorId, [...allowedCategories].sort().join(","), bulkCategory, IMPORT_SCHEMA_VERSION].join("|");
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
@@ -45,11 +58,43 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate bulkCategory if provided
+    const bulkCategoryRaw = (formData.get("bulkCategory") as string | null) || "";
+    const bulkCategory = bulkCategoryRaw.trim();
+    if (bulkCategory) {
+      if (!isValidCategorySlug(bulkCategory)) {
+        return NextResponse.json(
+          { ok: false, code: "VALIDATION_ERROR", requestId, message: `Invalid bulk category '${bulkCategory}'. Must be a canonical slug.` },
+          { status: 400 },
+        );
+      }
+      if (vendor.allowedCategories.length > 0 && !vendor.allowedCategories.includes(bulkCategory)) {
+        return NextResponse.json(
+          { ok: false, code: "VALIDATION_ERROR", requestId, message: `Bulk category '${bulkCategory}' is not in your allowed categories. Allowed: ${formatAllowedCategories(vendor.allowedCategories)}` },
+          { status: 400 },
+        );
+      }
+    }
+
+    // TOCTOU protection: verify previewId matches
+    const clientPreviewId = (formData.get("previewId") as string | null) || "";
+    const fileBuffer = await file.arrayBuffer();
+    const fileContentHash = crypto.createHash("sha256").update(Buffer.from(fileBuffer)).digest("hex");
+    const expectedPreviewId = computePreviewId(fileContentHash, vendorId, vendor.allowedCategories, bulkCategory);
+
+    if (!clientPreviewId || clientPreviewId !== expectedPreviewId) {
+      return NextResponse.json(
+        { ok: false, code: "PREVIEW_OUTDATED", requestId, message: "Preview is outdated. Re-run preview." },
+        { status: 409 },
+      );
+    }
+
     // Re-validate (never trust client)
-    const rows = await parseProductCsv(file);
+    const fileBlob = new File([fileBuffer], file.name, { type: file.type });
+    const rows = await parseProductCsv(fileBlob);
     const results = await Promise.all(
       rows.map((row, i) =>
-        validateProductRow(row, i + 1, vendor.allowedCategories, vendorId),
+        validateProductRow(row, i + 1, vendor.allowedCategories, vendorId, bulkCategory || undefined),
       ),
     );
 
