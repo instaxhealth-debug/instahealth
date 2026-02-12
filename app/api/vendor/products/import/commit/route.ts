@@ -101,6 +101,7 @@ export async function POST(request: Request) {
     const validResults = results.filter((r) => r.isValid);
     const invalidResults = results.filter((r) => !r.isValid);
 
+    const importStart = Date.now();
     let created = 0;
     let updated = 0;
     let failed = 0;
@@ -113,64 +114,109 @@ export async function POST(request: Request) {
       }
     }
 
-    // Process valid rows in batches
-    const chunks: typeof validResults[] = [];
-    for (let i = 0; i < validResults.length; i += BATCH_SIZE) {
-      chunks.push(validResults.slice(i, i + BATCH_SIZE));
+    // Phase 1: Separate rows into creates (with SKU, without SKU) and updates
+    // Validate first, then write — no side effects inside DB writes
+    const toUpsertBySku: typeof validResults = [];
+    const toCreateNoSku: typeof validResults = [];
+
+    for (const result of validResults) {
+      if (result.data.sku) {
+        toUpsertBySku.push(result);
+      } else {
+        toCreateNoSku.push(result);
+      }
     }
 
-    for (const chunk of chunks) {
-      await prisma.$transaction(async (tx) => {
-        for (const result of chunk) {
-          const { sku, name, category, priceFils, ...rest } = result.data;
+    // Phase 2: Process SKU rows — upsert per row, chunked (no interactive tx)
+    const skuChunks: typeof toUpsertBySku[] = [];
+    for (let i = 0; i < toUpsertBySku.length; i += BATCH_SIZE) {
+      skuChunks.push(toUpsertBySku.slice(i, i + BATCH_SIZE));
+    }
 
-          try {
-            if (sku) {
-              // Upsert by (vendorId, sku)
-              const existing = await tx.product.findUnique({
-                where: { vendorId_sku: { vendorId, sku } },
-                select: { id: true },
-              });
+    for (let ci = 0; ci < skuChunks.length; ci++) {
+      const chunkStart = Date.now();
+      const chunk = skuChunks[ci];
 
-              if (existing) {
-                await tx.product.update({
-                  where: { id: existing.id },
-                  data: { name, category, priceFils, ...rest },
-                });
-                updated++;
-              } else {
-                const slug = await generateUniqueSlug(tx, name);
-                await tx.product.create({
-                  data: { vendorId, sku, name, slug, category, priceFils, ...rest },
-                });
-                created++;
-              }
-            } else {
-              // No SKU — create only
-              const slug = await generateUniqueSlug(tx, name);
-              await tx.product.create({
-                data: { vendorId, name, slug, category, priceFils, ...rest },
-              });
-              created++;
-            }
-          } catch (rowErr: unknown) {
-            failed++;
-            const msg = (rowErr as Error).message || "Database write failed";
-            console.error(
-              `[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`,
-            );
-            errors.push({ row: result.rowIndex, message: msg });
+      for (const result of chunk) {
+        const { sku, name, category, priceFils, ...rest } = result.data;
+        if (!sku) continue; // type guard
+
+        try {
+          const existing = await prisma.product.findUnique({
+            where: { vendorId_sku: { vendorId, sku } },
+            select: { id: true },
+          });
+
+          if (existing) {
+            await prisma.product.update({
+              where: { id: existing.id },
+              data: { name, category, priceFils, ...rest },
+            });
+            updated++;
+          } else {
+            const slug = await generateUniqueSlug(name);
+            await prisma.product.create({
+              data: { vendorId, sku, name, slug, category, priceFils, ...rest },
+            });
+            created++;
           }
+        } catch (rowErr: unknown) {
+          failed++;
+          const msg = (rowErr as Error).message || "Database write failed";
+          console.error(
+            `[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`,
+          );
+          errors.push({ row: result.rowIndex, message: msg });
         }
-      });
+      }
+
+      console.log(
+        `[PRODUCT_IMPORT_CHUNK] requestId=${requestId} skuChunk=${ci + 1}/${skuChunks.length} rows=${chunk.length} elapsed=${Date.now() - chunkStart}ms`,
+      );
+    }
+
+    // Phase 3: Process no-SKU rows — create only, chunked with batch createMany where possible
+    const noSkuChunks: typeof toCreateNoSku[] = [];
+    for (let i = 0; i < toCreateNoSku.length; i += BATCH_SIZE) {
+      noSkuChunks.push(toCreateNoSku.slice(i, i + BATCH_SIZE));
+    }
+
+    for (let ci = 0; ci < noSkuChunks.length; ci++) {
+      const chunkStart = Date.now();
+      const chunk = noSkuChunks[ci];
+
+      // Each no-SKU row needs a unique slug, so process individually
+      for (const result of chunk) {
+        const { name, category, priceFils, ...rest } = result.data;
+
+        try {
+          const slug = await generateUniqueSlug(name);
+          await prisma.product.create({
+            data: { vendorId, name, slug, category, priceFils, ...rest },
+          });
+          created++;
+        } catch (rowErr: unknown) {
+          failed++;
+          const msg = (rowErr as Error).message || "Database write failed";
+          console.error(
+            `[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`,
+          );
+          errors.push({ row: result.rowIndex, message: msg });
+        }
+      }
+
+      console.log(
+        `[PRODUCT_IMPORT_CHUNK] requestId=${requestId} noSkuChunk=${ci + 1}/${noSkuChunks.length} rows=${chunk.length} elapsed=${Date.now() - chunkStart}ms`,
+      );
     }
 
     // Revalidate marketplace
     revalidatePath("/marketplace", "layout");
     revalidatePath("/vendor/products", "page");
 
+    const totalMs = Date.now() - importStart;
     console.log(
-      `[PRODUCT_IMPORT] requestId=${requestId} created=${created} updated=${updated} failed=${failed}`,
+      `[PRODUCT_IMPORT] requestId=${requestId} created=${created} updated=${updated} failed=${failed} totalMs=${totalMs}`,
     );
 
     return NextResponse.json({
@@ -206,12 +252,9 @@ export async function POST(request: Request) {
   }
 }
 
-async function generateUniqueSlug(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  name: string,
-): Promise<string> {
+async function generateUniqueSlug(name: string): Promise<string> {
   const base = slugify(name);
-  const existing = await tx.product.findUnique({ where: { slug: base } });
+  const existing = await prisma.product.findUnique({ where: { slug: base } });
   if (!existing) return base;
   return `${base}-${Date.now().toString(36)}`;
 }

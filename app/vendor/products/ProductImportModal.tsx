@@ -139,9 +139,31 @@ export function ProductImportModal() {
         method: "POST",
         body: formData,
       });
+
+      // Handle 5xx / timeout — force re-preview
+      if (res.status >= 500) {
+        toast({
+          title: "Import failed",
+          description: "Server error — please re-upload and try again.",
+          variant: "destructive",
+        });
+        reset();
+        return;
+      }
+
       const data = await res.json();
 
       if (!data.ok) {
+        // PREVIEW_OUTDATED means file/config changed — force full re-preview
+        if (data.code === "PREVIEW_OUTDATED") {
+          toast({
+            title: "Preview outdated",
+            description: "Something changed since preview. Please re-upload the file.",
+            variant: "destructive",
+          });
+          reset();
+          return;
+        }
         toast({ title: "Import failed", description: data.message, variant: "destructive" });
         setState("preview");
         return;
@@ -154,8 +176,13 @@ export function ProductImportModal() {
         description: `Created ${data.created}, updated ${data.updated} products`,
       });
     } catch {
-      toast({ title: "Network error", description: "Import request failed", variant: "destructive" });
-      setState("preview");
+      // Network error or timeout — force re-preview
+      toast({
+        title: "Import failed",
+        description: "Request timed out or network error — please re-upload and try again.",
+        variant: "destructive",
+      });
+      reset();
     }
   }
 
