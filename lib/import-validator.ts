@@ -6,8 +6,10 @@ import {
 import {
   mapCategoryToSlug,
   formatAllowedCategories,
+  CATEGORY_DISPLAY_NAMES,
   type MappingReason,
   type MappingConfidence,
+  type CategorySlug,
 } from "@/lib/utils/category";
 import type { ParsedRow } from "./csv-parser";
 
@@ -115,7 +117,7 @@ export async function validateProductRow(
       if (mapResult.ambiguousSlugs) {
         const ambiguous = formatAllowedCategories(mapResult.ambiguousSlugs);
         errors.push(
-          `Ambiguous category '${rawCategory}'. Could match: ${ambiguous}`,
+          `Ambiguous category '${rawCategory}' could mean: ${ambiguous}. Please set category explicitly.`,
         );
       } else {
         errors.push(
@@ -127,8 +129,9 @@ export async function validateProductRow(
 
   // Permission check: mapped slug must be in vendor's allowed categories
   if (mappedSlug && allowedCategories.length > 0 && !allowedCategories.includes(mappedSlug)) {
+    const displayName = CATEGORY_DISPLAY_NAMES[mappedSlug as CategorySlug] || mappedSlug;
     errors.push(
-      `Category '${mappedSlug}' is not allowed for your vendor. Allowed: ${allowedDisplay}`,
+      `Category '${rawCategory}' maps to '${mappedSlug} (${displayName})', but your vendor is only allowed: ${allowedDisplay}`,
     );
     mappedSlug = null;
     mappingReason = null;

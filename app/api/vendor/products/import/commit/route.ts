@@ -14,6 +14,13 @@ const BATCH_SIZE = 50;
 const IMPORT_SCHEMA_VERSION = 1;
 const MAX_SLUG_RETRIES = 10;
 
+/** Compute deterministic importKey for products without SKU */
+function computeImportKey(name: string, category: string, priceFils: number): string {
+  const normalized = name.toLowerCase().trim().replace(/\s+/g, " ");
+  const payload = `${normalized}|${category}|${priceFils}`;
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
+
 /** Must match preview route's computePreviewId exactly */
 function computePreviewId(
   fileContentHash: string,
@@ -171,7 +178,7 @@ export async function POST(request: Request) {
           await prisma.product.update({
             where: { vendorId_sku: { vendorId, sku } },
             data: { name, category, priceFils, ...rest },
-            // slug intentionally not updated — preserve existing slug
+            // slug and importKey intentionally not updated — preserve existing values
           });
           updated++;
         } catch (rowErr: unknown) {
@@ -187,23 +194,42 @@ export async function POST(request: Request) {
         }
       }
 
-      // Creates with retry-on-P2002 slug collision
-      for (const result of toCreate) {
-        const { sku, name, category, priceFils, ...rest } = result.data;
-        if (!sku) continue;
+      // Batch creates using createMany with skipDuplicates (idempotent)
+      if (toCreate.length > 0) {
+        const createData: Prisma.ProductCreateManyInput[] = [];
+        for (const result of toCreate) {
+          const { sku, name, category, priceFils, ...rest } = result.data;
+          if (!sku) continue;
+          const slug = slugify(name);
+          createData.push({ vendorId, sku, name, slug, category, priceFils, ...rest });
+        }
+        
         try {
-          await createProductWithSlugRetry({ vendorId, sku, name, category, priceFils, ...rest });
-          created++;
-        } catch (rowErr: unknown) {
-          failed++;
-          const msg = (rowErr as Error).message || "Database write failed";
-          console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
-          rowErrors.push({
-            rowNumber: result.rowIndex,
-            sku: result.data.sku ?? null,
-            name: result.data.name ?? null,
-            message: msg,
+          const createResult = await prisma.product.createMany({
+            data: createData,
+            skipDuplicates: true,
           });
+          created += createResult.count;
+        } catch (batchErr: unknown) {
+          // Fallback: try individual creates with slug retry
+          for (const result of toCreate) {
+            const { sku, name, category, priceFils, ...rest } = result.data;
+            if (!sku) continue;
+            try {
+              await createProductWithSlugRetry({ vendorId, sku, name, category, priceFils, ...rest });
+              created++;
+            } catch (rowErr: unknown) {
+              failed++;
+              const msg = (rowErr as Error).message || "Database write failed";
+              console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+              rowErrors.push({
+                rowNumber: result.rowIndex,
+                sku: result.data.sku ?? null,
+                name: result.data.name ?? null,
+                message: msg,
+              });
+            }
+          }
         }
       }
 
@@ -212,18 +238,46 @@ export async function POST(request: Request) {
       );
     }
 
-    // Phase 3: No-SKU rows — create only, with slug retry
+    // Phase 3: No-SKU rows — use importKey for idempotency
     for (let i = 0; i < withoutSku.length; i += BATCH_SIZE) {
       const chunkStart = Date.now();
       const chunk = withoutSku.slice(i, i + BATCH_SIZE);
       const ci = Math.floor(i / BATCH_SIZE);
       const totalChunks = Math.ceil(withoutSku.length / BATCH_SIZE);
 
-      for (const result of chunk) {
+      // Compute importKeys for this chunk
+      const importKeysInChunk = chunk.map((r) => computeImportKey(r.data.name, r.data.category, r.data.priceFils));
+      
+      // Batch lookup existing products by importKey
+      const existingProducts = await prisma.product.findMany({
+        where: { vendorId, importKey: { in: importKeysInChunk } },
+        select: { id: true, importKey: true },
+      });
+      const existingByImportKey = new Map(existingProducts.map((p) => [p.importKey!, p.id]));
+
+      // Split into updates and creates
+      const toUpdate: Array<{ result: typeof chunk[0]; importKey: string }> = [];
+      const toCreate: Array<{ result: typeof chunk[0]; importKey: string }> = [];
+      for (let j = 0; j < chunk.length; j++) {
+        const result = chunk[j];
+        const importKey = importKeysInChunk[j];
+        if (existingByImportKey.has(importKey)) {
+          toUpdate.push({ result, importKey });
+        } else {
+          toCreate.push({ result, importKey });
+        }
+      }
+
+      // Batch updates
+      for (const { result, importKey } of toUpdate) {
         const { name, category, priceFils, ...rest } = result.data;
         try {
-          await createProductWithSlugRetry({ vendorId, name, category, priceFils, ...rest });
-          created++;
+          await prisma.product.update({
+            where: { vendorId_importKey: { vendorId, importKey } },
+            data: { name, category, priceFils, ...rest },
+            // slug and importKey preserved
+          });
+          updated++;
         } catch (rowErr: unknown) {
           failed++;
           const msg = (rowErr as Error).message || "Database write failed";
@@ -237,8 +291,45 @@ export async function POST(request: Request) {
         }
       }
 
+      // Batch creates using createMany with skipDuplicates (idempotent)
+      if (toCreate.length > 0) {
+        const createData: Prisma.ProductCreateManyInput[] = [];
+        for (const { result, importKey } of toCreate) {
+          const { name, category, priceFils, ...rest } = result.data;
+          const slug = slugify(name);
+          createData.push({ vendorId, importKey, name, slug, category, priceFils, ...rest });
+        }
+        
+        try {
+          const createResult = await prisma.product.createMany({
+            data: createData,
+            skipDuplicates: true,
+          });
+          created += createResult.count;
+        } catch (batchErr: unknown) {
+          // Fallback: try individual creates with slug retry
+          for (const { result, importKey } of toCreate) {
+            const { name, category, priceFils, ...rest } = result.data;
+            try {
+              await createProductWithSlugRetry({ vendorId, importKey, name, category, priceFils, ...rest });
+              created++;
+            } catch (rowErr: unknown) {
+              failed++;
+              const msg = (rowErr as Error).message || "Database write failed";
+              console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+              rowErrors.push({
+                rowNumber: result.rowIndex,
+                sku: result.data.sku ?? null,
+                name: result.data.name ?? null,
+                message: msg,
+              });
+            }
+          }
+        }
+      }
+
       console.log(
-        `[PRODUCT_IMPORT_CHUNK] requestId=${requestId} noSkuChunk=${ci + 1}/${totalChunks} rows=${chunk.length} elapsed=${Date.now() - chunkStart}ms`,
+        `[PRODUCT_IMPORT_CHUNK] requestId=${requestId} noSkuChunk=${ci + 1}/${totalChunks} rows=${chunk.length} updates=${toUpdate.length} creates=${toCreate.length} elapsed=${Date.now() - chunkStart}ms`,
       );
     }
 

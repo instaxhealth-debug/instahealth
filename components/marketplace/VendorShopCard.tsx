@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
@@ -31,27 +32,34 @@ export function VendorShopCard({
   sampleImages = [],
   className,
 }: VendorShopCardProps) {
-  // Strict logo resolution with vendor name/slug matching
-  const resolveLogoUrl = (vendor: VendorShopCardProps["vendor"]): string => {
-    if (vendor.logoUrl && typeof vendor.logoUrl === "string" && vendor.logoUrl.startsWith("/")) {
-      return vendor.logoUrl;
+  const [logoError, setLogoError] = useState(false);
+
+  const normalizedLogoUrl = useMemo(() => {
+    const raw = typeof vendor.logoUrl === "string" ? vendor.logoUrl.trim() : "";
+    if (!raw) return "";
+    if (raw.startsWith("/public/")) return raw.replace(/^\/public/, "");
+    return raw;
+  }, [vendor.logoUrl]);
+
+  const hasLogoUrl =
+    normalizedLogoUrl.length > 0 &&
+    (normalizedLogoUrl.startsWith("/") || normalizedLogoUrl.startsWith("http://") || normalizedLogoUrl.startsWith("https://"));
+
+  if (process.env.NODE_ENV !== "production" && normalizedLogoUrl) {
+    if (normalizedLogoUrl.includes("/vendors/bloodtestvendors/") || normalizedLogoUrl.includes("/public/vendors/bloodtestvendors/")) {
+      console.warn("[VendorLogoWarning] seeded logo path detected", {
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        logoUrl: normalizedLogoUrl,
+      });
     }
-
-    return "/logos/vendor-fallback.png";
-  };
-
-  const resolvedLogoSrc = resolveLogoUrl(vendor);
-
-  // Hard debug logging (always in development)
-  if (typeof window !== "undefined") {
-    console.log("[VendorLogo]", {
-      vendor: vendor.name,
-      slug: vendor.slug,
-      id: vendor.id,
-      logoUrl: vendor.logoUrl,
-      resolvedLogoSrc,
-    });
   }
+
+  const initials = useMemo(() => {
+    const parts = vendor.name.trim().split(/\s+/).filter(Boolean);
+    const letters = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "");
+    return letters.join("") || "?";
+  }, [vendor.name]);
 
   return (
     <Link href={`/shop/${vendor.slug}/${category}`}>
@@ -60,17 +68,21 @@ export function VendorShopCard({
       {/* Top Row: Logo + Badges */}
         <div className="flex items-center justify-between gap-3">
           <div className="h-20 w-48 flex items-center flex-shrink-0">
-            <Image
-              src={resolvedLogoSrc}
-              alt={vendor.name}
-              width={220}
-              height={80}
-              className="h-20 w-auto object-contain"
-              priority
-              onError={() => {
-                console.warn("[VendorLogoError]", vendor.name, resolvedLogoSrc, "falling back to generic fallback");
-              }}
-            />
+            {hasLogoUrl && !logoError ? (
+              <Image
+                src={normalizedLogoUrl}
+                alt={vendor.name}
+                width={220}
+                height={80}
+                className="h-20 w-auto object-contain"
+                priority
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-lg font-semibold">
+                {initials}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {productCount === 0 && (

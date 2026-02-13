@@ -1,71 +1,503 @@
-// ==========================================
-// INSTAHEALTH PRISMA SCHEMA
-// ==========================================
-// DATABASE STRATEGY: Neon PostgreSQL ONLY
-// ==========================================
-//
-// PRODUCTION ARCHITECTURE:
-// - DEV Database: Neon (https://neon.tech) - used by local development & preview deployments
-// - PROD Database: Neon (https://neon.tech) - used by production only (instahealth.ae)
-//
-// ENVIRONMENT VARIABLES:
-// - LOCAL DEVELOPMENT: DATABASE_URL=<DEV_NEON_URL>
-// - VERCEL PREVIEW: DATABASE_URL=<DEV_NEON_URL>
-// - VERCEL PRODUCTION: DATABASE_URL=<PROD_NEON_URL>
-//
-// MIGRATION STRATEGY:
-// Data is NEVER auto-synced between DEV and PROD.
-// Data moves manually only via:
-//   1. Admin UI seeding on production
-//   2. Explicit export/import scripts
-//   3. Seed scripts run with explicit PROD DATABASE_URL
-//
-// NOTE: SQLite (file:./prisma/dev.db) is NO LONGER active.
-// It remains only as legacy/fallback documentation.
-// All development uses DEV Neon.
-//
-// ==========================================
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  // Use Neon PostgreSQL (https://neon.tech)
-  // DATABASE_URL and DIRECT_URL are set via environment variables
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id                String     @id @default(cuid())
-  email             String     @unique
-  passwordHash      String?    // Nullable for future OAuth support
-  name              String?
-  phone             String?    // E.164 format (e.g. +971545988544)
-  countryCode       String?    // Country code (e.g. "+971")
-  image             String?    // NextAuth required
-  emailVerified     DateTime?  // NextAuth required
-  role              Role       @default(USER)
-  defaultLocationId String?    // User's default location preference
-  defaultLocation   Location?  @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  
-  // Personal data preferences
-  heightCm                 Int?     // Height in centimeters
-  weightKg                 Int?     // Weight in kilograms
-  consentShareBodyMetrics  Boolean  @default(false) // Consent to share height/weight for recommendations
-  marketingPushOptIn       Boolean  @default(false) // Push notification marketing consent
-  marketingEmailOptIn      Boolean  @default(false) // Email marketing consent
-  
-  // Relations
-  orders            Order[]
-  carts             Cart[]
-  accounts          Account[]
-  sessions          Session[]
-  addresses         Address[]
+  id                      String    @id @default(cuid())
+  email                   String    @unique
+  passwordHash            String?
+  name                    String?
+  image                   String?
+  emailVerified           DateTime?
+  role                    Role      @default(USER)
+  defaultLocationId       String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  countryCode             String?
+  phone                   String?
+  heightCm                Int?
+  marketingEmailOptIn     Boolean   @default(false)
+  marketingPushOptIn      Boolean   @default(false)
+  weightKg                Int?
+  consentShareBodyMetrics Boolean   @default(false)
+  accounts                Account[]
+  addresses               Address[]
+  carts                   Cart?
+  orders                  Order[]
+  sessions                Session[]
+  defaultLocation         Location? @relation(fields: [defaultLocationId], references: [id])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Address {
+  id               String   @id @default(cuid())
+  userId           String
+  label            String
+  formattedAddress String
+  placeId          String
+  lat              Float
+  lng              Float
+  city             String?
+  country          String   @default("United Arab Emirates")
+  postalCode       String?
+  normalizedHash   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  area             String?
+  emirate          String?
+  instructions     String?
+  isDefault        Boolean  @default(false)
+  line1            String
+  line2            String?
+  phone            String?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders           Order[]
+
+  @@unique([userId, normalizedHash])
+  @@index([userId])
+  @@index([userId, isDefault])
+}
+
+model Vendor {
+  id                       String             @id @default(cuid())
+  name                     String
+  slug                     String             @unique
+  email                    String?            @unique
+  status                   String             @default("active")
+  legalEntityName          String?
+  country                  String?
+  licenseNumber            String?
+  complianceAccepted       Boolean            @default(false)
+  complianceAcceptedAt     DateTime?
+  logoUrl                  String?
+  tagline                  String?
+  rating                   Float?
+  ratingCount              Int?
+  isHouseBrand             Boolean            @default(false)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  verified                 Boolean            @default(false)
+  allowOutOfRadiusOverride Boolean            @default(false)
+  baseAddressFormatted     String?
+  baseLat                  Float?
+  baseLng                  Float?
+  basePlaceId              String?
+  enforceServiceRadius     Boolean            @default(true)
+  serviceRadiusKm          Int                @default(25)
+  userId                   String?            @unique
+  allowedCategories        String[]
+  cartItems                CartItem[]
+  orderItems               OrderItem[]
+  products                 Product[]
+  approvedApplications     VendorApplication?
+  vendorOrders             VendorOrder[]
+  vendorPayouts            VendorPayout[]
+
+  @@index([slug])
+  @@index([userId])
+}
+
+model Product {
+  id              String            @id @default(cuid())
+  vendorId        String
+  importKey       String?
+  name            String
+  slug            String            @unique
+  description     String?
+  category        String
+  priceFils       Int
+  imageUrl        String?
+  inStock         Boolean           @default(true)
+  active          Boolean           @default(true)
+  isGlobal        Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  inventoryStatus String            @default("in_stock")
+  published       Boolean           @default(true)
+  tags            String[]          @default([])
+  calendlyUrl     String?
+  sku             String?
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  locations       ProductLocation[]
+  variants        ProductVariant[]
+
+  @@unique([vendorId, sku])
+  @@unique([vendorId, importKey])
+  @@index([vendorId])
+  @@index([isGlobal])
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  productId  String
+  sku        String      @unique
+  strength   String
+  unitSize   String?
+  priceFils  Int
+  inStock    Boolean     @default(true)
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model MarketplaceEvent {
+  id        String               @id @default(cuid())
+  productId String
+  vendorId  String
+  eventType MarketplaceEventType
+  createdAt DateTime             @default(now())
+
+  @@index([createdAt])
+}
+
+model Location {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  slug      String            @unique
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  carts     Cart[]
+  products  ProductLocation[]
+  users     User[]
+
+  @@index([isActive])
+}
+
+model ProductLocation {
+  productId  String
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, locationId])
+}
+
+model Order {
+  id                      String        @id @default(cuid())
+  userId                  String?
+  locationId              String?
+  status                  String        @default("PENDING_PAYMENT")
+  subtotalFils            Int
+  deliveryFils            Int           @default(0)
+  totalFils               Int
+  currency                String        @default("AED")
+  stripeCheckoutSessionId String?       @unique
+  stripePaymentIntentId   String?
+  acceptedTerms           Boolean       @default(false)
+  acceptedDisclaimer      Boolean       @default(false)
+  ageConfirmed            Boolean       @default(false)
+  shippingName            String?
+  shippingPhone           String?
+  shippingAddressLine1    String?
+  shippingAddressLine2    String?
+  shippingNotes           String?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  addressId               String?
+  shippingArea            String?
+  shippingEmirate         String?
+  address                 Address?      @relation(fields: [addressId], references: [id])
+  user                    User?         @relation(fields: [userId], references: [id])
+  events                  OrderEvent[]
+  items                   OrderItem[]
+  refunds                 Refund[]
+  vendorOrders            VendorOrder[]
+
+  @@index([userId])
+  @@index([addressId])
+  @@index([stripeCheckoutSessionId])
+  @@index([status])
+}
+
+model OrderItem {
+  id               String            @id @default(cuid())
+  orderId          String
+  productId        String
+  vendorId         String
+  variantId        String?
+  quantity         Int               @default(1)
+  unitPriceFils    Int
+  lineTotalFils    Int
+  productName      String
+  productSlug      String?
+  vendorName       String
+  variantSku       String?
+  variantStrength  String?
+  variantUnitSize  String?
+  variantPriceFils Int?
+  fulfilled        Boolean           @default(false)
+  fulfilledAt      DateTime?
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id])
+  variant          ProductVariant?   @relation(fields: [variantId], references: [id])
+  vendor           Vendor            @relation(fields: [vendorId], references: [id])
+  vendorOrderItems VendorOrderItem[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([vendorId])
+  @@index([vendorId, fulfilled])
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String?    @unique
+  locationId String?
+  status     String     @default("ACTIVE")
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  location   Location?  @relation(fields: [locationId], references: [id])
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      CartItem[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model CartItem {
+  id            String          @id @default(cuid())
+  cartId        String
+  productId     String
+  variantId     String?
+  quantity      Int             @default(1)
+  unitPriceFils Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  vendorId      String
+  cart          Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product       Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  vendor        Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+  @@index([productId])
+  @@index([vendorId])
+}
+
+model VendorPayout {
+  id          String    @id @default(cuid())
+  vendorId    String
+  amountFils  Int
+  status      String    @default("PENDING")
+  reference   String?
+  paidAt      DateTime?
+  periodStart DateTime?
+  periodEnd   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+model VendorOrder {
+  id              String            @id @default(cuid())
+  orderId         String
+  vendorId        String
+  status          VendorOrderStatus @default(NEW)
+  acceptBy        DateTime
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  fulfilledAt     DateTime?
+  cancelledAt     DateTime?
+  notesToVendor   String?
+  notesInternal   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  resolutionNotes String?
+  terminalReason  String?
+  subtotalFils    Int               @default(0)
+  totalFils       Int               @default(0)
+  events          OrderEvent[]
+  refund          Refund?
+  order           Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items           VendorOrderItem[]
+
+  @@unique([orderId, vendorId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([acceptBy])
+}
+
+model Refund {
+  id             String       @id @default(cuid())
+  orderId        String
+  vendorOrderId  String       @unique
+  stripeRefundId String?
+  amountFils     Int
+  reason         String
+  status         RefundStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorOrder    VendorOrder  @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model VendorOrderItem {
+  id            String      @id @default(cuid())
+  vendorOrderId String
+  orderItemId   String
+  orderItem     OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  vendorOrder   VendorOrder @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorOrderId, orderItemId])
+  @@index([vendorOrderId])
+  @@index([orderItemId])
+}
+
+model OrderEvent {
+  id            String       @id @default(cuid())
+  orderId       String?
+  vendorOrderId String?
+  actorType     ActorType
+  actorId       String?
+  eventType     String
+  data          Json?
+  createdAt     DateTime     @default(now())
+  order         Order?       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorOrder   VendorOrder? @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([vendorOrderId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model VendorApplication {
+  id                         String                  @id @default(cuid())
+  legalBusinessName          String
+  tradingName                String?
+  country                    String
+  city                       String
+  businessRegNumber          String
+  taxVatNumber               String?
+  website                    String?
+  businessCategory           String
+  businessDescription        String
+  contactFullName            String
+  contactRole                String
+  contactEmail               String
+  contactPhone               String
+  contactWhatsApp            String?
+  preferredContactMethod     String
+  operationRegion            String
+  fulfillmentType            String
+  deliveryTimeframe          String
+  hasProductImages           Boolean                 @default(false)
+  complianceDocs             String[]                @default([])
+  productDescription         String
+  skuCount                   Int?
+  hasPricing                 Boolean                 @default(false)
+  informationAccuracy        Boolean                 @default(false)
+  agreeContact               Boolean                 @default(false)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  approvedAt                 DateTime?
+  approvedBy                 String?
+  notes                      String?
+  ipAddress                  String?
+  userAgent                  String?
+  approvedVendorId           String?                 @unique
+  confirmationEmailError     String?
+  confirmationEmailMessageId String?
+  confirmationEmailSentAt    DateTime?
+  confirmationEmailStatus    ConfirmationEmailStatus @default(PENDING)
+  status                     VendorApplicationStatus @default(PENDING)
+  logoUrl                    String?
+  selectedCategories         String[]                @default([])
+  approvedVendor             Vendor?                 @relation(fields: [approvedVendorId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([contactEmail])
+}
+
+model VendorInvite {
+  id             String                  @id @default(cuid())
+  email          String
+  applicationId  String?
+  vendorId       String?
+  expiresAt      DateTime
+  usedAt         DateTime?
+  emailStatus    ConfirmationEmailStatus @default(PENDING)
+  emailMessageId String?
+  emailError     String?
+  emailSentAt    DateTime?
+  createdAt      DateTime                @default(now())
+  tokenHash      String                  @unique
+
+  @@index([email])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([applicationId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
 }
 
 enum Role {
@@ -115,509 +547,4 @@ enum ConfirmationEmailStatus {
   PENDING
   SENT
   FAILED
-}
-
-// NextAuth adapter models
-model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model Address {
-  id                String   @id @default(cuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  label             String   // e.g. "Home", "Work"
-  phone             String?  // Optional contact phone for delivery
-  line1             String   // Apartment/villa + building
-  line2             String?  // Additional address line
-  area              String?  // Neighborhood/community
-  city              String?
-  emirate           String?  // UAE emirate
-  country           String   @default("United Arab Emirates")
-  instructions      String?  // Delivery instructions
-  
-  lat               Float
-  lng               Float
-  placeId           String
-  formattedAddress  String   // Full formatted address from Google
-  
-  isDefault         Boolean  @default(false)
-  
-  postalCode        String?
-  normalizedHash    String   // For deduplication
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  orders            Order[]
-
-  @@unique([userId, normalizedHash])
-  @@index([userId])
-  @@index([userId, isDefault])
-}
-
-model Vendor {
-  id        String      @id @default(cuid())
-  name      String
-  slug      String      @unique
-  email     String?     @unique
-  userId    String?     @unique  // Link to User for auth (vendor portal access)
-  allowedCategories String[]
-  status    String      @default("active")
-  verified  Boolean     @default(false)  // Replaces complianceAccepted for search
-  legalEntityName String?
-  country   String?
-  licenseNumber String?
-  complianceAccepted Boolean @default(false)
-  complianceAcceptedAt DateTime?
-  logoUrl   String?
-  tagline   String?
-  rating    Float?
-  ratingCount Int?
-  isHouseBrand Boolean @default(false)
-  
-  // Geo fields for service radius enforcement
-  basePlaceId           String?
-  baseAddressFormatted  String?
-  baseLat               Float?
-  baseLng               Float?
-  serviceRadiusKm       Int     @default(25)
-  enforceServiceRadius  Boolean @default(true)
-  allowOutOfRadiusOverride Boolean @default(false)
-
-  // Approved vendor applications
-  approvedApplications VendorApplication[]
-  
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  products  Product[]
-  orderItems OrderItem[]
-  vendorOrders VendorOrder[]
-  vendorPayouts VendorPayout[]
-  cartItems CartItem[]
-
-  @@index([slug])
-  @@index([userId])
-}
-
-model Product {
-  id          String          @id @default(cuid())
-  vendorId    String
-  vendor      Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  sku         String?
-  name        String
-  slug        String          @unique
-  description String?
-  category    String
-  priceFils   Int
-  imageUrl    String?
-  calendlyUrl String?
-  inStock     Boolean         @default(true)
-  inventoryStatus String      @default("in_stock")  // in_stock, low, out
-  active      Boolean         @default(true)
-  published   Boolean         @default(true)  // Separate from active for editorial control
-  isGlobal    Boolean         @default(false) // If true, available in all locations regardless of ProductLocation rows
-  tags        String[]        @default([])    // Search tags
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  locations   ProductLocation[]
-  orderItems  OrderItem[]
-  variants    ProductVariant[]
-  cartItems   CartItem[]
-
-  @@index([vendorId])
-  @@index([isGlobal])
-  @@unique([vendorId, sku])
-}
-
-model ProductVariant {
-  id          String      @id @default(cuid())
-  productId   String
-  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku         String      @unique
-  strength    String
-  unitSize    String?
-  priceFils   Int
-  inStock     Boolean     @default(true)
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
-  cartItems   CartItem[]
-
-  @@index([productId])
-}
-
-model MarketplaceEvent {
-  id        String              @id @default(cuid())
-  productId String
-  vendorId  String
-  eventType MarketplaceEventType
-  createdAt DateTime            @default(now())
-
-  @@index([createdAt])
-}
-
-model Location {
-  id        String          @id @default(cuid())
-  name      String          @unique
-  slug      String          @unique
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  
-  // Relations
-  products      ProductLocation[]
-  users         User[]           // Users with this as default location
-  carts         Cart[]           // Carts at this location
-
-  @@index([isActive])
-}
-
-model ProductLocation {
-  productId String
-  locationId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  location  Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@id([productId, locationId])
-}
-
-model Order {
-  id                       String      @id @default(cuid())
-  userId                   String?
-  user                     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  locationId               String?
-  addressId                String?
-  address                  Address?    @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  status                   String      @default("PENDING_PAYMENT") // PENDING_PAYMENT, PAID, FULFILLING, FULFILLED, PARTIALLY_FULFILLED, CANCELLED, REFUNDED
-  subtotalFils             Int
-  deliveryFils             Int         @default(0)
-  totalFils                Int
-  currency                 String      @default("AED")
-  stripeCheckoutSessionId  String?     @unique
-  stripePaymentIntentId    String?
-  acceptedTerms            Boolean     @default(false)
-  acceptedDisclaimer       Boolean     @default(false)
-  ageConfirmed             Boolean     @default(false)
-  shippingName             String?
-  shippingPhone            String?
-  shippingAddressLine1     String?
-  shippingAddressLine2     String?
-  shippingArea             String?
-  shippingEmirate          String?
-  shippingNotes            String?
-  createdAt                DateTime    @default(now())
-  updatedAt                DateTime    @updatedAt
-  items                    OrderItem[]
-  vendorOrders             VendorOrder[]
-  events                   OrderEvent[]
-  refunds                  Refund[]
-
-  @@index([userId])
-  @@index([addressId])
-  @@index([stripeCheckoutSessionId])
-  @@index([status])
-}
-
-model OrderItem {
-  id            String  @id @default(cuid())
-  orderId       String
-  productId     String
-  vendorId      String
-  variantId     String?
-  quantity      Int     @default(1)
-  unitPriceFils Int
-  lineTotalFils Int
-  // Snapshot fields - preserve order data even if product changes
-  productName   String  // Snapshot of product.name at time of order
-  productSlug   String? // Snapshot of product.slug
-  vendorName    String  // Snapshot of vendor.name at time of order
-  variantSku    String?
-  variantStrength String?
-  variantUnitSize String?
-  variantPriceFils Int?
-  fulfilled     Boolean @default(false)
-  fulfilledAt   DateTime?
-  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  vendor        Vendor  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  vendorOrderItems VendorOrderItem[]
-
-  @@index([orderId])
-  @@index([productId])
-  @@index([vendorId])
-  @@index([vendorId, fulfilled])
-}
-
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String?    // Nullable for guest carts (though guests use localStorage)
-  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  locationId String?   // Selected location for this cart
-  location  Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  status    String     @default("ACTIVE") // ACTIVE, ORDERED
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  items     CartItem[]
-
-  @@unique([userId]) // Only one active cart per user
-  @@index([userId])
-  @@index([status])
-}
-
-model CartItem {
-  id            String   @id @default(cuid())
-  cartId        String
-  productId     String
-  vendorId      String   // Vendor ownership (required for correct checkout flow)
-  variantId     String?
-  quantity      Int      @default(1)
-  unitPriceFils Int      @default(0) // Price snapshot in fils (1 AED = 100 fils)
-  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([cartId, productId, variantId])
-  @@index([cartId])
-  @@index([productId])
-  @@index([vendorId])
-}
-
-model VendorPayout {
-  id         String   @id @default(cuid())
-  vendorId   String
-  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  amountFils Int
-  status     String   @default("PENDING") // PENDING, PAID
-  reference  String?
-  paidAt     DateTime?
-  periodStart DateTime?
-  periodEnd   DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([vendorId])
-  @@index([status])
-}
-
-model VendorOrder {
-  id              String            @id @default(cuid())
-  orderId         String
-  vendorId        String
-
-  status          VendorOrderStatus @default(NEW)
-  subtotalFils    Int               @default(0)
-  totalFils       Int               @default(0)
-  acceptBy        DateTime
-  acceptedAt      DateTime?
-  rejectedAt      DateTime?
-  fulfilledAt     DateTime?
-  cancelledAt     DateTime?
-
-  notesToVendor   String?
-  notesInternal   String?
-  
-  terminalReason   String?          // Why did this vendor order reach terminal state (SLA expiry, cancellation, etc)
-  resolutionNotes  String?          // Additional context about resolution (optional)
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  order           Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  items           VendorOrderItem[]
-  events          OrderEvent[]
-  refund          Refund?
-
-  @@unique([orderId, vendorId])
-  @@index([vendorId])
-  @@index([status])
-  @@index([acceptBy])
-}
-
-model Refund {
-  id             String        @id @default(cuid())
-  orderId        String
-  vendorOrderId  String        @unique
-  stripeRefundId String?
-  amountFils     Int
-  reason         String
-  status         RefundStatus  @default(PENDING)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendorOrder    VendorOrder   @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([status])
-}
-
-model VendorOrderItem {
-  id            String        @id @default(cuid())
-  vendorOrderId String
-  orderItemId   String
-
-  vendorOrder   VendorOrder   @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-  orderItem     OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-
-  @@unique([vendorOrderId, orderItemId])
-  @@index([vendorOrderId])
-  @@index([orderItemId])
-}
-
-model OrderEvent {
-  id            String    @id @default(cuid())
-  orderId       String?
-  vendorOrderId String?
-
-  actorType     ActorType
-  actorId       String?
-  eventType     String    // VENDOR_ORDER_CREATED, VENDOR_ACCEPTED, VENDOR_REJECTED, VENDOR_SLA_EXPIRED, etc.
-  data          Json?
-
-  createdAt     DateTime  @default(now())
-
-  order         Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendorOrder   VendorOrder? @relation(fields: [vendorOrderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([vendorOrderId])
-  @@index([eventType])
-  @@index([createdAt])
-}
-
-model VendorApplication {
-  id                 String   @id @default(cuid())
-  status             VendorApplicationStatus   @default(PENDING)
-
-  // Business identity
-  legalBusinessName  String
-  tradingName        String?
-  country            String
-  city               String
-  businessRegNumber  String
-  taxVatNumber       String?
-  website            String?
-  businessCategory   String
-  businessDescription String
-  logoUrl            String?  // Logo uploaded during application
-
-  // Contact person
-  contactFullName    String
-  contactRole        String
-  contactEmail       String
-  contactPhone       String
-  contactWhatsApp    String?
-  preferredContactMethod String
-
-  // Operations
-  operationRegion    String
-  fulfillmentType    String
-  deliveryTimeframe  String
-  hasProductImages   Boolean  @default(false)
-  complianceDocs     String[] @default([])
-  selectedCategories String[] @default([]) // Categories vendor wants to sell in
-
-  // Products
-  productDescription String
-  skuCount           Int?
-  hasPricing         Boolean  @default(false)
-
-  // Agreements
-  informationAccuracy Boolean @default(false)
-  agreeContact       Boolean  @default(false)
-
-  // Metadata
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  confirmationEmailStatus ConfirmationEmailStatus @default(PENDING)
-  confirmationEmailMessageId String?
-  confirmationEmailError String?
-  confirmationEmailSentAt DateTime?
-  approvedAt         DateTime?
-  approvedBy         String?
-  notes              String?
-  ipAddress          String?
-  userAgent          String?
-
-  // Relation to created vendor (if approved)
-  approvedVendorId   String?  @unique
-  approvedVendor     Vendor?  @relation(fields: [approvedVendorId], references: [id], onDelete: SetNull)
-
-
-  @@index([status])
-  @@index([createdAt])
-  @@index([contactEmail])
-}
-
-model VendorInvite {
-  id            String   @id @default(cuid())
-  email         String
-  applicationId String?
-  vendorId      String?
-  tokenHash     String   @unique
-  expiresAt     DateTime
-  usedAt        DateTime?
-  emailStatus   ConfirmationEmailStatus @default(PENDING)
-  emailMessageId String?
-  emailError    String?
-  emailSentAt   DateTime?
-  createdAt     DateTime @default(now())
-
-  @@index([email])
-  @@index([tokenHash])
-  @@index([expiresAt])
-  @@index([applicationId])
-}
-
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  email     String
-  tokenHash String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([email])
-  @@index([expiresAt])
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Star, MapPin, Clock, CheckCircle2 } from "lucide-react";
@@ -14,35 +15,34 @@ interface VendorCardProps {
 }
 
 export function VendorCard({ vendor, className, showOfferingsCount, offeringsCount }: VendorCardProps) {
-  const normalizeLogoUrl = (logoUrl?: string) => {
-    if (!logoUrl) return undefined;
-    let normalized = logoUrl.trim();
+  const [logoError, setLogoError] = useState(false);
 
-    if (normalized.startsWith("/public/")) {
-      normalized = normalized.replace(/^\/public/, "");
+  const normalizedLogoUrl = useMemo(() => {
+    const raw = typeof vendor.logoUrl === "string" ? vendor.logoUrl.trim() : "";
+    if (!raw) return "";
+    if (raw.startsWith("/public/")) return raw.replace(/^\/public/, "");
+    return raw;
+  }, [vendor.logoUrl]);
+
+  const hasLogoUrl =
+    normalizedLogoUrl.length > 0 &&
+    (normalizedLogoUrl.startsWith("/") || normalizedLogoUrl.startsWith("http://") || normalizedLogoUrl.startsWith("https://"));
+
+  if (process.env.NODE_ENV !== "production" && normalizedLogoUrl) {
+    if (normalizedLogoUrl.includes("/vendors/bloodtestvendors/") || normalizedLogoUrl.includes("/public/vendors/bloodtestvendors/")) {
+      console.warn("[VendorLogoWarning] seeded logo path detected", {
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        logoUrl: normalizedLogoUrl,
+      });
     }
-
-    if (!normalized.startsWith("/")) {
-      normalized = `/${normalized}`;
-    }
-
-    normalized = normalized.replace(/\/vendors\/bloodtestvendors\//i, "/vendors/bloodtestvendors/");
-
-    return normalized;
-  };
-
-  const instabloodzLogo = "/vendors/bloodtestvendors/bloodz.png";
-  const vendorNameLower = vendor.name?.toLowerCase() || "";
-  const vendorSlugLower = vendor.slug?.toLowerCase() || "";
-
-  const normalizedLogo =
-    vendorNameLower.includes("instabloodz") || vendorSlugLower.includes("instablood")
-      ? instabloodzLogo
-      : normalizeLogoUrl(vendor.logoUrl);
-
-  if (process.env.NODE_ENV === "development" && vendor.logoUrl) {
-    console.log("[VendorLogo]", vendor.name, { logoUrl: vendor.logoUrl, normalizedLogo });
   }
+
+  const initials = useMemo(() => {
+    const parts = vendor.name.trim().split(/\s+/).filter(Boolean);
+    const letters = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "");
+    return letters.join("") || "?";
+  }, [vendor.name]);
 
   return (
     <div className={cn(
@@ -52,19 +52,23 @@ export function VendorCard({ vendor, className, showOfferingsCount, offeringsCou
     )}>
       <div className="flex items-start justify-between gap-4 mb-3">
         {/* Logo */}
-        {normalizedLogo && (
+        {hasLogoUrl && !logoError ? (
           <div className="flex-shrink-0">
             <div className="relative h-16 w-16 md:h-20 md:w-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
               <Image
-                src={normalizedLogo}
+                src={normalizedLogoUrl}
                 alt={`${vendor.name} logo`}
                 width={64}
                 height={64}
                 className="h-full w-full object-contain bg-white"
-                onError={() => {
-                  console.warn("[VendorLogoError]", vendor.name, normalizedLogo);
-                }}
+                onError={() => setLogoError(true)}
               />
+            </div>
+          </div>
+        ) : (
+          <div className="flex-shrink-0">
+            <div className="h-16 w-16 md:h-20 md:w-20 bg-gray-100 rounded-full border border-gray-200 flex items-center justify-center text-lg font-semibold text-gray-700">
+              {initials}
             </div>
           </div>
         )}

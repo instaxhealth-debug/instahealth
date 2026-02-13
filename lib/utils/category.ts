@@ -29,8 +29,12 @@ export const CATEGORY_DISPLAY_NAMES: Record<CategorySlug, string> = {
 // Canonical category registry with aliases vendors might use in CSV files
 const CATEGORY_ALIASES: Record<CategorySlug, string[]> = {
   [CATEGORY_SLUGS.PEPTIDES]: [
-    "injectable peptides", "peptide", "injections", "research peptides",
-    "peptide therapy", "peptide shots", "peptide injections",
+    "peptide", "injectable peptides", "peptides injectable", "injections",
+    "research peptides", "peptide therapy", "peptide shots", "peptide injections",
+    "oral peptides", "peptides oral", "capsule peptides", "peptide capsules",
+    "peptides capsules", "capsules", "caps", "oral capsules", "capsule",
+    "nasal peptides", "peptide nasal", "nasal spray", "peptide nasal spray",
+    "nasal",
   ],
   [CATEGORY_SLUGS.BLOOD_TESTS]: [
     "blood test", "lab tests", "lab test", "pathology", "labs",
@@ -83,9 +87,9 @@ export function normalizeCategoryInput(input: string): string {
   return input
     .toLowerCase()
     .trim()
-    .replace(/[_\-]+/g, " ")
-    .replace(/[^a-z0-9 ]/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/[_\-\/—,()\[\]]+/g, " ") // Replace separators and parentheses with space
+    .replace(/[^a-z0-9 ]/g, "") // Strip remaining punctuation
+    .replace(/\s+/g, " ") // Collapse multiple spaces
     .trim();
 }
 
