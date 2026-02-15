@@ -458,6 +458,10 @@ model VendorApplication {
   confirmationEmailMessageId String?
   confirmationEmailSentAt    DateTime?
   confirmationEmailStatus    ConfirmationEmailStatus @default(PENDING)
+  inviteEmailError           String?
+  inviteEmailMessageId       String?
+  inviteEmailSentAt          DateTime?
+  inviteEmailStatus          ConfirmationEmailStatus @default(PENDING)
   status                     VendorApplicationStatus @default(PENDING)
   logoUrl                    String?
   selectedCategories         String[]                @default([])

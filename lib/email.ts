@@ -13,17 +13,41 @@ interface EmailResponse {
   success: boolean;
   messageId?: string;
   error?: string;
+  providerError?: string;
 }
 
 export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.EMAIL_FROM || "no-reply@instahealth.ae";
+  const allowedFromDomains = (process.env.RESEND_ALLOWED_FROM_DOMAINS || "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+  const emailFromDomain = fromEmail.split("@")[1]?.toLowerCase() || "";
+  const effectiveAllowedDomains = allowedFromDomains.length
+    ? allowedFromDomains
+    : emailFromDomain
+      ? [emailFromDomain]
+      : [];
 
   if (!apiKey) {
     console.error("RESEND_API_KEY not configured");
     return {
       success: false,
       error: "Email service not configured",
+    };
+  }
+
+  if (!emailFromDomain || !effectiveAllowedDomains.includes(emailFromDomain)) {
+    const errorMessage = "EMAIL_FROM not verified in Resend. Use a verified sender.";
+    console.error("EMAIL_FROM domain not allowed", {
+      emailFromDomain: emailFromDomain || "missing",
+      allowedDomains: effectiveAllowedDomains,
+    });
+    return {
+      success: false,
+      error: errorMessage,
+      providerError: `EMAIL_FROM=${fromEmail}`,
     };
   }
 
@@ -43,11 +67,12 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("Resend API error:", error);
+      const errorText = await response.text();
+      console.error("Resend API error:", errorText);
       return {
         success: false,
-        error: `Email send failed: ${response.statusText}`,
+        error: `Email send failed: ${response.status} ${response.statusText}`,
+        providerError: errorText,
       };
     }
 
@@ -61,6 +86,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResponse> {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
+      providerError: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

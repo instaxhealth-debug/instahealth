@@ -6,6 +6,21 @@ import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug";
 import { createHash, randomUUID } from "crypto";
 import { getBaseUrl, redactToken, isValidProductionBaseUrl } from "@/lib/url";
 
+function maskEmailForLogs(email: string | null | undefined) {
+  if (!email) {
+    return "unknown";
+  }
+  const [local, domain] = email.split("@");
+  if (!domain) {
+    return "invalid";
+  }
+  const trimmedLocal = local || "";
+  if (trimmedLocal.length <= 2) {
+    return `***@${domain}`;
+  }
+  return `${trimmedLocal[0]}***${trimmedLocal[trimmedLocal.length - 1]}@${domain}`;
+}
+
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
 
@@ -130,11 +145,30 @@ export async function POST(request: NextRequest) {
         applicationId: application.id,
         inviteId: invite.id,
         baseUrl,
+        vendorEmail: application.contactEmail,
+        emailFrom: maskEmailForLogs(process.env.EMAIL_FROM),
+      });
+
+      await prisma.vendorApplication.update({
+        where: { id: application.id },
+        data: {
+          inviteEmailStatus: "FAILED",
+          inviteEmailError: errorMessage,
+          inviteEmailMessageId: null,
+          inviteEmailSentAt: null,
+        },
       });
 
       return NextResponse.json(
-        { ok: true, inviteId: invite.id, requestId, inviteEmailStatus: "FAILED" },
-        { status: 200 }
+        {
+          ok: false,
+          code: "EMAIL_CONFIG_INVALID",
+          message: errorMessage,
+          requestId,
+          providerError: errorMessage,
+          inviteId: invite.id,
+        },
+        { status: 500 }
       );
     }
     const inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
@@ -145,22 +179,44 @@ export async function POST(request: NextRequest) {
       inviteLink
     );
 
+    const emailStatus = emailResult.success ? "SENT" : "FAILED";
+    const emailError = emailResult.success
+      ? null
+      : (emailResult.providerError || emailResult.error || "Unknown error");
+    const emailMessageId = emailResult.success ? (emailResult.messageId || null) : null;
+    const emailSentAt = emailResult.success ? new Date() : null;
+
     await prisma.vendorInvite.update({
       where: { id: invite.id },
       data: {
-        emailStatus: emailResult.success ? "SENT" : "FAILED",
-        emailMessageId: emailResult.success ? (emailResult.messageId || null) : null,
-        emailError: emailResult.success ? null : (emailResult.error || "Unknown error"),
-        emailSentAt: emailResult.success ? new Date() : null,
+        emailStatus,
+        emailMessageId,
+        emailError,
+        emailSentAt,
+      },
+    });
+
+    await prisma.vendorApplication.update({
+      where: { id: application.id },
+      data: {
+        inviteEmailStatus: emailStatus,
+        inviteEmailMessageId: emailMessageId,
+        inviteEmailError: emailError,
+        inviteEmailSentAt: emailSentAt,
       },
     });
 
     console.log("[VENDOR_INVITE_EMAIL]", {
       requestId,
+      applicationId: application.id,
       inviteId: invite.id,
+      vendorEmail: application.contactEmail,
+      baseUrl,
+      emailFrom: maskEmailForLogs(process.env.EMAIL_FROM),
       status: emailResult.success ? "SENT" : "FAILED",
       emailMessageId: emailResult.messageId || null,
       emailError: emailResult.error || null,
+      providerError: emailResult.providerError || null,
     });
 
     if (emailResult.success) {
@@ -188,13 +244,26 @@ export async function POST(request: NextRequest) {
 
     if (!emailResult.success) {
       return NextResponse.json(
-        { error: "Failed to send invite email", requestId, inviteId: invite.id },
-        { status: 502 }
+        {
+          ok: false,
+          code: "EMAIL_SEND_FAILED",
+          message: emailResult.error || "Failed to send invite email",
+          requestId,
+          providerError: emailResult.providerError || null,
+          inviteId: invite.id,
+        },
+        { status: 500 }
       );
     }
 
     return NextResponse.json(
-      { success: true, inviteId: invite.id, requestId, ...(isProd ? {} : { inviteLink }) },
+      {
+        ok: true,
+        messageId: emailResult.messageId || null,
+        inviteId: invite.id,
+        requestId,
+        ...(isProd ? {} : { inviteLink }),
+      },
       { status: 201 }
     );
   } catch (error: any) {
@@ -203,7 +272,13 @@ export async function POST(request: NextRequest) {
     }
     console.error("[VENDOR_INVITE] Error:", error);
     return NextResponse.json(
-      { error: "Failed to send invite", requestId },
+      {
+        ok: false,
+        code: "UNKNOWN",
+        message: "Failed to send invite",
+        requestId,
+        providerError: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

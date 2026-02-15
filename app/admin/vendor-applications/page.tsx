@@ -43,6 +43,9 @@ export default async function VendorApplicationsPage({
     confirmationEmailStatus: string;
     confirmationEmailMessageId: string | null;
     confirmationEmailError: string | null;
+    inviteEmailStatus: string;
+    inviteEmailMessageId: string | null;
+    inviteEmailError: string | null;
   }> = await prisma.vendorApplication.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -106,9 +109,12 @@ export default async function VendorApplicationsPage({
     return {
       ...application,
       isActivated: Boolean(isActivated),
-      inviteEmailStatus: inviteMap.get(application.id)?.emailStatus || "PENDING",
-      inviteEmailMessageId: inviteMap.get(application.id)?.emailMessageId || null,
-      inviteEmailError: inviteMap.get(application.id)?.emailError || null,
+      inviteEmailStatus:
+        application.inviteEmailStatus || inviteMap.get(application.id)?.emailStatus || "PENDING",
+      inviteEmailMessageId:
+        application.inviteEmailMessageId || inviteMap.get(application.id)?.emailMessageId || null,
+      inviteEmailError:
+        application.inviteEmailError || inviteMap.get(application.id)?.emailError || null,
     };
   });
 

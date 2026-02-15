@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Attempt email (this can fail without affecting approval)
     let baseUrl: string;
     let inviteLink: string;
-    let emailResult: { success: boolean; error?: string; messageId?: string };
+    let emailResult: { success: boolean; error?: string; messageId?: string; providerError?: string };
 
     try {
       baseUrl = getBaseUrl({ requestId, route: "/api/admin/vendor-applications/approve", allowBadBaseUrl: true });
@@ -196,19 +196,39 @@ export async function POST(request: NextRequest) {
       emailResult = {
         success: false,
         error: (error?.message || 'Unknown email error').substring(0, 500),
+        providerError: error?.message || 'Unknown email error',
       };
       baseUrl = 'https://instahealth.ae'; // Fallback for logging
       inviteLink = `${baseUrl}/vendor/activate?token=${rawToken}`;
     }
 
     // Step 3: Update invite with email result
+    const emailStatus = emailResult.success ? "SENT" : "FAILED";
+    const emailMessageId = emailResult.messageId || null;
+    const emailError = emailResult.success
+      ? null
+      : (emailResult.providerError || emailResult.error)
+        ? (emailResult.providerError || emailResult.error || "").substring(0, 500)
+        : null;
+    const emailSentAt = emailResult.success ? new Date() : null;
+
     await prisma.vendorInvite.update({
       where: { id: inviteToken.id },
       data: {
-        emailStatus: emailResult.success ? "SENT" : "FAILED",
-        emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.success ? null : emailResult.error ? emailResult.error.substring(0, 500) : null,
-        emailSentAt: emailResult.success ? new Date() : null,
+        emailStatus,
+        emailMessageId,
+        emailError,
+        emailSentAt,
+      },
+    });
+
+    await prisma.vendorApplication.update({
+      where: { id: application.id },
+      data: {
+        inviteEmailStatus: emailStatus,
+        inviteEmailMessageId: emailMessageId,
+        inviteEmailError: emailError,
+        inviteEmailSentAt: emailSentAt,
       },
     });
 
@@ -231,15 +251,30 @@ export async function POST(request: NextRequest) {
       emailError: emailResult.error ? emailResult.error.substring(0, 200) : null,
     });
 
-    // IMPORTANT: Always return 200 even if email failed
-    // Application is APPROVED, email failure is secondary
+    if (!emailResult.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "EMAIL_SEND_FAILED",
+          message: emailResult.error || "Failed to send invite email",
+          requestId,
+          providerError: emailResult.providerError || null,
+          inviteId: inviteToken.id,
+          applicationId: application.id,
+          inviteEmailStatus: "FAILED",
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: true,
+        messageId: emailResult.messageId || null,
         inviteId: inviteToken.id,
         applicationId: application.id,
         requestId,
-        inviteEmailStatus: emailResult.success ? "SENT" : "FAILED",
+        inviteEmailStatus: "SENT",
       },
       { status: 200 }
     );

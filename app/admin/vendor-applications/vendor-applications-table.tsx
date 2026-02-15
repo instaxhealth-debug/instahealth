@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface VendorApplicationRow {
   id: string;
@@ -27,6 +28,7 @@ export function VendorApplicationsTable({
   applications: VendorApplicationRow[];
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleAction = async (
@@ -48,24 +50,38 @@ export function VendorApplicationsTable({
 
       // Check for errors (either non-2xx status OR ok: false)
       if (!response.ok || result.ok === false) {
-        const code = result.code || 'UNKNOWN';
-        const message = result.message || result.error || 'Action failed';
-        const requestId = result.requestId || 'N/A';
+        const code = result.code || "UNKNOWN";
+        const message = result.message || result.error || "Action failed";
+        const requestId = result.requestId || "N/A";
+        const providerError = result.providerError ? ` Provider: ${result.providerError}` : "";
 
-        alert(`${action} failed: ${code} (requestId: ${requestId}) - ${message}`);
+        toast({
+          title: `${action} failed: ${code}`,
+          description: `${message} (requestId: ${requestId}).${providerError}`,
+          variant: "destructive",
+        });
+        router.refresh();
       } else {
-        // Success - check if email failed (for approve action)
-        if (action === 'approve' && result.inviteEmailStatus === 'FAILED') {
-          alert(
-            `Approved successfully!\n\n` +
-            `However, invite email FAILED (requestId: ${result.requestId || 'N/A'}).\n` +
-            `Use "Send invite email" button to retry.`
-          );
+        if (action === "approve" && result.inviteEmailStatus === "FAILED") {
+          toast({
+            title: "Approved, invite email failed",
+            description: `RequestId: ${result.requestId || "N/A"}. Use "Retry invite email" to resend.`,
+            variant: "destructive",
+          });
+        } else if (action === "invite") {
+          toast({
+            title: "Invite email sent",
+            description: result.messageId ? `MessageId: ${result.messageId}` : "Invite email sent successfully.",
+          });
         }
         router.refresh();
       }
     } catch (err) {
-      alert(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast({
+        title: "Network error",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setLoadingId(null);
     }
@@ -150,7 +166,9 @@ export function VendorApplicationsTable({
                     onClick={() => handleAction("invite", application.id)}
                     disabled={loadingId === application.id}
                   >
-                    Send invite email
+                    {application.inviteEmailStatus === "FAILED"
+                      ? "Retry invite email"
+                      : "Send invite email"}
                   </Button>
                 )}
                 {(application.confirmationEmailStatus === "FAILED" ||
