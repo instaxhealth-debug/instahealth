@@ -14,6 +14,9 @@ import * as XLSX from "xlsx";
  * - "Display Price" → displayPrice (optional)
  * - "Product Name", "name" → name
  * 
+ * SUPPORTED CATEGORY ALIASES:
+ * - "drip", "drips", "IV", "IV Drip", "IV Drips", "ivdrip", etc. → iv-drips
+ * 
  * REQUIRED FIELDS (enforced by validator):
  * - name
  * - priceAED
@@ -62,6 +65,52 @@ const HEADER_ALIASES: Record<string, string[]> = {
   isGlobal: ["isglobal", "is global", "is_global", "global"],
   bookingUrl: ["bookingurl", "booking url", "booking_url", "calendly", "calendlyurl"],
 };
+
+/**
+ * Category aliases for flexible category matching
+ * Maps casual/human-friendly category names to internal category slugs
+ */
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  "iv-drips": [
+    "drip",
+    "drips",
+    "iv drip",
+    "iv drips",
+    "ivdrip",
+    "ivdrips",
+    "ivs",
+    "iv",
+  ],
+};
+
+/**
+ * Normalize a category string for matching
+ */
+function normalizeCategory(category: string): string {
+  return category
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s]+/g, " ") // Replace underscores/spaces with single space
+    .replace(/\s+/g, " "); // Collapse multiple spaces
+}
+
+/**
+ * Map a raw category value to the internal category slug
+ * Returns the normalized slug if a match is found, otherwise returns original
+ */
+function mapCategory(rawCategory: string): string {
+  const normalized = normalizeCategory(rawCategory);
+
+  // Check all category aliases
+  for (const [categorySlug, aliases] of Object.entries(CATEGORY_ALIASES)) {
+    if (aliases.includes(normalized)) {
+      return categorySlug;
+    }
+  }
+
+  // If no alias match, return the original category (trimmed)
+  return rawCategory.trim();
+}
 
 /**
  * Normalize a header string for matching
@@ -128,6 +177,11 @@ export async function parseProductCsv(file: File): Promise<ParsedRow[]> {
       if (mappedField && value !== null && value !== undefined) {
         parsed[mappedField] = value.toString().trim();
       }
+    }
+
+    // Normalize category value if present
+    if (parsed.category) {
+      parsed.category = mapCategory(parsed.category);
     }
 
     // Return typed result with defaults for required fields
