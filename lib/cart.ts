@@ -48,14 +48,24 @@ export async function getOrCreateCart(userId: string) {
 export async function addToCart(userId: string, productId: string, quantity: number = 1, variantId?: string | null) {
   const cart = await getOrCreateCart(userId);
 
-  // FIX: Fetch product to get vendorId
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: { vendorId: true },
+  // FIX: Fetch product to get vendorId - MUST check vendor status
+  const product = await prisma.product.findFirst({
+    where: {
+      id: productId,
+      vendor: {
+        status: "active",
+      },
+    },
+    select: {
+      id: true,
+      vendorId: true,
+      active: true,
+      published: true,
+    },
   });
 
-  if (!product) {
-    throw new Error(`Product ${productId} not found`);
+  if (!product || !product.active || !product.published) {
+    throw new Error(`Product ${productId} not available`);
   }
 
   const existingItem = await prisma.cartItem.findFirst({
@@ -137,12 +147,19 @@ export async function getCartWithProducts(userId: string) {
   }
 
   // Filter out ghost items (items with null product or invalid variant)
+  // ALSO filter out items from inactive vendors
   const validItems = cart.items.filter((item: any) => {
     const isGhost = !item.product || (item.variantId && !item.variant);
+    const vendorInactive = item.product?.vendor?.status !== "active";
+
     if (isGhost) {
       console.warn(`[getCartWithProducts] Ghost item detected:`, { itemId: item.id, productId: item.productId, variantId: item.variantId });
     }
-    return !isGhost;
+    if (vendorInactive) {
+      console.warn(`[getCartWithProducts] Inactive vendor product in cart:`, { itemId: item.id, productId: item.productId, vendorId: item.vendorId });
+    }
+
+    return !isGhost && !vendorInactive;
   });
 
   // Calculate totals in fils using unitPriceFils (price snapshot from cart item)

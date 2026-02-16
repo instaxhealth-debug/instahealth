@@ -31,22 +31,7 @@ export default async function VendorApplicationsPage({
           status: statusFilter,
         };
 
-  const applications: Array<{
-    id: string;
-    status: string;
-    legalBusinessName: string;
-    tradingName: string | null;
-    contactFullName: string;
-    contactEmail: string;
-    createdAt: Date;
-    approvedVendorId: string | null;
-    confirmationEmailStatus: string;
-    confirmationEmailMessageId: string | null;
-    confirmationEmailError: string | null;
-    inviteEmailStatus: string;
-    inviteEmailMessageId: string | null;
-    inviteEmailError: string | null;
-  }> = await prisma.vendorApplication.findMany({
+  const applications = await prisma.vendorApplication.findMany({
     where,
     orderBy: { createdAt: "desc" },
   });

@@ -139,8 +139,13 @@ async function buildProductSearchObject(
 }
 
 export async function upsertProductToAlgolia(productId: string): Promise<void> {
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
+  const product = await prisma.product.findFirst({
+    where: {
+      id: productId,
+      vendor: {
+        status: "active",
+      },
+    },
     include: {
       vendor: {
         select: {
@@ -179,7 +184,13 @@ export async function reindexAllProducts(): Promise<{ count: number; duration: n
     select: { id: true, slug: true },
   });
 
-  const totalCount = await prisma.product.count();
+  const totalCount = await prisma.product.count({
+    where: {
+      vendor: {
+        status: "active",
+      },
+    },
+  });
   const pageSize = 100;
   const batchSize = 300; // Objects per saveObjects call
   let totalProcessed = 0;
@@ -188,6 +199,11 @@ export async function reindexAllProducts(): Promise<{ count: number; duration: n
     const products = await prisma.product.findMany({
       skip: offset,
       take: pageSize,
+      where: {
+        vendor: {
+          status: "active",
+        },
+      },
       include: {
         vendor: {
           select: {
@@ -232,7 +248,12 @@ export async function reindexProductsByIds(productIds: string[]): Promise<void> 
   for (let i = 0; i < productIds.length; i += batchSize) {
     const chunk = productIds.slice(i, i + batchSize);
     const products = await prisma.product.findMany({
-      where: { id: { in: chunk } },
+      where: {
+        id: { in: chunk },
+        vendor: {
+          status: "active",
+        },
+      },
       include: {
         vendor: {
           select: {

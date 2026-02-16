@@ -16,7 +16,9 @@
       "Bash(npx prisma migrate deploy)",
       "Bash(cat package.json)",
       "Bash(npx prisma:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(npm install libphonenumber-js)",
+      "Read(//Users/cruzfrangieh/Desktop/InstaXHealth/**)"
     ]
   },
   "enableAllProjectMcpServers": true,

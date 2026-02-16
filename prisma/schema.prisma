@@ -105,6 +105,8 @@ model Vendor {
   name                     String
   slug                     String             @unique
   email                    String?            @unique
+  phone                    String?
+  phoneRaw                 String?
   status                   String             @default("active")
   legalEntityName          String?
   country                  String?
@@ -156,6 +158,7 @@ model Product {
   updatedAt       DateTime          @updatedAt
   inventoryStatus String            @default("in_stock")
   published       Boolean           @default(true)
+  featured        Boolean           @default(false)
   tags            String[]          @default([])
   calendlyUrl     String?
   sku             String?
@@ -169,6 +172,8 @@ model Product {
   @@unique([vendorId, importKey])
   @@index([vendorId])
   @@index([isGlobal])
+  @@index([featured])
+  @@index([featured, createdAt])
 }
 
 model ProductVariant {
@@ -257,6 +262,7 @@ model Order {
   @@index([addressId])
   @@index([stripeCheckoutSessionId])
   @@index([status])
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -287,6 +293,7 @@ model OrderItem {
   @@index([productId])
   @@index([vendorId])
   @@index([vendorId, fulfilled])
+  @@index([productId, orderId])
 }
 
 model Cart {
@@ -434,6 +441,7 @@ model VendorApplication {
   contactRole                String
   contactEmail               String
   contactPhone               String
+  contactPhoneRaw            String?
   contactWhatsApp            String?
   preferredContactMethod     String
   operationRegion            String

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { sendVendorApplicationEmail, sendAdminApplicationNotification } from '@/lib/email';
 import { getBaseUrl } from "@/lib/url";
 import { randomUUID } from 'crypto';
+import { isValidCategoryLabel, validateCategorySlugs } from '@/lib/constants/vendor-categories';
+import { normalizePhone, isValidPhone } from '@/lib/phone';
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
@@ -111,13 +113,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate selectedCategories
-    if (!Array.isArray(body.selectedCategories) || body.selectedCategories.length === 0) {
+    // Validate selectedCategories (server-side enforcement)
+    if (!validateCategorySlugs(body.selectedCategories)) {
       return NextResponse.json(
         {
           ok: false,
           code: 'VALIDATION_ERROR',
-          message: 'At least one marketplace category must be selected',
+          message: 'Invalid marketplace categories. Only approved categories are allowed.',
+          requestId,
+          applicationId: null
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate businessCategory (server-side enforcement)
+    if (!isValidCategoryLabel(body.businessCategory)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid business category',
+          requestId,
+          applicationId: null
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate and normalize phone number to E.164 format
+    if (!body.contactPhone || !isValidPhone(body.contactPhone, body.country)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid phone number format. Please enter a valid phone number.',
+          requestId,
+          applicationId: null
+        },
+        { status: 400 }
+      );
+    }
+
+    const normalizedPhone = normalizePhone(body.contactPhone, body.country);
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Unable to normalize phone number. Please check the format.',
           requestId,
           applicationId: null
         },
@@ -142,8 +186,9 @@ export async function POST(request: NextRequest) {
         contactFullName: body.contactFullName,
         contactRole: body.contactRole,
         contactEmail: body.contactEmail,
-        contactPhone: body.contactPhone,
-        contactWhatsApp: body.contactWhatsApp || null,
+        contactPhone: normalizedPhone,
+        contactPhoneRaw: body.contactPhone,
+        contactWhatsApp: body.contactWhatsApp ? normalizePhone(body.contactWhatsApp, body.country) : null,
         preferredContactMethod: body.preferredContactMethod,
         operationRegion: body.operationRegion,
         fulfillmentType: body.fulfillmentType,

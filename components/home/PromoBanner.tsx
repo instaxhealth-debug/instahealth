@@ -2,23 +2,22 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-const desktopPromoImage = "/ADS for Insta Health/InstaConsultz - web Version ad.png";
 
 const promoImages = [
   {
     src: "/ADS for Insta Health/3.png",
-    desktopSrc: desktopPromoImage,
-    alt: "Promotional banner 1",
+    desktopSrc: "/ADS for Insta Health/InstaConsultz - web Version ad.png",
+    alt: "InstaHealth - Your health marketplace",
   },
   {
     src: "/ADS for Insta Health/4.png",
-    desktopSrc: desktopPromoImage,
-    alt: "Promotional banner 2",
+    desktopSrc: "/ADS for Insta Health/InstaConsultz - web Version ad.png",
+    alt: "InstaHealth promotional banner",
   },
   {
     src: "/ADS for Insta Health/5.png",
-    desktopSrc: desktopPromoImage,
-    alt: "Promotional banner 3",
+    desktopSrc: "/ADS for Insta Health/InstaConsultz - web Version ad.png",
+    alt: "InstaHealth services",
   },
 ];
 

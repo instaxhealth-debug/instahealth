@@ -17,8 +17,15 @@ interface ProductPageProps {
 export default async function ProductPage({ params }: ProductPageProps) {
   noStore();
 
-  const product = await prisma.product.findUnique({
-    where: { slug: params.handle },
+  const product = await prisma.product.findFirst({
+    where: {
+      slug: params.handle,
+      active: true,
+      published: true,
+      vendor: {
+        status: "active",
+      },
+    },
     include: {
       vendor: {
         select: {
@@ -36,7 +43,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     },
   });
 
-  if (!product || !product.active || !product.published) {
+  if (!product) {
     notFound();
   }
 

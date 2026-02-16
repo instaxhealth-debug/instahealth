@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { formatPriceAED } from "@/lib/utils/price";
 
+// Query options for product helpers
+export type ProductQueryOptions = {
+  includeInactive?: boolean;
+};
+
 // Product type for storefront (without Shopify placeholders)
 export interface StorefrontProduct {
   id: string;
@@ -61,13 +66,19 @@ function prismaProductToStorefrontProduct(prismaProduct: {
   };
 }
 
-// Fetch all active products from Prisma
-export async function getProductsFromPrisma(): Promise<StorefrontProduct[]> {
+// Fetch all active products from Prisma (PUBLIC: only active vendors)
+export async function getProductsFromPrisma(
+  options: ProductQueryOptions = {}
+): Promise<StorefrontProduct[]> {
+  const { includeInactive = false } = options;
+  const vendorWhere = includeInactive ? {} : { vendor: { status: "active" } };
+
   try {
     const prismaProducts = await prisma.product.findMany({
       where: {
         active: true,
         inStock: true,
+        ...vendorWhere,
       },
       include: {
         vendor: {
@@ -89,16 +100,21 @@ export async function getProductsFromPrisma(): Promise<StorefrontProduct[]> {
   }
 }
 
-// Fetch products by category
+// Fetch products by category (PUBLIC: only active vendors)
 export async function getProductsByCategoryFromPrisma(
-  category: string
+  category: string,
+  options: ProductQueryOptions = {}
 ): Promise<StorefrontProduct[]> {
+  const { includeInactive = false } = options;
+  const vendorWhere = includeInactive ? {} : { vendor: { status: "active" } };
+
   try {
     const prismaProducts = await prisma.product.findMany({
       where: {
         active: true,
         inStock: true,
         category: category,
+        ...vendorWhere,
       },
       include: {
         vendor: {
@@ -124,16 +140,21 @@ export async function getProductsByCategoryFromPrisma(
   }
 }
 
-// Fetch products by vendor ID
+// Fetch products by vendor ID (PUBLIC: only active vendors)
 export async function getProductsByVendorIdFromPrisma(
-  vendorId: string
+  vendorId: string,
+  options: ProductQueryOptions = {}
 ): Promise<StorefrontProduct[]> {
+  const { includeInactive = false } = options;
+  const vendorWhere = includeInactive ? {} : { vendor: { status: "active" } };
+
   try {
     const prismaProducts = await prisma.product.findMany({
       where: {
         active: true,
         inStock: true,
         vendorId: vendorId,
+        ...vendorWhere,
       },
       include: {
         vendor: {
@@ -159,14 +180,21 @@ export async function getProductsByVendorIdFromPrisma(
   }
 }
 
-// Fetch a single product by slug
+// Fetch a single product by slug (PUBLIC: only active vendors)
 export async function getProductBySlugFromPrisma(
-  slug: string
+  slug: string,
+  options: ProductQueryOptions = {}
 ): Promise<StorefrontProduct | null> {
+  const { includeInactive = false } = options;
+  const vendorWhere = includeInactive ? {} : { vendor: { status: "active" } };
+
   try {
-    const prismaProduct = await prisma.product.findUnique({
+    const prismaProduct = await prisma.product.findFirst({
       where: {
         slug: slug,
+        active: true,
+        inStock: true,
+        ...vendorWhere,
       },
       include: {
         vendor: {
@@ -178,7 +206,7 @@ export async function getProductBySlugFromPrisma(
       },
     });
 
-    if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+    if (!prismaProduct) {
       return null;
     }
 
@@ -189,14 +217,21 @@ export async function getProductBySlugFromPrisma(
   }
 }
 
-// Fetch a single product by ID
+// Fetch a single product by ID (PUBLIC: only active vendors)
 export async function getProductByIdFromPrisma(
-  id: string
+  id: string,
+  options: ProductQueryOptions = {}
 ): Promise<StorefrontProduct | null> {
+  const { includeInactive = false } = options;
+  const vendorWhere = includeInactive ? {} : { vendor: { status: "active" } };
+
   try {
-    const prismaProduct = await prisma.product.findUnique({
+    const prismaProduct = await prisma.product.findFirst({
       where: {
         id: id,
+        active: true,
+        inStock: true,
+        ...vendorWhere,
       },
       include: {
         vendor: {
@@ -208,7 +243,7 @@ export async function getProductByIdFromPrisma(
       },
     });
 
-    if (!prismaProduct || !prismaProduct.active || !prismaProduct.inStock) {
+    if (!prismaProduct) {
       return null;
     }
 

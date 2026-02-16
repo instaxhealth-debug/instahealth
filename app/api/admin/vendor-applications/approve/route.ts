@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
           name: application.tradingName || application.legalBusinessName,
           slug: vendorSlug,
           email: application.contactEmail,
+          phone: application.contactPhone || null,
+          phoneRaw: application.contactPhoneRaw || null,
           userId: vendorUser.id,
           status: "active",
           legalEntityName: application.legalBusinessName,
@@ -122,6 +124,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: vendorUser.id,
           status: "active",
+          phone: application.contactPhone || vendor.phone,
+          phoneRaw: application.contactPhoneRaw || vendor.phoneRaw,
           logoUrl: application.logoUrl || vendor.logoUrl,
           allowedCategories: application.selectedCategories && application.selectedCategories.length > 0
             ? application.selectedCategories

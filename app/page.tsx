@@ -7,6 +7,7 @@ import { FeaturedSection } from "@/components/home/FeaturedSection";
 import { getProductsFromPrisma } from "@/lib/api/products";
 import { getMostBooked, getPopularNow } from "@/lib/marketplace-rankings";
 import { prismaProductToOffering, type MarketplaceProduct } from "@/lib/marketplace-offerings";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
@@ -19,6 +20,10 @@ export default async function HomePage() {
     getPopularNow(10),
     getMostBooked(10),
   ]);
+
+  // Filter products by featured flag (fallback to first 4 if none featured)
+  const featuredProducts = products.filter((p) => (p as any).featured === true);
+  const displayedFeatured = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
 
   const popularOfferings = popularNow
     .filter(Boolean)
@@ -47,7 +52,7 @@ export default async function HomePage() {
         <AvailableNow />
         <PopularNow offerings={popularOfferings} />
         <MostBooked offerings={mostBookedOfferings} />
-        <FeaturedSection products={products.slice(0, 4)} />
+        <FeaturedSection products={displayedFeatured} />
       </div>
     </div>
   );

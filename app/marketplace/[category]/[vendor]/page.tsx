@@ -74,7 +74,7 @@ export default async function MarketplaceVendorPage({
   // First verify vendor exists
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, phone: true, status: true },
   });
 
   if (!vendor || vendor.status !== "active") {
@@ -129,9 +129,19 @@ export default async function MarketplaceVendorPage({
         <h1 className="text-2xl md:text-3xl font-bold mb-1">
           {vendor.name} - {categorySlug.replace("-", " ")}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {offerings.length} product{offerings.length !== 1 ? "s" : ""} available
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-muted-foreground">
+            {offerings.length} product{offerings.length !== 1 ? "s" : ""} available
+          </p>
+          {vendor.phone && (
+            <a
+              href={`tel:${vendor.phone.replace(/\s+/g, "")}`}
+              className="text-sm text-[#41a59b] hover:underline font-medium"
+            >
+              📞 {vendor.phone}
+            </a>
+          )}
+        </div>
       </div>
 
       {offerings.length === 0 ? (

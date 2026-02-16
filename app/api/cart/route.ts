@@ -23,7 +23,15 @@ export async function GET(req: NextRequest) {
       include: {
         items: {
           include: {
-            product: true,
+            product: {
+              include: {
+                vendor: {
+                  select: {
+                    status: true,
+                  },
+                },
+              },
+            },
             variant: true,
           },
         },
@@ -40,15 +48,21 @@ export async function GET(req: NextRequest) {
 
     if (DEBUG) console.log("[API:CART:GET] Cart identity:", { userId: cart.userId, cartId: cart.id, locationId: cart.locationId, status: cart.status, totalItems: cart.items.length });
 
-    // FIX: Filter out ghost items (items with null product or orphaned variants)
-    const validItems = cart.items.filter(item => {
+    // FIX: Filter out ghost items AND inactive vendor items
+    const validItems = cart.items.filter((item: any) => {
       const isGhost = !item.product || (item.variantId && !item.variant);
+      const vendorInactive = item.product?.vendor?.status !== "active";
+
       if (isGhost && DEBUG) {
         console.log("[API:CART:GET] Dropped ghost item:", { itemId: item.id, productId: item.productId, variantId: item.variantId });
       }
-      return !isGhost;
+      if (vendorInactive && DEBUG) {
+        console.log("[API:CART:GET] Dropped inactive vendor item:", { itemId: item.id, productId: item.productId, vendorId: item.vendorId });
+      }
+
+      return !isGhost && !vendorInactive;
     });
-    
+
     const droppedGhostItems = cart.items.length - validItems.length;
     if (DEBUG) {
       console.log("[API:CART:GET] Ghost item analysis:", { total: cart.items.length, valid: validItems.length, droppedGhostItems });
@@ -98,13 +112,20 @@ export async function POST(req: NextRequest) {
     
     let validatedProduct: { id: string; vendorId: string } | null = null;
 
-    // FIX: Validate product exists before attempting add/update
+    // FIX: Validate product exists AND vendor is active before attempting add/update
     if (action !== "remove") {
-      const product = await prisma.product.findUnique({ where: { id: productId } });
+      const product = await prisma.product.findFirst({
+        where: {
+          id: productId,
+          vendor: {
+            status: "active",
+          },
+        },
+      });
       if (!product) {
-        if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: product not found", productId);
+        if (DEBUG) console.log("[API:CART:POST] ✗ Validation failed: product not found or vendor inactive", productId);
         return NextResponse.json(
-          { error: "Product not found", code: "INVALID_PRODUCT" },
+          { error: "Product not available", code: "INVALID_PRODUCT" },
           { status: 400 }
         );
       }
@@ -201,16 +222,21 @@ export async function POST(req: NextRequest) {
           data: { quantity: existingItem.quantity + quantity },
         });
       } else {
-        // Fetch product to store price snapshot (already validated above)
-        const product = await prisma.product.findUnique({
-          where: { id: productId },
+        // Fetch product to store price snapshot (already validated above with vendor status)
+        const product = await prisma.product.findFirst({
+          where: {
+            id: productId,
+            vendor: {
+              status: "active",
+            },
+          },
           include: { variants: true },
         });
 
         if (!product) {
-          if (DEBUG) console.log("[API:CART:POST] ✗ Product not found during create:", productId);
+          if (DEBUG) console.log("[API:CART:POST] ✗ Product not found or vendor inactive during create:", productId);
           return NextResponse.json(
-            { error: "Product not found", code: "INVALID_PRODUCT" },
+            { error: "Product not available", code: "INVALID_PRODUCT" },
             { status: 400 }
           );
         }
@@ -250,7 +276,15 @@ export async function POST(req: NextRequest) {
       include: {
         items: {
           include: {
-            product: true,
+            product: {
+              include: {
+                vendor: {
+                  select: {
+                    status: true,
+                  },
+                },
+              },
+            },
             variant: true,
           },
         },

@@ -408,13 +408,16 @@ export default function VendorApplyPage() {
                     required
                   >
                     <option value="">Select a category</option>
-                    <option value="Supplements">Supplements</option>
-                    <option value="Peptides">Peptides</option>
-                    <option value="Clinics">Clinics</option>
+                    <option value="Blood testing packages">Blood testing packages</option>
                     <option value="IV Drips">IV Drips</option>
-                    <option value="Blood Tests">Blood Tests</option>
+                    <option value="Clinics">Clinics</option>
+                    <option value="Peptides">Peptides</option>
                     <option value="Hormones">Hormones</option>
-                    <option value="Other">Other</option>
+                    <option value="Consultations">Consultations</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Supplements">Supplements</option>
+                    <option value="Haircare">Haircare</option>
+                    <option value="Pets">Pets</option>
                   </select>
                 </div>
 
@@ -467,17 +470,31 @@ export default function VendorApplyPage() {
                     Marketplace Categories * (Select all that apply)
                   </label>
                   <div className="space-y-2">
-                    {['blood-tests', 'iv-drips', 'clinics', 'supplements', 'peptides', 'hormones', 'consultations', 'skincare', 'haircare'].map((cat) => (
-                      <label key={cat} className="flex items-center gap-2">
+                    {[
+                      { value: 'blood-tests', label: 'Blood testing packages', description: 'Blood testing packages' },
+                      { value: 'iv-drips', label: 'IV Drips', description: 'IV therapy and wellness drips' },
+                      { value: 'clinics', label: 'Clinics', description: 'Medical clinics and healthcare facilities' },
+                      { value: 'peptides', label: 'Peptides', description: 'Peptide products from verified vendors' },
+                      { value: 'hormones', label: 'Hormones', description: 'Hormone optimization' },
+                      { value: 'consultations', label: 'Consultations', description: 'Consult with health pros' },
+                      { value: 'insurance', label: 'Insurance', description: 'Health insurance plans' },
+                      { value: 'supplements', label: 'Supplements', description: 'Vitamins and supplements' },
+                      { value: 'haircare', label: 'Haircare', description: 'Hair wellness products' },
+                      { value: 'pets', label: 'Pets', description: 'Pet health and wellness' },
+                    ].map((cat) => (
+                      <label key={cat.value} className="flex items-start gap-2">
                         <input
                           type="checkbox"
                           name="selectedCategories"
-                          value={cat}
-                          checked={formData.selectedCategories.includes(cat)}
+                          value={cat.value}
+                          checked={formData.selectedCategories.includes(cat.value)}
                           onChange={handleInputChange}
-                          className="w-4 h-4"
+                          className="w-4 h-4 mt-1"
                         />
-                        <span className="text-sm capitalize">{cat.replace('-', ' ')}</span>
+                        <div>
+                          <span className="text-sm font-medium">{cat.label}</span>
+                          <p className="text-xs text-gray-500">{cat.description}</p>
+                        </div>
                       </label>
                     ))}
                   </div>

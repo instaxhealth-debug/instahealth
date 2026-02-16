@@ -81,15 +81,20 @@ export async function POST(req: NextRequest) {
 
       if (DEBUG) console.log("[API:CART:MERGE] Processing item:", { productId: guestItem.productId, variantId: normalizedVariantId });
 
-      // VALIDATION: Check if product exists and get vendorId
-      const product = await prisma.product.findUnique({
-        where: { id: guestItem.productId },
+      // VALIDATION: Check if product exists AND vendor is active
+      const product = await prisma.product.findFirst({
+        where: {
+          id: guestItem.productId,
+          vendor: {
+            status: "active",
+          },
+        },
         select: { id: true, vendorId: true },
       });
 
       if (!product) {
         skippedCount++;
-        if (DEBUG) console.log("[API:CART:MERGE] ✗ Skipped invalid productId:", guestItem.productId);
+        if (DEBUG) console.log("[API:CART:MERGE] ✗ Skipped invalid product or inactive vendor:", guestItem.productId);
         continue;
       }
 
