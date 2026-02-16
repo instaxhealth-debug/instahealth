@@ -26,6 +26,7 @@ model User {
   marketingPushOptIn      Boolean   @default(false)
   weightKg                Int?
   consentShareBodyMetrics Boolean   @default(false)
+  stripeCustomerId        String?   @unique
   accounts                Account[]
   addresses               Address[]
   carts                   Cart?

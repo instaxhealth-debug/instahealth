@@ -3,30 +3,34 @@
  * Uses E.164 international format for storage
  */
 
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from 'libphonenumber-js';
+import { ALL_COUNTRIES } from './countries';
 
 /**
  * Normalize country input to ISO 3166-1 alpha-2 code
- * @param country - Country name or code
+ * @param country - Country ISO2 code or name
  * @returns ISO alpha-2 code or "AE" as default
  */
-export function normalizeCountryCode(country: string | undefined): 'AE' {
+export function normalizeCountryCode(country: string | undefined): CountryCode {
   if (!country) return 'AE';
 
   const normalized = country.trim().toUpperCase();
 
-  // UAE variants
-  if (
-    normalized === 'AE' ||
-    normalized === 'UAE' ||
-    normalized === 'UNITED ARAB EMIRATES' ||
-    normalized.includes('DUBAI') ||
-    normalized.includes('ABU DHABI')
-  ) {
-    return 'AE';
+  // Direct ISO2 match
+  const countryByIso2 = ALL_COUNTRIES.find((c) => c.iso2 === normalized);
+  if (countryByIso2) {
+    return countryByIso2.iso2 as CountryCode;
   }
 
-  // Default to AE for Dubai marketplace
+  // Match by name (case-insensitive)
+  const countryByName = ALL_COUNTRIES.find(
+    (c) => c.name.toUpperCase() === normalized
+  );
+  if (countryByName) {
+    return countryByName.iso2 as CountryCode;
+  }
+
+  // Default to AE
   return 'AE';
 }
 
