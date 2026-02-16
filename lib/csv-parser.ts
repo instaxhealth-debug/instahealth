@@ -1,5 +1,30 @@
 import * as XLSX from "xlsx";
 
+/**
+ * CSV Product Importer with Flexible Header Mapping
+ * 
+ * This parser accepts vendor CSV files with various column naming conventions
+ * and maps them to the internal schema. Header matching is case-insensitive
+ * with whitespace trimming.
+ * 
+ * SUPPORTED HEADER ALIASES:
+ * - "Price (AED)", "Price", "priceAED" → priceAED
+ * - "Category" → category
+ * - "Duration" → duration (optional)
+ * - "Display Price" → displayPrice (optional)
+ * - "Product Name", "name" → name
+ * 
+ * REQUIRED FIELDS (enforced by validator):
+ * - name
+ * - priceAED
+ * - category
+ * 
+ * OPTIONAL FIELDS:
+ * - duration, displayPrice, description, imageUrl, tags, etc.
+ * 
+ * The importer will NOT reject rows for missing optional fields.
+ */
+
 export interface ParsedRow {
   sku?: string;
   name: string;
@@ -13,6 +38,56 @@ export interface ParsedRow {
   inStock?: string;
   isGlobal?: string;
   bookingUrl?: string;
+  duration?: string;
+  displayPrice?: string;
+}
+
+/**
+ * Header aliases for flexible CSV imports
+ * Maps common vendor column names to internal field names
+ */
+const HEADER_ALIASES: Record<string, string[]> = {
+  priceAED: ["priceaed", "price (aed)", "price", "price aed"],
+  category: ["category"],
+  name: ["name", "product name", "productname"],
+  duration: ["duration"],
+  displayPrice: ["display price", "displayprice", "display_price"],
+  sku: ["sku", "product code", "code"],
+  description: ["description", "desc"],
+  imageUrl: ["imageurl", "image url", "image", "image_url"],
+  tags: ["tags", "tag"],
+  published: ["published", "is published", "ispublished"],
+  active: ["active", "is active", "isactive"],
+  inStock: ["instock", "in stock", "in_stock", "stock"],
+  isGlobal: ["isglobal", "is global", "is_global", "global"],
+  bookingUrl: ["bookingurl", "booking url", "booking_url", "calendly", "calendlyurl"],
+};
+
+/**
+ * Normalize a header string for matching
+ */
+function normalizeHeader(header: string): string {
+  return header
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " "); // Collapse multiple spaces
+}
+
+/**
+ * Map a raw header from the CSV to an internal field name
+ */
+function mapHeader(rawHeader: string): string | null {
+  const normalized = normalizeHeader(rawHeader);
+
+  // Check all field aliases
+  for (const [fieldName, aliases] of Object.entries(HEADER_ALIASES)) {
+    if (aliases.includes(normalized)) {
+      return fieldName;
+    }
+  }
+
+  // If no match found, return null
+  return null;
 }
 
 export async function parseProductCsv(file: File): Promise<ParsedRow[]> {
@@ -24,24 +99,53 @@ export async function parseProductCsv(file: File): Promise<ParsedRow[]> {
   }
 
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
-  if (data.length === 0) {
+  if (rawData.length === 0) {
     throw new Error("No data rows found");
   }
 
-  return data.map((row) => ({
-    sku: row.sku?.toString().trim() || undefined,
-    name: row.name?.toString().trim() || "",
-    category: row.category?.toString().trim() || "",
-    priceAED: row.priceAED?.toString().trim() || "",
-    description: row.description?.toString().trim() || undefined,
-    imageUrl: row.imageUrl?.toString().trim() || undefined,
-    tags: row.tags?.toString().trim() || undefined,
-    published: row.published?.toString().trim() || undefined,
-    active: row.active?.toString().trim() || undefined,
-    inStock: row.inStock?.toString().trim() || undefined,
-    isGlobal: row.isGlobal?.toString().trim() || undefined,
-    bookingUrl: row.bookingUrl?.toString().trim() || undefined,
-  }));
+  // Build header mapping from first row
+  const firstRow = rawData[0];
+  const headerMap = new Map<string, string>();
+
+  for (const rawHeader of Object.keys(firstRow)) {
+    const mappedField = mapHeader(rawHeader);
+    if (mappedField) {
+      headerMap.set(rawHeader, mappedField);
+    }
+  }
+
+  // Log header mapping for debugging
+  console.log("[CSV_PARSER] Header mapping:", Object.fromEntries(headerMap));
+
+  // Transform rows using the header mapping
+  return rawData.map((row) => {
+    const parsed: Record<string, string | undefined> = {};
+
+    for (const [rawHeader, value] of Object.entries(row)) {
+      const mappedField = headerMap.get(rawHeader);
+      if (mappedField && value !== null && value !== undefined) {
+        parsed[mappedField] = value.toString().trim();
+      }
+    }
+
+    // Return typed result with defaults for required fields
+    return {
+      sku: parsed.sku,
+      name: parsed.name || "",
+      category: parsed.category || "",
+      priceAED: parsed.priceAED || "",
+      description: parsed.description,
+      imageUrl: parsed.imageUrl,
+      tags: parsed.tags,
+      published: parsed.published,
+      active: parsed.active,
+      inStock: parsed.inStock,
+      isGlobal: parsed.isGlobal,
+      bookingUrl: parsed.bookingUrl,
+      duration: parsed.duration,
+      displayPrice: parsed.displayPrice,
+    } as ParsedRow;
+  });
 }

@@ -6,6 +6,7 @@ import {
   MapPin,
   CreditCard,
   Database,
+  Settings,
   ChevronRight,
 } from "lucide-react";
 import { AccountLogoutButton } from "./AccountLogoutButton";
@@ -46,6 +47,12 @@ export function AccountSidebar({ activeItem = "personal-details" }: AccountSideb
       title: "Personal Data",
       subtitle: "Manage your data options",
       href: "/my-account/personal-data",
+    },
+    {
+      icon: Settings,
+      title: "Settings",
+      subtitle: "Notifications and preferences",
+      href: "/my-account/settings",
     },
   ];
 

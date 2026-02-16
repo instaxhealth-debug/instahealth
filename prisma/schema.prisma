@@ -27,6 +27,11 @@ model User {
   weightKg                Int?
   consentShareBodyMetrics Boolean   @default(false)
   stripeCustomerId        String?   @unique
+  emailNotificationsEnabled Boolean @default(true)
+  smsNotificationsEnabled Boolean   @default(false)
+  marketingOptIn          Boolean   @default(false)
+  timezone                String    @default("Asia/Dubai")
+  language                String    @default("en")
   accounts                Account[]
   addresses               Address[]
   carts                   Cart?
