@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/auth/requireVendor";
-import { isServiceCategory, isValidCalendlyUrl, normalizeCategory } from "@/lib/vendor-categories";
+import { isServiceCategory, isValidBookingUrl, normalizeCategory } from "@/lib/vendor-categories";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 function revalidateMarketplace(category: string, vendorId: string) {
@@ -63,7 +63,7 @@ export async function PATCH(
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { allowedCategories: true },
+      select: { allowedCategories: true, bookingUrl: true },
     });
 
     if (!vendor) {
@@ -76,14 +76,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Category not allowed" }, { status: 403 });
     }
 
-    const calendlyUrl = body.calendlyUrl ?? product.calendlyUrl ?? null;
+    const bookingUrl = body.bookingUrl ?? product.bookingUrl ?? null;
+    const hasBookingUrl = !!bookingUrl || !!vendor.bookingUrl;
 
     if (isService) {
-      if (calendlyUrl && !isValidCalendlyUrl(calendlyUrl)) {
-        return NextResponse.json({ error: "Calendly URL must start with https://calendly.com/" }, { status: 400 });
+      if (bookingUrl && !isValidBookingUrl(bookingUrl)) {
+        return NextResponse.json({ error: "Booking URL must be a valid Calendly, Acuity, Fresha, Square, or HTTPS link" }, { status: 400 });
       }
-      if ((body.active ?? product.active) && !calendlyUrl) {
-        return NextResponse.json({ error: "Active services require a Calendly URL" }, { status: 400 });
+      if ((body.active ?? product.active) && !hasBookingUrl) {
+        return NextResponse.json({ error: "Active services require a booking URL (set at product or vendor level)" }, { status: 400 });
       }
       if (body.variants?.length) {
         return NextResponse.json({ error: "Service items cannot have variants" }, { status: 400 });
@@ -99,7 +100,7 @@ export async function PATCH(
         tags: Array.isArray(body.tags) ? body.tags : product.tags,
         category,
         priceFils: body.priceFils ?? product.priceFils,
-        calendlyUrl: isService ? calendlyUrl : null,
+        bookingUrl: isService ? bookingUrl : null,
         inventoryStatus: isService
           ? "in_stock"
           : body.inventoryStatus ?? product.inventoryStatus,

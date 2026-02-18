@@ -48,7 +48,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   if (isServiceCategory(product.category)) {
-    if (product.calendlyUrl) {
+    if (product.bookingUrl) {
       try {
         await logMarketplaceEvent({
           productId: product.id,
@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       } catch (error) {
         console.error("[PRODUCT_PAGE] Failed to log booking click", error);
       }
-      redirect(product.calendlyUrl);
+      redirect(product.bookingUrl);
     }
     notFound();
   }

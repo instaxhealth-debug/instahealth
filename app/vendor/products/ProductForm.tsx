@@ -33,7 +33,7 @@ interface ProductFormData {
   inStock: boolean;
   active: boolean;
   published: boolean;
-  calendlyUrl: string;
+  bookingUrl: string;
 }
 
 interface VendorProductFormProps {
@@ -53,7 +53,7 @@ interface VendorProductFormProps {
     inStock: boolean;
     active: boolean;
     published: boolean;
-    calendlyUrl: string | null;
+    bookingUrl: string | null;
     variants: VariantForm[];
   };
 }
@@ -86,7 +86,7 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
     inStock: product?.inStock ?? true,
     active: product?.active ?? true,
     published: product?.published ?? false,
-    calendlyUrl: product?.calendlyUrl || "",
+    bookingUrl: product?.bookingUrl || "",
   });
 
   const [variants, setVariants] = useState<VariantForm[]>(product?.variants || []);
@@ -201,7 +201,7 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
       inStock: next.inStock,
       active: next.active,
       published: next.published,
-      calendlyUrl: next.calendlyUrl || null,
+      bookingUrl: next.bookingUrl || null,
       variants: isService ? [] : variants,
     };
   };
@@ -423,15 +423,15 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
           {isService ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="calendlyUrl">Calendly booking URL</Label>
+                <Label htmlFor="bookingUrl">Booking URL</Label>
                 <Input
-                  id="calendlyUrl"
-                  value={form.calendlyUrl}
-                  onChange={(e) => updateForm({ calendlyUrl: e.target.value })}
-                  placeholder="https://calendly.com/your-link"
+                  id="bookingUrl"
+                  value={form.bookingUrl}
+                  onChange={(e) => updateForm({ bookingUrl: e.target.value })}
+                  placeholder="https://calendly.com/your-link or Acuity/Fresha/Square URL"
                 />
-                {fieldErrors.calendlyUrl && (
-                  <p className="text-xs text-red-600">{fieldErrors.calendlyUrl.join(", ")}</p>
+                {fieldErrors.bookingUrl && (
+                  <p className="text-xs text-red-600">{fieldErrors.bookingUrl.join(", ")}</p>
                 )}
               </div>
               <div className="flex items-center justify-between">

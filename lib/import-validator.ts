@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   isServiceCategory,
-  isValidCalendlyUrl,
+  isValidBookingUrl,
 } from "@/lib/vendor-categories";
 import {
   mapCategoryToSlug,
@@ -35,7 +35,8 @@ export interface ValidationResult {
     active: boolean;
     inStock: boolean;
     isGlobal: boolean;
-    calendlyUrl: string | null;
+    bookingUrl: string | null;
+    durationMinutes: number | null;
     inventoryStatus: string;
   };
 }
@@ -68,6 +69,28 @@ export async function validateProductRow(
   let mappingConfidence: MappingConfidence | null = null;
   let missingCategory = false;
   const allowedDisplay = formatAllowedCategories(allowedCategories);
+
+  // Fetch vendor to check for vendor-level bookingUrl
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { bookingUrl: true },
+  });
+
+  if (!vendor) {
+    errors.push("Vendor not found");
+    return {
+      rowIndex,
+      isValid: false,
+      errors,
+      action: "create",
+      rawCategory,
+      mappedCategorySlug: null,
+      mappingReason: null,
+      mappingConfidence: null,
+      missingCategory: true,
+      data: {} as any,
+    };
+  }
 
   // Required fields (except category — handled specially)
   if (!row.name) errors.push("name is required");
@@ -144,12 +167,19 @@ export async function validateProductRow(
   const isService = category ? isServiceCategory(category) : false;
   const bookingUrl = row.bookingUrl || null;
   const active = parseBoolean(row.active, true);
+  const durationMinutes = row.duration ? parseInt(row.duration, 10) : null;
 
-  if (isService && bookingUrl && !isValidCalendlyUrl(bookingUrl)) {
-    errors.push("bookingUrl must be a valid Calendly URL (https://calendly.com/...)");
+  // Validate bookingUrl if provided
+  if (isService && bookingUrl && !isValidBookingUrl(bookingUrl)) {
+    errors.push("bookingUrl must be a valid HTTPS booking URL (Calendly, Acuity, Fresha, Square, or generic HTTPS)");
   }
-  if (isService && active && !bookingUrl) {
-    errors.push("Active services require a bookingUrl (Calendly URL)");
+  
+  // Check if we have a bookingUrl at product OR vendor level
+  const hasBookingUrl = !!bookingUrl || !!vendor.bookingUrl;
+  
+  // For active services, require bookingUrl at product OR vendor level
+  if (isService && active && !hasBookingUrl) {
+    errors.push("Active services require a bookingUrl (either at product level or vendor level)");
   }
 
   // Determine create vs update (always vendor-scoped)
@@ -184,7 +214,8 @@ export async function validateProductRow(
       active,
       inStock: isService ? true : parseBoolean(row.inStock, true),
       isGlobal: parseBoolean(row.isGlobal, false),
-      calendlyUrl: isService ? bookingUrl : null,
+      bookingUrl: isService ? bookingUrl : null,
+      durationMinutes: isService ? durationMinutes : null,
       inventoryStatus: "in_stock",
     },
   };

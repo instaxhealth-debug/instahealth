@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logMarketplaceEvent } from "@/lib/marketplace-events";
-import { isValidCalendlyUrl } from "@/lib/vendor-categories";
+import { isValidBookingUrl } from "@/lib/vendor-categories";
 
 export async function GET(
   _request: Request,
@@ -20,7 +20,12 @@ export async function GET(
       vendorId: true,
       active: true,
       published: true,
-      calendlyUrl: true,
+      bookingUrl: true,
+      vendor: {
+        select: {
+          bookingUrl: true,
+        },
+      },
     },
   });
 
@@ -28,7 +33,9 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (!product.calendlyUrl || !isValidCalendlyUrl(product.calendlyUrl)) {
+  const resolvedBookingUrl = product.bookingUrl || product.vendor.bookingUrl;
+
+  if (!resolvedBookingUrl || !isValidBookingUrl(resolvedBookingUrl)) {
     return NextResponse.json({ error: "Booking unavailable" }, { status: 404 });
   }
 
@@ -42,5 +49,5 @@ export async function GET(
     console.error("[MARKETPLACE_BOOK] Failed to log event", error);
   }
 
-  return NextResponse.redirect(product.calendlyUrl, { status: 307 });
+  return NextResponse.redirect(resolvedBookingUrl, { status: 307 });
 }

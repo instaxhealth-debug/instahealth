@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVendorContext, validateImageUrl } from "@/lib/vendor-auth";
 import { prisma } from "@/lib/prisma";
+import { isValidBookingUrl } from "@/lib/vendor-categories";
 
 export async function PATCH(req: NextRequest) {
   try {
     const vendor = await getVendorContext();
     const body = await req.json();
 
-    let { logoUrl, tagline, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
+    let { logoUrl, tagline, bookingUrl, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
 
     // Validate logoUrl if provided
     if (logoUrl !== undefined && logoUrl !== null) {
@@ -20,6 +21,16 @@ export async function PATCH(req: NextRequest) {
       }
       if (validation.normalizedUrl) {
         logoUrl = validation.normalizedUrl;
+      }
+    }
+
+    // Validate bookingUrl if provided
+    if (bookingUrl !== undefined && bookingUrl !== null && bookingUrl !== "") {
+      if (!isValidBookingUrl(bookingUrl)) {
+        return NextResponse.json(
+          { error: "Booking URL must be a valid Calendly, Acuity, Fresha, Square, or HTTPS link" },
+          { status: 400 }
+        );
       }
     }
 
@@ -39,6 +50,7 @@ export async function PATCH(req: NextRequest) {
 
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl || null;
     if (tagline !== undefined) updateData.tagline = tagline || null;
+    if (bookingUrl !== undefined) updateData.bookingUrl = bookingUrl || null;
     if (serviceRadiusKm !== undefined) updateData.serviceRadiusKm = parseInt(serviceRadiusKm);
     if (enforceServiceRadius !== undefined) updateData.enforceServiceRadius = enforceServiceRadius;
     if (allowOutOfRadiusOverride !== undefined) updateData.allowOutOfRadiusOverride = allowOutOfRadiusOverride;
@@ -60,6 +72,7 @@ export async function PATCH(req: NextRequest) {
         id: updated.id,
         logoUrl: updated.logoUrl,
         tagline: updated.tagline,
+        bookingUrl: updated.bookingUrl,
         serviceRadiusKm: updated.serviceRadiusKm,
         enforceServiceRadius: updated.enforceServiceRadius,
         allowOutOfRadiusOverride: updated.allowOutOfRadiusOverride,

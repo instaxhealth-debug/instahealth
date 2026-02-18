@@ -16,6 +16,7 @@ interface VendorSettingsFormProps {
     id: string;
     logoUrl: string | null;
     tagline: string | null;
+    bookingUrl: string | null;
     serviceRadiusKm: number;
     enforceServiceRadius: boolean;
     allowOutOfRadiusOverride: boolean;
@@ -30,6 +31,7 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
   const [formData, setFormData] = useState({
     logoUrl: vendor.logoUrl || "",
     tagline: vendor.tagline || "",
+    bookingUrl: vendor.bookingUrl || "",
     serviceRadiusKm: vendor.serviceRadiusKm,
     enforceServiceRadius: vendor.enforceServiceRadius,
     allowOutOfRadiusOverride: vendor.allowOutOfRadiusOverride,
@@ -105,6 +107,23 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
               placeholder="Brief description of your business"
               rows={3}
             />
+          </div>
+
+          {/* Booking URL */}
+          <div className="space-y-2">
+            <Label htmlFor="bookingUrl">Booking URL (Vendor Default)</Label>
+            <Input
+              id="bookingUrl"
+              type="url"
+              value={formData.bookingUrl}
+              onChange={(e) =>
+                setFormData({ ...formData, bookingUrl: e.target.value })
+              }
+              placeholder="https://calendly.com/your-link or Acuity/Fresha/Square URL"
+            />
+            <p className="text-xs text-muted-foreground">
+              Default booking link for your services. Supports Calendly, Acuity, Fresha, Square, or any HTTPS URL. Services can override this with their own booking URL.
+            </p>
           </div>
 
           {/* Service Radius */}

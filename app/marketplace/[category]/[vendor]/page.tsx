@@ -32,7 +32,7 @@ function prismaProductToOffering(product: {
   imageUrl: string | null;
   inStock: boolean;
   active: boolean;
-  calendlyUrl: string | null;
+  bookingUrl: string | null;
   vendor: {
     id: string;
     name: string;
@@ -50,7 +50,7 @@ function prismaProductToOffering(product: {
     stockStatus: isService ? undefined : product.inStock ? "in_stock" : "out_of_stock",
     image: product.imageUrl || undefined,
     slug: product.slug,
-    calendlyUrl: product.calendlyUrl || undefined,
+    bookingUrl: product.bookingUrl || undefined,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

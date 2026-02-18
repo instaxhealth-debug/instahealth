@@ -17,7 +17,7 @@ type ProductRow = {
   inventoryStatus: string;
   inStock: boolean;
   priceFils: number;
-  calendlyUrl: string | null;
+  bookingUrl: string | null;
 };
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
       inventoryStatus: true,
       inStock: true,
       priceFils: true,
-      calendlyUrl: true,
+      bookingUrl: true,
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -131,9 +131,9 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
                         <div className="font-medium">{product.active ? "Yes" : "No"}</div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Calendly</span>
+                        <span className="text-muted-foreground">Booking</span>
                         <div className="font-medium">
-                          {product.calendlyUrl ? "Connected" : "Not connected"}
+                          {product.bookingUrl ? "Connected" : "Not connected"}
                         </div>
                       </div>
                       <div>

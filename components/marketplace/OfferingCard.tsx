@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
 import type { Offering } from "@/types/offering";
-import { isValidCalendlyUrl } from "@/lib/vendor-categories";
+import { isValidBookingUrl } from "@/lib/vendor-categories";
 
 interface OfferingCardProps {
   offering: Offering;
@@ -54,11 +54,11 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
       : { label: "Out of stock", variant: "destructive" as const }
     : { label: "In stock", variant: "default" as const };
 
-  const hasValidCalendly =
+  const hasValidBooking =
     offering.type !== "product" &&
-    !!offering.calendlyUrl &&
-    isValidCalendlyUrl(offering.calendlyUrl);
-  const route = offering.type === "product" ? getRoute() : hasValidCalendly ? getRoute() : "#";
+    !!offering.bookingUrl &&
+    isValidBookingUrl(offering.bookingUrl);
+  const route = offering.type === "product" ? getRoute() : hasValidBooking ? getRoute() : "#";
 
   return (
     <Card
@@ -156,20 +156,20 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
               <Button
                 className="w-full rounded-full mt-1.5 bg-primary hover:bg-primary/90 text-white font-semibold h-8 text-xs"
                 size="sm"
-                disabled={!hasValidCalendly}
+                disabled={!hasValidBooking}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (!hasValidCalendly) return;
+                  if (!hasValidBooking) return;
                   window.location.href = getRoute();
                 }}
               >
-                {hasValidCalendly ? (
+                {hasValidBooking ? (
                   <Calendar className="h-3.5 w-3.5 mr-1.5" />
                 ) : (
                   <Ban className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                {hasValidCalendly
+                {hasValidBooking
                   ? offering.type === "service"
                     ? "Book Now"
                     : "Book Test"

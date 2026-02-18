@@ -76,7 +76,10 @@ export async function getPopularNow(limit = 10) {
         imageUrl: true,
         inStock: true,
         inventoryStatus: true,
-        calendlyUrl: true,
+        bookingUrl: true,
+        vendor: {
+          select: { bookingUrl: true },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -107,7 +110,10 @@ export async function getPopularNow(limit = 10) {
         imageUrl: true,
         inStock: true,
         inventoryStatus: true,
-        calendlyUrl: true,
+        bookingUrl: true,
+        vendor: {
+          select: { bookingUrl: true },
+        },
       },
     });
 
@@ -142,7 +148,10 @@ export async function getPopularNow(limit = 10) {
       imageUrl: true,
       inStock: true,
       inventoryStatus: true,
-      calendlyUrl: true,
+      bookingUrl: true,
+        vendor: {
+          select: { bookingUrl: true },
+        },
     },
   });
 
@@ -210,7 +219,10 @@ export async function getMostBooked(limit = 10) {
         imageUrl: true,
         inStock: true,
         inventoryStatus: true,
-        calendlyUrl: true,
+        bookingUrl: true,
+        vendor: {
+          select: { bookingUrl: true },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -240,7 +252,10 @@ export async function getMostBooked(limit = 10) {
       imageUrl: true,
       inStock: true,
       inventoryStatus: true,
-      calendlyUrl: true,
+      bookingUrl: true,
+        vendor: {
+          select: { bookingUrl: true },
+        },
     },
   });
 

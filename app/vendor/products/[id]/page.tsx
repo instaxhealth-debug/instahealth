@@ -39,7 +39,7 @@ export default async function VendorProductDetailPage({
       inStock: true,
       active: true,
       published: true,
-      calendlyUrl: true,
+      bookingUrl: true,
       variants: {
         select: {
           id: true,
@@ -77,7 +77,7 @@ export default async function VendorProductDetailPage({
         inStock: product.inStock,
         active: product.active,
         published: product.published,
-        calendlyUrl: product.calendlyUrl,
+        bookingUrl: product.bookingUrl,
         variants: product.variants.map((variant: VariantRow) => ({
           id: variant.id,
           sku: variant.sku,

@@ -12,7 +12,10 @@ export interface MarketplaceProduct {
   imageUrl: string | null;
   inStock: boolean;
   inventoryStatus?: string | null;
-  calendlyUrl: string | null;
+  bookingUrl: string | null;
+  vendor: {
+    bookingUrl: string | null;
+  };
 }
 
 export function prismaProductToOffering(product: MarketplaceProduct): Offering {
@@ -42,7 +45,7 @@ export function prismaProductToOffering(product: MarketplaceProduct): Offering {
     stockStatus,
     image: product.imageUrl || undefined,
     slug: product.slug,
-    calendlyUrl: product.calendlyUrl || undefined,
+    bookingUrl: product.bookingUrl || product.vendor.bookingUrl || undefined,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

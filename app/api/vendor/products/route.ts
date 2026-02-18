@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/auth/requireVendor";
-import { isServiceCategory, isValidCalendlyUrl, normalizeCategory } from "@/lib/vendor-categories";
+import { isServiceCategory, isValidBookingUrl, normalizeCategory } from "@/lib/vendor-categories";
 import { isValidCategorySlug, formatAllowedCategories, CATEGORY_SLUGS } from "@/lib/utils/category";
 import { slugify } from "@/lib/slugify";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { allowedCategories: true },
+      select: { allowedCategories: true, bookingUrl: true },
     });
 
     if (!vendor) {
@@ -133,29 +133,30 @@ export async function POST(request: Request) {
     }
 
     const isService = isServiceCategory(normalizedCategory);
-    const calendlyUrl = body.calendlyUrl || null;
+    const bookingUrl = body.bookingUrl || null;
+    const hasBookingUrl = !!bookingUrl || !!vendor.bookingUrl;
 
     if (isService) {
-      if (calendlyUrl && !isValidCalendlyUrl(calendlyUrl)) {
+      if (bookingUrl && !isValidBookingUrl(bookingUrl)) {
         return NextResponse.json(
           {
             ok: false,
             code: "VALIDATION_ERROR",
             requestId,
-            message: "Calendly URL must start with https://calendly.com/",
-            fieldErrors: { calendlyUrl: ["Calendly URL must start with https://calendly.com/"] },
+            message: "Booking URL must be a valid Calendly, Acuity, Fresha, Square, or HTTPS link",
+            fieldErrors: { bookingUrl: ["Booking URL must be a valid Calendly, Acuity, Fresha, Square, or HTTPS link"] },
           },
           { status: 400 }
         );
       }
-      if (body.active && !calendlyUrl) {
+      if (body.active && !hasBookingUrl) {
         return NextResponse.json(
           {
             ok: false,
             code: "VALIDATION_ERROR",
             requestId,
-            message: "Active services require a Calendly URL",
-            fieldErrors: { calendlyUrl: ["Active services require a Calendly URL"] },
+            message: "Active services require a booking URL (set at product or vendor level)",
+            fieldErrors: { bookingUrl: ["Active services require a booking URL (set at product or vendor level)"] },
           },
           { status: 400 }
         );
@@ -204,7 +205,7 @@ export async function POST(request: Request) {
         priceFils: Number(body.priceFils) || 0,
         imageUrl: body.imageUrl || null,
         tags: Array.isArray(body.tags) ? body.tags : [],
-        calendlyUrl: isService ? calendlyUrl : null,
+        bookingUrl: isService ? bookingUrl : null,
         inventoryStatus: isService ? "in_stock" : body.inventoryStatus || "in_stock",
         inStock: isService ? true : Boolean(body.inStock),
         active: body.active !== false,
