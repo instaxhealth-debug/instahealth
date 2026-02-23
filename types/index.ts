@@ -63,8 +63,6 @@ export interface BaseItem {
 export interface Product extends BaseItem {
   type: "product";
   vertical: "pepz";
-  shopifyProductId: string;
-  shopifyVariantId: string;
   price: number;
   compareAtPrice?: number;
   currency: string;
@@ -132,7 +130,6 @@ export interface Order {
   total: number;
   currency: string;
   shippingAddress: Address;
-  shopifyOrderId?: string;
   createdAt: Date;
   updatedAt: Date;
 }

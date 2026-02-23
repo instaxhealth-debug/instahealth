@@ -6,7 +6,7 @@ export type ProductQueryOptions = {
   includeInactive?: boolean;
 };
 
-// Product type for storefront (without Shopify placeholders)
+// Product type for storefront
 export interface StorefrontProduct {
   id: string;
   type: "product";

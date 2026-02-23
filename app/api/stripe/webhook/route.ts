@@ -54,7 +54,86 @@ export async function POST(req: NextRequest) {
 
       console.log('Checkout session completed:', session.id);
 
-      // Find order by Stripe session ID (or metadata fallback)
+      // Check if this is a service booking
+      if (session.metadata?.kind === 'SERVICE_BOOKING') {
+        const bookingId = session.metadata.bookingId;
+        
+        const booking = await prisma.serviceBooking.findUnique({
+          where: { id: bookingId },
+          include: {
+            product: true,
+            vendor: true,
+          },
+        });
+
+        if (!booking) {
+          console.error('Service booking not found:', bookingId);
+          return NextResponse.json({ received: true, warning: 'Booking not found' });
+        }
+
+        // Check if already processed (idempotency)
+        if (booking.status === 'PAID_AWAITING_SCHEDULE' || booking.status === 'SCHEDULED') {
+          console.log('Booking already processed:', booking.id);
+          return NextResponse.json({ received: true, alreadyProcessed: true });
+        }
+
+        // Update booking status
+        await prisma.serviceBooking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'PAID_AWAITING_SCHEDULE',
+            stripePaymentIntentId: session.payment_intent as string,
+          },
+        });
+
+        console.log('Service booking marked as PAID:', booking.id);
+
+        // Send confirmation emails (optional - implement if email is configured)
+        try {
+          const { sendEmail } = await import('@/lib/email');
+          
+          // Email to customer
+          await sendEmail({
+            to: booking.customerEmail,
+            subject: `Booking Confirmed: ${booking.product.name}`,
+            html: `
+              <h2>Your booking is confirmed!</h2>
+              <p>Hi ${booking.customerName},</p>
+              <p>Your booking for <strong>${booking.product.name}</strong> with ${booking.vendor.name} has been confirmed.</p>
+              <p><strong>Amount Paid:</strong> AED ${(booking.amountFils / 100).toFixed(2)}</p>
+              ${booking.bookingUrlResolved ? `<p><a href="${booking.bookingUrlResolved}">Click here to schedule your exact time slot</a></p>` : ''}
+              <p>Booking ID: ${booking.id}</p>
+              <p>If you have any questions, please contact ${booking.vendor.name}.</p>
+            `,
+          });
+
+          // Email to vendor (if vendor has email)
+          if (booking.vendor.email) {
+            await sendEmail({
+              to: booking.vendor.email,
+              subject: `New Booking: ${booking.product.name}`,
+              html: `
+                <h2>New booking received</h2>
+                <p><strong>Service:</strong> ${booking.product.name}</p>
+                <p><strong>Customer:</strong> ${booking.customerName}</p>
+                <p><strong>Email:</strong> ${booking.customerEmail}</p>
+                <p><strong>Phone:</strong> ${booking.customerPhone}</p>
+                <p><strong>Amount:</strong> AED ${(booking.amountFils / 100).toFixed(2)}</p>
+                ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
+                <p>Booking ID: ${booking.id}</p>
+                <p><a href="${process.env.NEXT_PUBLIC_BASE_URL}/vendor/bookings/${booking.id}">View in portal</a></p>
+              `,
+            });
+          }
+        } catch (emailError) {
+          console.error('Failed to send booking confirmation emails:', emailError);
+          // Don't fail the webhook if email fails
+        }
+
+        return NextResponse.json({ received: true, bookingProcessed: true });
+      }
+
+      // Otherwise handle as regular order
       const metadataOrderId = session.metadata?.orderId;
       const order = await prisma.order.findFirst({
         where: metadataOrderId
@@ -143,6 +222,83 @@ export async function POST(req: NextRequest) {
             error: error instanceof Error ? error.message : String(error),
           },
         });
+      }
+    } else if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+
+      console.log('Payment intent succeeded:', paymentIntent.id);
+
+      // Check if this is a service booking
+      if (paymentIntent.metadata?.kind === 'SERVICE_BOOKING') {
+        const bookingId = paymentIntent.metadata.bookingId;
+        
+        const booking = await prisma.serviceBooking.findUnique({
+          where: { id: bookingId },
+          include: {
+            product: true,
+            vendor: true,
+          },
+        });
+
+        if (!booking) {
+          console.error('Service booking not found:', bookingId);
+          return NextResponse.json({ received: true, warning: 'Booking not found' });
+        }
+
+        // Check if already processed (idempotency)
+        if (booking.status === 'PAID_AWAITING_SCHEDULE' || booking.status === 'SCHEDULED') {
+          console.log('Booking already processed:', booking.id);
+          return NextResponse.json({ received: true, alreadyProcessed: true });
+        }
+
+        // Update booking status
+        await prisma.serviceBooking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'PAID_AWAITING_SCHEDULE',
+          },
+        });
+
+        console.log('Service booking marked as PAID (via PaymentIntent):', booking.id);
+
+        // Send confirmation emails
+        try {
+          const { sendEmail } = await import('@/lib/email');
+          
+          await sendEmail({
+            to: booking.customerEmail,
+            subject: `Booking Confirmed: ${booking.product.name}`,
+            html: `
+              <h2>Your booking is confirmed!</h2>
+              <p>Hi ${booking.customerName},</p>
+              <p>Your booking for <strong>${booking.product.name}</strong> with ${booking.vendor.name} has been confirmed.</p>
+              <p><strong>Amount Paid:</strong> AED ${(booking.amountFils / 100).toFixed(2)}</p>
+              ${booking.bookingUrlResolved ? `<p><a href="${booking.bookingUrlResolved}">Click here to schedule your exact time slot</a></p>` : ''}
+              <p>Booking ID: ${booking.id}</p>
+            `,
+          });
+
+          if (booking.vendor.email) {
+            await sendEmail({
+              to: booking.vendor.email,
+              subject: `New Booking: ${booking.product.name}`,
+              html: `
+                <h2>New booking received</h2>
+                <p><strong>Service:</strong> ${booking.product.name}</p>
+                <p><strong>Customer:</strong> ${booking.customerName}</p>
+                <p><strong>Email:</strong> ${booking.customerEmail}</p>
+                <p><strong>Phone:</strong> ${booking.customerPhone}</p>
+                <p><strong>Amount:</strong> AED ${(booking.amountFils / 100).toFixed(2)}</p>
+                ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
+                <p><a href="${process.env.NEXT_PUBLIC_BASE_URL}/vendor/bookings/${booking.id}">View in portal</a></p>
+              `,
+            });
+          }
+        } catch (emailError) {
+          console.error('Failed to send booking confirmation emails:', emailError);
+        }
+
+        return NextResponse.json({ received: true, bookingProcessed: true });
       }
     } else if (event.type === 'payment_intent.payment_failed') {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;

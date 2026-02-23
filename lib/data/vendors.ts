@@ -133,7 +133,7 @@ export const vendors: Vendor[] = [
 
 // OFFERINGS - Unified structure for products, services, and tests
 export const offerings: Offering[] = [
-  // InstaPepz products (from Shopify)
+  // InstaPepz products
   ...mockProducts.slice(0, 5).map((product, idx) => ({
     id: `offering-instapepz-${product.id}`,
     vendorId: "vendor-instapepz",
@@ -151,8 +151,6 @@ export const offerings: Offering[] = [
     availabilityText: "Delivery today",
     image: product.image,
     slug: product.slug,
-    shopifyProductId: product.shopifyProductId,
-    shopifyVariantId: product.shopifyVariantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   })),

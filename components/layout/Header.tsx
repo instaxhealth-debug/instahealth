@@ -110,8 +110,8 @@ export function Header({ initialLocation: _initialLocation, locations: _location
                   {/* 4. Marketplace */}
                   <HeaderNavItem
                     icon={Home}
-                    label="Marketplace"
-                    href="/marketplace"
+                    label="Home"
+                    href="https://www.instahealth.ae/"
                   />
                 </>
               )}

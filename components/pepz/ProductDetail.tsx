@@ -8,7 +8,6 @@ import { ShoppingCart, Package, Truck } from "lucide-react";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useLocationStore } from "@/lib/store/location-store";
 import { useToast } from "@/hooks/use-toast";
-// Shopify removed - This component replaced by ProductDetailWithVariants
 import type { Product } from "@/types";
 
 interface ProductDetailProps {
@@ -27,7 +26,7 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     async function fetchProduct() {
       try {
         setIsLoading(true);
-        // Shopify removed - TODO: Use Prisma ProductDetailWithVariants instead
+        // This component is deprecated - use ProductDetailWithVariants instead
         const data = null as any;
 
         if (!data.product) {
@@ -45,11 +44,9 @@ export function ProductDetail({ slug }: ProductDetailProps) {
           description: data.product.description || "",
           image: data.product.images.edges[0]?.node.url || "",
           categoryId: data.product.productType || "",
-          shopifyProductId: data.product.id,
-          shopifyVariantId: firstVariant?.id || "",
           price: parseFloat(firstVariant?.price.amount || "0"),
           currency: firstVariant?.price.currencyCode || "USD",
-          inventoryQuantity: firstVariant?.availableForSale ? 999 : 0, // Storefront API doesn't provide exact inventory
+          inventoryQuantity: firstVariant?.availableForSale ? 999 : 0,
           isActive: firstVariant?.availableForSale || false,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -70,7 +67,6 @@ export function ProductDetail({ slug }: ProductDetailProps) {
   const handleAddToCart = async () => {
     if (!product) return;
     try {
-      // Note: shopifyVariantId is a Shopify ID, not our DB ProductVariant.id
       // For products without variants in our DB, use undefined/null for variantId
       await addItem(product.id, undefined, quantity);
       toast({
@@ -90,7 +86,6 @@ export function ProductDetail({ slug }: ProductDetailProps) {
     if (!product) return;
     // Add to cart first, then redirect
     try {
-      // Note: shopifyVariantId is a Shopify ID, not our DB ProductVariant.id
       // For products without variants in our DB, use undefined/null for variantId
       await addItem(product.id, undefined, quantity);
       window.location.href = `/checkout?product=${product.id}&quantity=${quantity}`;

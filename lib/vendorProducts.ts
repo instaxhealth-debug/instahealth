@@ -1,7 +1,6 @@
-// Vendor product helpers - Shopify removed, TODO: Convert to Prisma
+// Vendor product helpers
 
 import { VENDORS, type Vertical, type VendorConfig } from "@/data/vendors";
-type ShopifyProduct = any; // Stub type
 
 export function getActiveVendorsByVertical(vertical: Vertical): VendorConfig[] {
   return VENDORS.filter((v) => v.isActive && v.vertical === vertical);
@@ -16,10 +15,10 @@ export async function getVendorCatalogPreview(
   limit = 3
 ): Promise<{
   vendor: VendorConfig;
-  products: ShopifyProduct[];
+  products: any[];
   total: number;
 }> {
-  // Shopify removed - TODO: Convert to Prisma
+  // Returns empty - use Prisma for actual product queries
   return {
     vendor,
     products: [],
@@ -29,7 +28,7 @@ export async function getVendorCatalogPreview(
 
 export async function getVendorFullCatalog(
   vendor: VendorConfig
-): Promise<ShopifyProduct[]> {
-  // Shopify removed - TODO: Convert to Prisma
+): Promise<any[]> {
+  // Returns empty - use Prisma for actual product queries
   return [];
 }

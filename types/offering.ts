@@ -30,10 +30,6 @@ export interface Offering {
   slug: string;
   bookingUrl?: string;
   
-  // Shopify integration (for products)
-  shopifyProductId?: string;
-  shopifyVariantId?: string;
-  
   // Metadata
   createdAt: Date;
   updatedAt: Date;

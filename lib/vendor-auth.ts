@@ -138,3 +138,49 @@ export function validateImageUrl(
       "Invalid URL format. Use https:// URLs or public paths like /vendors/, /products/, /logos/, /images/",
   };
 }
+
+/**
+ * getVendorSession: Non-redirecting vendor session getter
+ * Returns vendor context or null if not authenticated/authorized
+ * Use this in API routes where you want to handle auth failures manually
+ */
+export async function getVendorSession(): Promise<VendorContext | null> {
+  const session = await auth();
+
+  if (!session?.user?.id || !session?.user?.email) {
+    return null;
+  }
+
+  const userId = session.user.id;
+  const userEmail = session.user.email;
+  const userRole = session.user.role || "USER";
+
+  if (userRole !== "VENDOR" && userRole !== "ADMIN") {
+    return null;
+  }
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      status: true,
+      allowedCategories: true,
+    },
+  });
+
+  if (!vendor || vendor.status !== "active") {
+    return null;
+  }
+
+  return {
+    userId,
+    vendorId: vendor.id,
+    vendorSlug: vendor.slug,
+    vendorName: vendor.name,
+    role: userRole,
+    email: userEmail,
+    allowedCategories: vendor.allowedCategories || [],
+  };
+}

@@ -8,7 +8,7 @@ import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 
 const NAV_ITEMS = [
   {
-    label: "Marketplace",
+    label: "Home",
     href: "/",
     icon: Home,
   },

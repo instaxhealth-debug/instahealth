@@ -7,7 +7,6 @@ export type VendorConfig = {
   id: string;
   name: string;
   vertical: Vertical;
-  shopifyVendorName: string; // Must match Shopify product vendor field exactly
   isActive: boolean;
   serviceAreas?: string[];
   availabilityText?: string;
@@ -26,7 +25,6 @@ export const VENDORS: VendorConfig[] = [
     id: "instapepz",
     name: "InstaPepz",
     vertical: "peptides",
-    shopifyVendorName: "InstaPepz",
     isActive: true,
     serviceAreas: ["Dubai", "Abu Dhabi", "Sharjah"],
     availabilityText: "Delivery today",
@@ -42,7 +40,6 @@ export const VENDORS: VendorConfig[] = [
     id: "syncom",
     name: "Syncom",
     vertical: "peptides",
-    shopifyVendorName: "Syncom",
     isActive: true,
     serviceAreas: ["Dubai", "Abu Dhabi", "Sharjah"],
     availabilityText: "Delivery today",

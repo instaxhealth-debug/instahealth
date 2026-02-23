@@ -273,3 +273,66 @@ export async function getRefundStatus(vendorOrderId: string) {
     where: { vendorOrderId },
   });
 }
+
+/**
+ * Issue a refund for a service booking.
+ *
+ * IDEMPOTENT: Updates booking status to REFUNDED to prevent double refunds.
+ */
+export async function issueServiceBookingRefund(bookingId: string) {
+  const booking = await prisma.serviceBooking.findUniqueOrThrow({
+    where: { id: bookingId },
+  });
+
+  // Check if already refunded
+  if (booking.status === "REFUNDED") {
+    return { success: true, alreadyRefunded: true };
+  }
+
+  // Only allow refund for paid or scheduled bookings
+  if (!["PAID_AWAITING_SCHEDULE", "SCHEDULED"].includes(booking.status)) {
+    throw new Error(
+      `Cannot refund booking in status: ${booking.status}`
+    );
+  }
+
+  // Get payment intent ID
+  let paymentIntentId = booking.stripePaymentIntentId;
+
+  if (!paymentIntentId && booking.stripeCheckoutSessionId) {
+    const session = await stripe.checkout.sessions.retrieve(
+      booking.stripeCheckoutSessionId
+    );
+    paymentIntentId = session.payment_intent as string;
+  }
+
+  if (!paymentIntentId) {
+    throw new Error("No payment intent found for this booking");
+  }
+
+  // Create refund in Stripe
+  const stripeRefund = await stripe.refunds.create({
+    payment_intent: paymentIntentId,
+    amount: booking.amountFils,
+    reason: "requested_by_customer",
+    metadata: {
+      bookingId: booking.id,
+      vendorId: booking.vendorId,
+      productId: booking.productId,
+    },
+  }, {
+    idempotencyKey: `booking_refund_${bookingId}`,
+  });
+
+  // Update booking status
+  await prisma.serviceBooking.update({
+    where: { id: bookingId },
+    data: { status: "REFUNDED" },
+  });
+
+  return {
+    success: true,
+    refundId: stripeRefund.id,
+    amount: stripeRefund.amount,
+  };
+}
