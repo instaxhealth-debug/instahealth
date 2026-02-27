@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { parseImageCsv } from "@/lib/csv-image-parser";
+import { upload } from "@vercel/blob/client";
 
 interface UploadResult {
   filename: string;
@@ -17,6 +18,10 @@ interface UploadResult {
   error?: string;
 }
 
+const MAX_FILES_PER_BATCH = 10; // Practical limit for client uploads
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export function BulkFileUpload() {
   const { toast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
@@ -24,13 +29,53 @@ export function BulkFileUpload() {
   const [csvMapping, setCsvMapping] = useState<Map<string, string> | null>(null);
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [results, setResults] = useState<UploadResult[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
+  const extractSkuFromFilename = (filename: string): string => {
+    return filename.replace(/\.(jpg|jpeg|png|webp)$/i, "").trim();
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
-    setFiles((prev) => [...prev, ...selectedFiles]);
+
+    // Validate file count
+    if (selectedFiles.length > MAX_FILES_PER_BATCH) {
+      toast({
+        title: "Too many files",
+        description: `Maximum ${MAX_FILES_PER_BATCH} files per batch. Please select fewer files.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate each file
+    const invalidFiles: string[] = [];
+    const validFiles: File[] = [];
+
+    for (const file of selectedFiles) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        invalidFiles.push(`${file.name}: Invalid type (${file.type})`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push(`${file.name}: Too large (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Some files were rejected",
+        description: invalidFiles.join(", "),
+        variant: "destructive",
+      });
+    }
+
+    setFiles((prev) => [...prev, ...validFiles]);
     setResults(null);
   };
 
@@ -96,48 +141,113 @@ export function BulkFileUpload() {
 
     setIsUploading(true);
     setResults(null);
+    setUploadProgress({ current: 0, total: files.length });
+
+    const uploadResults: UploadResult[] = [];
 
     try {
-      const formData = new FormData();
+      // Process files one by one (sequential for progress tracking)
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({ current: i + 1, total: files.length });
 
-      // Add files
-      files.forEach((file) => {
-        formData.append("files", file);
-      });
+        try {
+          // Determine SKU
+          let sku: string;
+          if (mappingMode === "csv" && csvMapping) {
+            const mappedSku = csvMapping.get(file.name);
+            if (!mappedSku) {
+              uploadResults.push({
+                filename: file.name,
+                sku: "",
+                success: false,
+                error: "SKU not found in CSV mapping",
+              });
+              continue;
+            }
+            sku = mappedSku;
+          } else {
+            sku = extractSkuFromFilename(file.name);
+          }
 
-      // Add metadata
-      formData.append("mappingMode", mappingMode);
-      formData.append("replaceExisting", replaceExisting.toString());
+          // Upload directly to Vercel Blob
+          const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+          const blobPath = `vendors/unknown/products/${sku}.${ext}`; // vendorId will be validated server-side
 
-      // Add CSV mapping if in CSV mode
-      if (mappingMode === "csv" && csvMapping) {
-        const mappingArray = Array.from(csvMapping.entries()).map(
-          ([filename, sku]) => ({ filename, sku })
-        );
-        formData.append("mapping", JSON.stringify(mappingArray));
+          const blob = await upload(blobPath, file, {
+            access: "public",
+            handleUploadUrl: "/api/vendor/products/images/upload-token",
+          });
+
+          // Update database with blob URL
+          const updateResponse = await fetch("/api/vendor/products/images/update-images", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              updates: [
+                {
+                  sku,
+                  blobUrl: blob.url,
+                  filename: file.name,
+                },
+              ],
+              replaceExisting,
+            }),
+          });
+
+          // Robust error handling
+          let updateData: any;
+          const contentType = updateResponse.headers.get("content-type");
+
+          if (contentType?.includes("application/json")) {
+            updateData = await updateResponse.json();
+          } else {
+            const text = await updateResponse.text();
+            throw new Error(`Server error (${updateResponse.status}): ${text.substring(0, 200)}`);
+          }
+
+          if (!updateResponse.ok) {
+            throw new Error(updateData.error || `HTTP ${updateResponse.status}`);
+          }
+
+          // Extract result from update response
+          const result = updateData.results?.[0];
+          if (result) {
+            uploadResults.push(result);
+          } else {
+            uploadResults.push({
+              filename: file.name,
+              sku,
+              success: true,
+              imageUrl: blob.url,
+            });
+          }
+        } catch (error) {
+          console.error(`[BULK_UPLOAD] Error processing ${file.name}:`, error);
+          uploadResults.push({
+            filename: file.name,
+            sku: extractSkuFromFilename(file.name),
+            success: false,
+            error: error instanceof Error ? error.message : "Upload failed",
+          });
+        }
       }
 
-      const response = await fetch("/api/vendor/products/images/bulk-upload", {
-        method: "POST",
-        body: formData,
-      });
+      setResults(uploadResults);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Upload failed");
-      }
-
-      setResults(data.results);
+      const successCount = uploadResults.filter((r) => r.success).length;
+      const failureCount = uploadResults.filter((r) => !r.success).length;
 
       toast({
         title: "Upload complete",
-        description: `${data.successCount} images uploaded successfully, ${data.failureCount} failed`,
-        variant: data.failureCount === 0 ? "default" : "destructive",
+        description: `${successCount} images uploaded successfully, ${failureCount} failed`,
+        variant: failureCount === 0 ? "default" : "destructive",
       });
 
       // Clear files on success
-      if (data.successCount > 0) {
+      if (successCount > 0) {
         setFiles([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -149,6 +259,7 @@ export function BulkFileUpload() {
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -204,7 +315,7 @@ export function BulkFileUpload() {
 
       {/* File Input */}
       <div className="space-y-2">
-        <Label htmlFor="image-files">Select Images</Label>
+        <Label htmlFor="image-files">Select Images (max {MAX_FILES_PER_BATCH})</Label>
         <Input
           id="image-files"
           ref={fileInputRef}
@@ -213,12 +324,15 @@ export function BulkFileUpload() {
           multiple
           onChange={handleFileSelect}
         />
+        <p className="text-xs text-muted-foreground">
+          Max {MAX_FILES_PER_BATCH} files per batch • Max 5MB per file • JPEG, PNG, WebP only
+        </p>
       </div>
 
       {/* Selected Files List */}
       {files.length > 0 && (
         <div className="space-y-2">
-          <Label>Selected Files ({files.length})</Label>
+          <Label>Selected Files ({files.length}/{MAX_FILES_PER_BATCH})</Label>
           <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2">
             {files.map((file, index) => (
               <div
@@ -234,6 +348,7 @@ export function BulkFileUpload() {
                   size="sm"
                   onClick={() => removeFile(index)}
                   className="h-6 w-6 p-0"
+                  disabled={isUploading}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -255,6 +370,7 @@ export function BulkFileUpload() {
           id="replace-existing"
           checked={replaceExisting}
           onCheckedChange={setReplaceExisting}
+          disabled={isUploading}
         />
       </div>
 
@@ -268,7 +384,7 @@ export function BulkFileUpload() {
         {isUploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Uploading {files.length} images...
+            Uploading {uploadProgress?.current || 0}/{uploadProgress?.total || 0}...
           </>
         ) : (
           <>

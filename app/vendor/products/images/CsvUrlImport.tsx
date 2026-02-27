@@ -141,10 +141,19 @@ export function CsvUrlImport() {
         }),
       });
 
-      const data = await response.json();
+      // Robust error handling - check content type
+      let data: any;
+      const contentType = response.headers.get("content-type");
+
+      if (contentType?.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Server error (${response.status}): ${text.substring(0, 200)}`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || "Import failed");
+        throw new Error(data.error || `HTTP ${response.status}`);
       }
 
       setResults(data.results);

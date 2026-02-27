@@ -78,7 +78,8 @@ DEF456,product3.webp`;
                 <li>All URLs must be <strong>HTTPS</strong> (HTTP is not allowed)</li>
                 <li>Supported formats: JPEG, PNG, WebP</li>
                 <li>Maximum file size: <strong>5MB per image</strong></li>
-                <li>Maximum batch size: <strong>100 images at once</strong></li>
+                <li>Maximum batch size: <strong>10 files per upload</strong></li>
+                <li>For more files, upload in multiple batches</li>
               </ul>
             </div>
           </div>
