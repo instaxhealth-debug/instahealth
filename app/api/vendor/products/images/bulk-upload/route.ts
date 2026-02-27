@@ -17,6 +17,15 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check for BLOB_READ_WRITE_TOKEN
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error("[BULK_UPLOAD] BLOB_READ_WRITE_TOKEN is missing");
+      return NextResponse.json(
+        { error: "Server configuration error: BLOB_READ_WRITE_TOKEN missing" },
+        { status: 500 }
+      );
+    }
+
     const { vendorId } = await requireVendor();
 
     // Parse multipart form data
