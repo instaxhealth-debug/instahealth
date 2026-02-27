@@ -19,6 +19,7 @@ export default async function VendorSettings() {
       logoUrl: true,
       tagline: true,
       bookingUrl: true,
+      bookingInstructions: true,
       serviceRadiusKm: true,
       enforceServiceRadius: true,
       allowOutOfRadiusOverride: true,

@@ -17,6 +17,7 @@ interface VendorSettingsFormProps {
     logoUrl: string | null;
     tagline: string | null;
     bookingUrl: string | null;
+    bookingInstructions: string | null;
     serviceRadiusKm: number;
     enforceServiceRadius: boolean;
     allowOutOfRadiusOverride: boolean;
@@ -32,6 +33,7 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
     logoUrl: vendor.logoUrl || "",
     tagline: vendor.tagline || "",
     bookingUrl: vendor.bookingUrl || "",
+    bookingInstructions: vendor.bookingInstructions || "",
     serviceRadiusKm: vendor.serviceRadiusKm,
     enforceServiceRadius: vendor.enforceServiceRadius,
     allowOutOfRadiusOverride: vendor.allowOutOfRadiusOverride,
@@ -123,6 +125,23 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
             />
             <p className="text-xs text-muted-foreground">
               Default booking link for your services. Supports Calendly, Acuity, Fresha, Square, or any HTTPS URL. Services can override this with their own booking URL.
+            </p>
+          </div>
+
+          {/* Booking Instructions */}
+          <div className="space-y-2">
+            <Label htmlFor="bookingInstructions">Booking Instructions (Optional)</Label>
+            <Textarea
+              id="bookingInstructions"
+              value={formData.bookingInstructions}
+              onChange={(e) =>
+                setFormData({ ...formData, bookingInstructions: e.target.value })
+              }
+              placeholder="e.g., 'Please have your health records ready' or 'Select morning slots for faster service'"
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">
+              Instructions shown to customers before they schedule. Use this to prepare customers or provide helpful tips.
             </p>
           </div>
 

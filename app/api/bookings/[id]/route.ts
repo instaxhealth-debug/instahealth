@@ -15,7 +15,7 @@ export async function GET(
           select: { name: true, slug: true },
         },
         vendor: {
-          select: { name: true },
+          select: { name: true, bookingInstructions: true },
         },
       },
     });

@@ -27,7 +27,9 @@ export function ServiceCard({ service, className }: ServiceCardProps) {
       <Link href={`/ivz/services/${service.slug}`}>
         <CardContent className="p-0">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            {service.image ? (
+            {service.image &&
+             !service.image.startsWith("/Users") &&
+             (service.image.startsWith("/logos/") || service.image.startsWith("http")) ? (
               <Image
                 src={service.image}
                 alt={service.name}

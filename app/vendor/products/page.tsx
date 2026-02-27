@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { isServiceCategory } from "@/lib/vendor-categories";
 import { ProductImportModal } from "./ProductImportModal";
+import { ImagePlus } from "lucide-react";
+
 type ProductRow = {
   id: string;
   name: string;
@@ -73,6 +75,12 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
         </div>
         <div className="flex gap-2">
           <ProductImportModal />
+          <Button variant="outline" asChild>
+            <Link href="/vendor/products/images">
+              <ImagePlus className="h-4 w-4 mr-2" />
+              Bulk Images
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/vendor/products/new">Add item</Link>
           </Button>

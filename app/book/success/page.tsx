@@ -20,6 +20,7 @@ interface Booking {
   };
   vendor: {
     name: string;
+    bookingInstructions?: string | null;
   };
   amountFils: number;
 }
@@ -132,6 +133,13 @@ function BookingSuccessContent() {
               <p className="text-sm text-muted-foreground">
                 Click below to select your exact time slot with the provider.
               </p>
+              {booking.vendor.bookingInstructions && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-md">
+                  <p className="text-sm text-blue-900 dark:text-blue-100 whitespace-pre-wrap">
+                    {booking.vendor.bookingInstructions}
+                  </p>
+                </div>
+              )}
               <a
                 href={booking.bookingUrlResolved}
                 target="_blank"
@@ -147,9 +155,7 @@ function BookingSuccessContent() {
 
           <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              <strong>Important:</strong> Your payment reserves this booking. You&apos;ll now
-              select your exact time slot with the provider. If scheduling cannot be
-              completed, you&apos;ll receive a full refund.
+              <strong>Important:</strong> Payment reserves your service. Time slot selection occurs on the booking page. Please complete scheduling within 72 hours to avoid delays.
             </p>
           </div>
 

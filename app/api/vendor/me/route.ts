@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest) {
     const vendor = await getVendorContext();
     const body = await req.json();
 
-    let { logoUrl, tagline, bookingUrl, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
+    let { logoUrl, tagline, bookingUrl, bookingInstructions, serviceRadiusKm, enforceServiceRadius, allowOutOfRadiusOverride } = body;
 
     // Validate logoUrl if provided
     if (logoUrl !== undefined && logoUrl !== null) {
@@ -51,6 +51,7 @@ export async function PATCH(req: NextRequest) {
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl || null;
     if (tagline !== undefined) updateData.tagline = tagline || null;
     if (bookingUrl !== undefined) updateData.bookingUrl = bookingUrl || null;
+    if (bookingInstructions !== undefined) updateData.bookingInstructions = bookingInstructions || null;
     if (serviceRadiusKm !== undefined) updateData.serviceRadiusKm = parseInt(serviceRadiusKm);
     if (enforceServiceRadius !== undefined) updateData.enforceServiceRadius = enforceServiceRadius;
     if (allowOutOfRadiusOverride !== undefined) updateData.allowOutOfRadiusOverride = allowOutOfRadiusOverride;
@@ -73,6 +74,7 @@ export async function PATCH(req: NextRequest) {
         logoUrl: updated.logoUrl,
         tagline: updated.tagline,
         bookingUrl: updated.bookingUrl,
+        bookingInstructions: updated.bookingInstructions,
         serviceRadiusKm: updated.serviceRadiusKm,
         enforceServiceRadius: updated.enforceServiceRadius,
         allowOutOfRadiusOverride: updated.allowOutOfRadiusOverride,
