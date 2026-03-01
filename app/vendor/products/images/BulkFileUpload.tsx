@@ -9,6 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { parseImageCsv } from "@/lib/csv-image-parser";
 import { upload } from "@vercel/blob/client";
+import { FailedUploadRetry } from "./FailedUploadRetry";
+
+interface SkuSuggestion {
+  sku: string;
+  productName: string;
+  score: number;
+  scorePercent: string;
+}
 
 interface UploadResult {
   filename: string;
@@ -16,6 +24,11 @@ interface UploadResult {
   success: boolean;
   imageUrl?: string;
   error?: string;
+  requiresConfirmation?: boolean;
+  suggestions?: SkuSuggestion[];
+  derivedSku?: string;
+  matchMethod?: string;
+  wasAutoAssigned?: boolean;
 }
 
 const MAX_FILES_PER_BATCH = 10;
@@ -34,6 +47,7 @@ export function BulkFileUpload() {
   const [mappingMode, setMappingMode] = useState<"filename" | "csv">("filename");
   const [csvMapping, setCsvMapping] = useState<Map<string, string> | null>(null);
   const [replaceExisting, setReplaceExisting] = useState(false);
+  const [enableFuzzyMatch, setEnableFuzzyMatch] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [results, setResults] = useState<UploadResult[] | null>(null);
@@ -122,6 +136,40 @@ export function BulkFileUpload() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleRetrySuccess = (retryData: {
+    filename: string;
+    sku: string;
+    imageUrl: string;
+  }) => {
+    setResults((prev) => {
+      if (!prev) return prev;
+      return prev.map((result) =>
+        result.filename === retryData.filename
+          ? {
+              ...result,
+              success: true,
+              sku: retryData.sku,
+              imageUrl: retryData.imageUrl,
+              requiresConfirmation: false,
+              error: undefined,
+            }
+          : result
+      );
+    });
+
+    toast({
+      title: "Upload successful",
+      description: `${retryData.filename} → SKU: ${retryData.sku}`,
+    });
+  };
+
+  const dismissRetry = (filename: string) => {
+    setResults((prev) => {
+      if (!prev) return prev;
+      return prev.filter((result) => result.filename !== filename);
+    });
+  };
+
   /**
    * Upload a single file directly to Blob, then update DB
    * NO file bytes pass through Next.js API routes
@@ -163,7 +211,7 @@ export function BulkFileUpload() {
         handleUploadUrl: "/api/vendor/products/images/upload-token",
       });
 
-      // Update database via small JSON endpoint
+      // Update database via small JSON endpoint with fuzzy matching
       const updateResponse = await fetch("/api/vendor/products/images/update-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,6 +219,8 @@ export function BulkFileUpload() {
           sku,
           imageUrl: blob.url,
           replaceExisting,
+          filename: file.name,
+          allowFuzzyMatch: enableFuzzyMatch,
         }),
       });
 
@@ -186,14 +236,31 @@ export function BulkFileUpload() {
       }
 
       if (!updateResponse.ok) {
+        // Check if this is a 404 with suggestions
+        if (updateResponse.status === 404 && updateData.requiresConfirmation) {
+          return {
+            filename: file.name,
+            sku,
+            derivedSku: sku,
+            success: false,
+            requiresConfirmation: true,
+            suggestions: updateData.suggestions || [],
+            error: updateData.error,
+            imageUrl: blob.url, // Keep imageUrl for retry
+          };
+        }
+
         throw new Error(updateData.error || `HTTP ${updateResponse.status}`);
       }
 
       return {
         filename: file.name,
-        sku,
+        sku: updateData.sku,
+        derivedSku: sku,
         success: true,
         imageUrl: blob.url,
+        matchMethod: updateData.matchMethod,
+        wasAutoAssigned: updateData.wasAutoAssigned,
       };
     } catch (error) {
       console.error(`[BULK_UPLOAD] Error uploading ${file.name}:`, error);
@@ -396,19 +463,36 @@ export function BulkFileUpload() {
       )}
 
       {/* Options */}
-      <div className="flex items-center justify-between border rounded-md p-3">
-        <div className="space-y-0.5">
-          <Label htmlFor="replace-existing">Replace Existing Images</Label>
-          <p className="text-xs text-muted-foreground">
-            Overwrite images that are already set for products
-          </p>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between border rounded-md p-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="replace-existing">Replace Existing Images</Label>
+            <p className="text-xs text-muted-foreground">
+              Overwrite images that are already set for products
+            </p>
+          </div>
+          <Switch
+            id="replace-existing"
+            checked={replaceExisting}
+            onCheckedChange={setReplaceExisting}
+            disabled={isUploading}
+          />
         </div>
-        <Switch
-          id="replace-existing"
-          checked={replaceExisting}
-          onCheckedChange={setReplaceExisting}
-          disabled={isUploading}
-        />
+
+        <div className="flex items-center justify-between border rounded-md p-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="fuzzy-match">Smart SKU Matching</Label>
+            <p className="text-xs text-muted-foreground">
+              Auto-fix minor filename differences (e.g., spaces, copy, final)
+            </p>
+          </div>
+          <Switch
+            id="fuzzy-match"
+            checked={enableFuzzyMatch}
+            onCheckedChange={setEnableFuzzyMatch}
+            disabled={isUploading}
+          />
+        </div>
       </div>
 
       {/* Upload Button */}
@@ -436,39 +520,71 @@ export function BulkFileUpload() {
         <div className="space-y-3 border-t pt-6">
           <h3 className="font-semibold">Upload Results</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {results.map((result, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-md border ${
-                  result.success
-                    ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
-                    : "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  {result.success ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 text-sm space-y-1">
-                    <p className="font-medium">
-                      {result.filename} → SKU: {result.sku}
-                    </p>
-                    {result.success && result.imageUrl && (
-                      <p className="text-green-700 dark:text-green-300 text-xs">
-                        ✓ Uploaded successfully
-                      </p>
+            {results.map((result, index) => {
+              // Show retry UI for failed uploads with suggestions
+              if (!result.success && result.requiresConfirmation && result.suggestions) {
+                return (
+                  <FailedUploadRetry
+                    key={index}
+                    filename={result.filename}
+                    derivedSku={result.derivedSku || result.sku}
+                    originalError={result.error || "Product not found"}
+                    suggestions={result.suggestions}
+                    imageUrl={result.imageUrl || ""}
+                    replaceExisting={replaceExisting}
+                    onRetrySuccess={handleRetrySuccess}
+                    onDismiss={() => dismissRetry(result.filename)}
+                  />
+                );
+              }
+
+              // Show standard success/error result
+              return (
+                <div
+                  key={index}
+                  className={`p-3 rounded-md border ${
+                    result.success
+                      ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
+                      : "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {result.success ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     )}
-                    {!result.success && result.error && (
-                      <p className="text-red-700 dark:text-red-300 text-xs">
-                        ✗ {result.error}
+                    <div className="flex-1 text-sm space-y-1">
+                      <p className="font-medium">
+                        {result.filename} → SKU: {result.sku}
                       </p>
-                    )}
+                      {result.success && result.imageUrl && (
+                        <>
+                          <p className="text-green-700 dark:text-green-300 text-xs">
+                            ✓ Uploaded successfully
+                            {result.wasAutoAssigned && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                                ({result.matchMethod === "normalized" ? "normalized match" : "fuzzy match"})
+                              </span>
+                            )}
+                          </p>
+                          {result.derivedSku && result.derivedSku !== result.sku && (
+                            <p className="text-xs text-green-600 dark:text-green-400">
+                              Derived: {result.derivedSku} → Matched: {result.sku}
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {!result.success && result.error && (
+                        <p className="text-red-700 dark:text-red-300 text-xs">
+                          ✗ {result.error}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
