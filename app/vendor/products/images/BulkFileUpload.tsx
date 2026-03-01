@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { parseImageCsv } from "@/lib/csv-image-parser";
+import { upload } from "@vercel/blob/client";
 
 interface UploadResult {
   filename: string;
@@ -17,9 +18,15 @@ interface UploadResult {
   error?: string;
 }
 
-const MAX_FILES_PER_BATCH = 10; // Practical limit for server uploads
+const MAX_FILES_PER_BATCH = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_CONCURRENT_UPLOADS = 3; // Limit concurrent uploads
+
+function extractSkuFromFilename(filename: string): string {
+  // Remove file extension and return as SKU
+  return filename.replace(/\.(jpg|jpeg|png|webp)$/i, "");
+}
 
 export function BulkFileUpload() {
   const { toast } = useToast();
@@ -115,6 +122,93 @@ export function BulkFileUpload() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  /**
+   * Upload a single file directly to Blob, then update DB
+   * NO file bytes pass through Next.js API routes
+   * Uses secure handleUpload pattern (token NOT exposed to browser)
+   */
+  const uploadSingleFile = async (
+    file: File,
+    vendorId: string
+  ): Promise<UploadResult> => {
+    let sku = "";
+    try {
+      // Determine SKU based on mapping mode
+      if (mappingMode === "csv" && csvMapping) {
+        const mappedSku = csvMapping.get(file.name);
+        if (!mappedSku) {
+          return {
+            filename: file.name,
+            sku: "",
+            success: false,
+            error: "SKU not found in CSV mapping",
+          };
+        }
+        sku = mappedSku;
+      } else {
+        // filename mode: extract SKU from filename
+        sku = extractSkuFromFilename(file.name);
+      }
+
+      // Construct blob path: vendors/{vendorId}/products/{sku}.{ext}
+      // This path will be validated server-side in handleUpload
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const blobPath = `vendors/${vendorId}/products/${sku}.${ext}`;
+
+      // Upload directly to Blob using secure handleUpload pattern
+      // handleUploadUrl calls our endpoint which uses handleUpload()
+      // This does NOT expose BLOB_READ_WRITE_TOKEN to browser
+      const blob = await upload(blobPath, file, {
+        access: "public",
+        handleUploadUrl: "/api/vendor/products/images/upload-token",
+      });
+
+      // Update database via small JSON endpoint
+      const updateResponse = await fetch("/api/vendor/products/images/update-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku,
+          imageUrl: blob.url,
+          replaceExisting,
+        }),
+      });
+
+      // Robust error handling - check content type
+      const contentType = updateResponse.headers.get("content-type");
+      let updateData: any;
+
+      if (contentType?.includes("application/json")) {
+        updateData = await updateResponse.json();
+      } else {
+        const text = await updateResponse.text();
+        throw new Error(`Server error (${updateResponse.status}): ${text.substring(0, 200)}`);
+      }
+
+      if (!updateResponse.ok) {
+        throw new Error(updateData.error || `HTTP ${updateResponse.status}`);
+      }
+
+      return {
+        filename: file.name,
+        sku,
+        success: true,
+        imageUrl: blob.url,
+      };
+    } catch (error) {
+      console.error(`[BULK_UPLOAD] Error uploading ${file.name}:`, error);
+      return {
+        filename: file.name,
+        sku: sku || extractSkuFromFilename(file.name),
+        success: false,
+        error: error instanceof Error ? error.message : "Upload failed",
+      };
+    }
+  };
+
+  /**
+   * Upload files with controlled concurrency (max 3 at a time)
+   */
   const handleUpload = async () => {
     if (files.length === 0) {
       toast({
@@ -139,51 +233,48 @@ export function BulkFileUpload() {
     setUploadProgress({ current: 0, total: files.length });
 
     try {
-      // Build FormData for server-side upload
-      const formData = new FormData();
+      // Get vendorId for blob path construction (tiny JSON response)
+      const vendorIdResponse = await fetch("/api/vendor/products/images/vendor-id");
 
-      // Add files
-      files.forEach((file) => {
-        formData.append("files", file);
-      });
-
-      // Add metadata
-      formData.append("mappingMode", mappingMode);
-      formData.append("replaceExisting", replaceExisting.toString());
-
-      // Add CSV mapping if in CSV mode
-      if (mappingMode === "csv" && csvMapping) {
-        const mappingArray = Array.from(csvMapping.entries()).map(
-          ([filename, sku]) => ({ filename, sku })
-        );
-        formData.append("mapping", JSON.stringify(mappingArray));
-      }
-
-      // Upload to server-side API route
-      const response = await fetch("/api/vendor/products/images/bulk-upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      // Robust error handling - check content type
-      let data: any;
-      const contentType = response.headers.get("content-type");
+      const contentType = vendorIdResponse.headers.get("content-type");
+      let vendorData: any;
 
       if (contentType?.includes("application/json")) {
-        data = await response.json();
+        vendorData = await vendorIdResponse.json();
       } else {
-        const text = await response.text();
-        throw new Error(`Server error (${response.status}): ${text.substring(0, 200)}`);
+        const text = await vendorIdResponse.text();
+        throw new Error(`Server error (${vendorIdResponse.status}): ${text.substring(0, 200)}`);
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
+      if (!vendorIdResponse.ok) {
+        throw new Error(vendorData.error || "Failed to get vendor ID");
       }
 
-      setResults(data.results || []);
+      const { vendorId } = vendorData;
 
-      const successCount = data.successCount || 0;
-      const failureCount = data.failureCount || 0;
+      // Upload files with controlled concurrency
+      const uploadResults: UploadResult[] = [];
+      let currentIndex = 0;
+
+      // Process files in batches of MAX_CONCURRENT_UPLOADS
+      while (currentIndex < files.length) {
+        const batch = files.slice(currentIndex, currentIndex + MAX_CONCURRENT_UPLOADS);
+
+        const batchResults = await Promise.all(
+          batch.map((file) => uploadSingleFile(file, vendorId))
+        );
+
+        uploadResults.push(...batchResults);
+        currentIndex += batch.length;
+
+        // Update progress
+        setUploadProgress({ current: currentIndex, total: files.length });
+      }
+
+      setResults(uploadResults);
+
+      const successCount = uploadResults.filter((r) => r.success).length;
+      const failureCount = uploadResults.filter((r) => !r.success).length;
 
       toast({
         title: "Upload complete",
@@ -330,7 +421,7 @@ export function BulkFileUpload() {
         {isUploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Uploading {files.length} images...
+            Uploading {uploadProgress?.current || 0}/{uploadProgress?.total || 0} images...
           </>
         ) : (
           <>
