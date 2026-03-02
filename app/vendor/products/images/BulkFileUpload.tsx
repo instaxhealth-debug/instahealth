@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,12 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { parseImageCsv } from "@/lib/csv-image-parser";
 import { upload } from "@vercel/blob/client";
 import { FailedUploadRetry } from "./FailedUploadRetry";
+import { SmartMatchPreview } from "./SmartMatchPreview";
+import {
+  findProductMatch,
+  type VendorProduct,
+  type ProductMatchResult,
+} from "@/lib/matching/product-image-matcher";
 
 interface SkuSuggestion {
   sku: string;
@@ -44,7 +50,7 @@ function extractSkuFromFilename(filename: string): string {
 export function BulkFileUpload() {
   const { toast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
-  const [mappingMode, setMappingMode] = useState<"filename" | "csv">("filename");
+  const [mappingMode, setMappingMode] = useState<"filename" | "csv" | "smart">("smart");
   const [csvMapping, setCsvMapping] = useState<Map<string, string> | null>(null);
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [enableFuzzyMatch, setEnableFuzzyMatch] = useState(true);
@@ -53,6 +59,12 @@ export function BulkFileUpload() {
   const [results, setResults] = useState<UploadResult[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+
+  // Smart Match state
+  const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [smartMatchResults, setSmartMatchResults] = useState<ProductMatchResult[] | null>(null);
+  const [smartMatchMapping, setSmartMatchMapping] = useState<Map<string, VendorProduct>>(new Map());
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -93,6 +105,81 @@ export function BulkFileUpload() {
 
     setFiles((prev) => [...prev, ...validFiles]);
     setResults(null);
+    setSmartMatchResults(null); // Reset smart match on new file selection
+  };
+
+  const fetchVendorProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    try {
+      const response = await fetch("/api/vendor/products");
+      if (!response.ok) {
+        throw new Error("Failed to fetch products");
+      }
+      const data = await response.json();
+      const products: VendorProduct[] = data.products.map((p: any) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        slug: p.slug,
+      }));
+      setVendorProducts(products);
+    } catch (error) {
+      toast({
+        title: "Failed to load products",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, [toast]);
+
+  const performSmartMatch = useCallback(() => {
+    const matchResults = files.map((file) =>
+      findProductMatch(file.name, vendorProducts)
+    );
+
+    setSmartMatchResults(matchResults);
+
+    // Pre-populate mapping with auto-accepted matches
+    const initialMapping = new Map<string, VendorProduct>();
+    matchResults.forEach((result) => {
+      if (result.autoAccept && result.suggestedProduct) {
+        initialMapping.set(result.filename, result.suggestedProduct);
+      }
+    });
+    setSmartMatchMapping(initialMapping);
+  }, [files, vendorProducts]);
+
+  // Fetch vendor products when Smart Match mode is selected
+  useEffect(() => {
+    if (mappingMode === "smart" && vendorProducts.length === 0) {
+      fetchVendorProducts();
+    }
+  }, [mappingMode, vendorProducts.length, fetchVendorProducts]);
+
+  // Trigger Smart Match when files are selected in Smart Match mode
+  useEffect(() => {
+    if (mappingMode === "smart" && files.length > 0 && vendorProducts.length > 0) {
+      performSmartMatch();
+    }
+  }, [files, vendorProducts, mappingMode, performSmartMatch]);
+
+  const handleSmartMatchUpdate = (filename: string, product: VendorProduct) => {
+    setSmartMatchMapping((prev) => new Map(prev).set(filename, product));
+  };
+
+  const handleSmartMatchConfirm = () => {
+    // Convert smart match mapping to proceed with upload
+    // This will be used in uploadSingleFile
+    handleUpload();
+  };
+
+  const handleSmartMatchCancel = () => {
+    setSmartMatchResults(null);
+    setSmartMatchMapping(new Map());
+    setFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleCsvMapping = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +269,19 @@ export function BulkFileUpload() {
     let sku = "";
     try {
       // Determine SKU based on mapping mode
-      if (mappingMode === "csv" && csvMapping) {
+      if (mappingMode === "smart") {
+        // Smart Match mode: use resolved product from mapping
+        const matchedProduct = smartMatchMapping.get(file.name);
+        if (!matchedProduct) {
+          return {
+            filename: file.name,
+            sku: "",
+            success: false,
+            error: "Product not resolved in Smart Match preview",
+          };
+        }
+        sku = matchedProduct.sku;
+      } else if (mappingMode === "csv" && csvMapping) {
         const mappedSku = csvMapping.get(file.name);
         if (!mappedSku) {
           return {
@@ -415,6 +514,19 @@ export function BulkFileUpload() {
             <input
               type="radio"
               name="mappingMode"
+              value="smart"
+              checked={mappingMode === "smart"}
+              onChange={(e) => setMappingMode("smart")}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-medium">
+              Smart Match <span className="text-green-600">(recommended)</span>
+            </span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="mappingMode"
               value="filename"
               checked={mappingMode === "filename"}
               onChange={(e) => setMappingMode("filename")}
@@ -434,6 +546,11 @@ export function BulkFileUpload() {
             <span className="text-sm">CSV Mapping</span>
           </label>
         </div>
+        {mappingMode === "smart" && (
+          <p className="text-xs text-muted-foreground">
+            Automatically matches filenames like &quot;epithalon.png&quot; to existing products using intelligent matching.
+          </p>
+        )}
       </div>
 
       {/* CSV Mapping Upload (only if CSV mode) */}
@@ -500,58 +617,75 @@ export function BulkFileUpload() {
         </div>
       )}
 
-      {/* Options */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between border rounded-md p-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="replace-existing">Replace Existing Images</Label>
-            <p className="text-xs text-muted-foreground">
-              Overwrite images that are already set for products
-            </p>
-          </div>
-          <Switch
-            id="replace-existing"
-            checked={replaceExisting}
-            onCheckedChange={setReplaceExisting}
-            disabled={isUploading}
-          />
-        </div>
+      {/* Smart Match Preview */}
+      {mappingMode === "smart" && smartMatchResults && !results && (
+        <SmartMatchPreview
+          matchResults={smartMatchResults}
+          allProducts={vendorProducts}
+          onMatchUpdate={handleSmartMatchUpdate}
+          onConfirm={handleSmartMatchConfirm}
+          onCancel={handleSmartMatchCancel}
+        />
+      )}
 
-        <div className="flex items-center justify-between border rounded-md p-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="fuzzy-match">Smart SKU Matching</Label>
-            <p className="text-xs text-muted-foreground">
-              Auto-fix minor filename differences (e.g., spaces, copy, final)
-            </p>
+      {/* Options (only show if not in Smart Match preview mode) */}
+      {!(mappingMode === "smart" && smartMatchResults && !results) && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border rounded-md p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="replace-existing">Replace Existing Images</Label>
+              <p className="text-xs text-muted-foreground">
+                Overwrite images that are already set for products
+              </p>
+            </div>
+            <Switch
+              id="replace-existing"
+              checked={replaceExisting}
+              onCheckedChange={setReplaceExisting}
+              disabled={isUploading}
+            />
           </div>
-          <Switch
-            id="fuzzy-match"
-            checked={enableFuzzyMatch}
-            onCheckedChange={setEnableFuzzyMatch}
-            disabled={isUploading}
-          />
-        </div>
-      </div>
 
-      {/* Upload Button */}
-      <Button
-        onClick={handleUpload}
-        disabled={isUploading || files.length === 0}
-        className="w-full"
-        size="lg"
-      >
-        {isUploading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Uploading {uploadProgress?.current || 0}/{uploadProgress?.total || 0} images...
-          </>
-        ) : (
-          <>
-            <Upload className="mr-2 h-4 w-4" />
-            Upload {files.length} Images
-          </>
-        )}
-      </Button>
+          {mappingMode !== "smart" && (
+            <div className="flex items-center justify-between border rounded-md p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="fuzzy-match">Smart SKU Matching</Label>
+                <p className="text-xs text-muted-foreground">
+                  Auto-fix minor filename differences (e.g., spaces, copy, final)
+                </p>
+              </div>
+              <Switch
+                id="fuzzy-match"
+                checked={enableFuzzyMatch}
+                onCheckedChange={setEnableFuzzyMatch}
+                disabled={isUploading}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Upload Button (only show if not in Smart Match preview mode) */}
+      {!(mappingMode === "smart" && smartMatchResults && !results) && (
+        <Button
+          onClick={handleUpload}
+          disabled={isUploading || files.length === 0 || (mappingMode === "csv" && !csvMapping)}
+          className="w-full"
+          size="lg"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Uploading {uploadProgress?.current || 0}/{uploadProgress?.total || 0} images...
+            </>
+          ) : (
+            <>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload {files.length} Images
+            </>
+          )}
+        </Button>
+      )}
 
       {/* Results */}
       {results && (
