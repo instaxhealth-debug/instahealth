@@ -41,7 +41,8 @@ interface SmartMatchRow {
   file: File;
   filename: string;
   key: string;
-  resolvedSku: string | null;
+  resolvedProductId: string | null;  // Product ID for dropdown value
+  resolvedSku: string | null;        // Actual SKU for upload
   confidence: "high" | "medium" | "low" | "none";
   score: number;
 }
@@ -146,13 +147,17 @@ export function BulkFileUpload() {
     const rows: SmartMatchRow[] = files.map((file) => {
       const matchResult = findProductMatch(file.name, vendorProducts);
 
+      // Auto-accept: populate both product ID and SKU
+      const autoAcceptProduct = matchResult.autoAccept && matchResult.suggestedProduct
+        ? matchResult.suggestedProduct
+        : null;
+
       return {
         file,
         filename: file.name,
         key: matchResult.candidateKey,
-        resolvedSku: matchResult.autoAccept && matchResult.suggestedSku
-          ? matchResult.suggestedSku
-          : null,
+        resolvedProductId: autoAcceptProduct?.id || null,
+        resolvedSku: autoAcceptProduct?.sku || null,
         confidence: matchResult.confidence,
         score: matchResult.score,
       };
@@ -175,25 +180,54 @@ export function BulkFileUpload() {
     }
   }, [files, vendorProducts, mappingMode, performSmartMatch]);
 
-  const handleSmartMatchUpdate = (filename: string, sku: string) => {
+  const handleSmartMatchUpdate = (filename: string, productId: string) => {
+    // Find the product by ID to get its SKU
+    const product = vendorProducts.find((p) => p.id === productId);
+
+    if (!product) {
+      console.error("[Smart Match] Product not found for ID:", productId);
+      return;
+    }
+
     setSmartMatchRows((prev) =>
       prev.map((row) =>
-        row.filename === filename ? { ...row, resolvedSku: sku } : row
+        row.filename === filename
+          ? { ...row, resolvedProductId: productId, resolvedSku: product.sku }
+          : row
       )
     );
   };
 
   const handleSmartMatchConfirm = () => {
-    // All rows must have resolvedSku before upload
-    const allResolved = smartMatchRows.every((row) => row.resolvedSku !== null);
-    if (!allResolved) {
+    // HARD GUARD: All rows must have BOTH resolvedProductId AND resolvedSku
+    const unresolvedRows = smartMatchRows.filter(
+      (row) => !row.resolvedProductId || !row.resolvedSku
+    );
+
+    if (unresolvedRows.length > 0) {
+      const filenames = unresolvedRows.map((r) => r.filename).join(", ");
       toast({
         title: "Cannot upload",
-        description: "All files must have a resolved product match",
+        description: `All files must have a valid product with SKU. Missing SKU for: ${filenames}`,
         variant: "destructive",
       });
       return;
     }
+
+    // Additional check: verify all SKUs are non-empty strings
+    const invalidSkuRows = smartMatchRows.filter(
+      (row) => !row.resolvedSku || row.resolvedSku.trim() === ""
+    );
+
+    if (invalidSkuRows.length > 0) {
+      toast({
+        title: "Invalid SKU",
+        description: "Some matched products have empty SKUs. Fix product SKU or use manual override.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     handleUpload();
   };
 
@@ -292,16 +326,16 @@ export function BulkFileUpload() {
     try {
       // Determine SKU based on mapping mode
       if (mappingMode === "smart") {
-        // Smart Match mode: use resolved SKU passed from preview
-        if (!resolvedSku) {
+        // HARD GUARD: Smart Match mode requires valid resolvedSku
+        if (!resolvedSku || resolvedSku.trim() === "") {
           return {
             filename: file.name,
             sku: "",
             success: false,
-            error: "Product not resolved in Smart Match preview",
+            error: "No SKU found for matched product. Fix product SKU or use manual override.",
           };
         }
-        sku = resolvedSku;
+        sku = resolvedSku.trim();
       } else if (mappingMode === "csv" && csvMapping) {
         const mappedSku = csvMapping.get(file.name);
         if (!mappedSku) {

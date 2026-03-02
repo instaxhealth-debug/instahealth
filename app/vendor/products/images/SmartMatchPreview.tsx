@@ -11,7 +11,8 @@ interface SmartMatchRow {
   file: File;
   filename: string;
   key: string;
-  resolvedSku: string | null;
+  resolvedProductId: string | null;  // Product ID for dropdown value
+  resolvedSku: string | null;        // Actual SKU for upload
   confidence: "high" | "medium" | "low" | "none";
   score: number;
 }
@@ -19,7 +20,7 @@ interface SmartMatchRow {
 interface SmartMatchPreviewProps {
   smartMatchRows: SmartMatchRow[];
   allProducts: VendorProduct[];
-  onMatchUpdate: (filename: string, sku: string) => void;
+  onMatchUpdate: (filename: string, productId: string) => void;  // Now passes product ID
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -33,8 +34,8 @@ export function SmartMatchPreview({
 }: SmartMatchPreviewProps) {
   const [searchTerms, setSearchTerms] = useState<Map<string, string>>(new Map());
 
-  const handleProductSelect = (filename: string, sku: string) => {
-    onMatchUpdate(filename, sku);
+  const handleProductSelect = (filename: string, productId: string) => {
+    onMatchUpdate(filename, productId);
   };
 
   const handleSearchChange = (filename: string, term: string) => {
@@ -60,13 +61,14 @@ export function SmartMatchPreview({
     );
   };
 
+  // ✅ Resolved ONLY if both productId AND sku exist (real SKU, not just label)
   const allResolved = useMemo(
-    () => smartMatchRows.every((row) => row.resolvedSku !== null),
+    () => smartMatchRows.every((row) => row.resolvedProductId && row.resolvedSku && row.resolvedSku.trim() !== ""),
     [smartMatchRows]
   );
 
   const resolvedCount = useMemo(
-    () => smartMatchRows.filter((row) => row.resolvedSku !== null).length,
+    () => smartMatchRows.filter((row) => row.resolvedProductId && row.resolvedSku && row.resolvedSku.trim() !== "").length,
     [smartMatchRows]
   );
 
@@ -144,10 +146,10 @@ export function SmartMatchPreview({
             <tbody>
               {smartMatchRows.map((row) => {
                 const topMatches = getTopMatches(row);
-                const selectedProduct = row.resolvedSku
-                  ? allProducts.find((p) => p.sku === row.resolvedSku)
+                const selectedProduct = row.resolvedProductId
+                  ? allProducts.find((p) => p.id === row.resolvedProductId)
                   : null;
-                const isAutoAccepted = row.resolvedSku !== null && row.confidence === "high";
+                const isAutoAccepted = row.resolvedProductId !== null && row.resolvedSku !== null && row.confidence === "high";
 
                 return (
                   <tr key={row.filename} className="border-t hover:bg-muted/50">
@@ -171,7 +173,7 @@ export function SmartMatchPreview({
                     {/* Suggested Match Dropdown */}
                     <td className="p-3">
                       <select
-                        value={row.resolvedSku || ""}
+                        value={row.resolvedProductId || ""}
                         onChange={(e) => {
                           if (e.target.value) {
                             handleProductSelect(row.filename, e.target.value);
@@ -179,23 +181,28 @@ export function SmartMatchPreview({
                         }}
                         className="w-full text-sm border rounded-md p-2 bg-background"
                       >
-                        {!row.resolvedSku && (
+                        {!row.resolvedProductId && (
                           <option value="">Select a product...</option>
                         )}
                         {topMatches.map((product) => (
-                          <option key={product.id} value={product.sku}>
-                            {product.name} ({product.sku})
+                          <option key={product.id} value={product.id}>
+                            {product.name} ({product.sku || "NO SKU"})
                           </option>
                         ))}
-                        {topMatches.length === 0 && row.resolvedSku && (
-                          <option value={row.resolvedSku}>
-                            {selectedProduct?.name || row.resolvedSku} ({row.resolvedSku})
+                        {topMatches.length === 0 && row.resolvedProductId && (
+                          <option value={row.resolvedProductId}>
+                            {selectedProduct?.name || "Unknown"} ({row.resolvedSku || "NO SKU"})
                           </option>
                         )}
                       </select>
                       {selectedProduct && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          SKU: {selectedProduct.sku}
+                          SKU: {selectedProduct.sku || "⚠️ NO SKU"}
+                        </div>
+                      )}
+                      {row.resolvedProductId && (!row.resolvedSku || row.resolvedSku.trim() === "") && (
+                        <div className="text-xs text-red-600 mt-1">
+                          ⚠️ This product has no SKU
                         </div>
                       )}
                     </td>
@@ -228,14 +235,14 @@ export function SmartMatchPreview({
                               <button
                                 key={product.id}
                                 onClick={() => {
-                                  handleProductSelect(row.filename, product.sku);
+                                  handleProductSelect(row.filename, product.id);
                                   handleSearchChange(row.filename, "");
                                 }}
                                 className="w-full text-left p-2 hover:bg-muted text-sm border-b last:border-b-0"
                               >
                                 <div className="font-medium">{product.name}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  SKU: {product.sku}
+                                  SKU: {product.sku || "⚠️ NO SKU"}
                                 </div>
                               </button>
                             ))}
