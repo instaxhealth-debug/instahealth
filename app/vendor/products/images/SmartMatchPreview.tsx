@@ -46,10 +46,17 @@ export function SmartMatchPreview({
     if (!term) return allProducts.slice(0, 10); // Show first 10 if no search
 
     return allProducts.filter(
-      (p) =>
-        p.name.toLowerCase().includes(term) ||
-        p.sku.toLowerCase().includes(term) ||
-        p.slug?.toLowerCase().includes(term)
+      (p) => {
+        const nameLower = (p.name ?? "").toLowerCase();
+        const skuLower = (p.sku ?? "").toLowerCase();
+        const slugLower = (p.slug ?? "").toLowerCase();
+
+        return (
+          nameLower.includes(term) ||
+          skuLower.includes(term) ||
+          slugLower.includes(term)
+        );
+      }
     );
   };
 
@@ -81,8 +88,9 @@ export function SmartMatchPreview({
     const normalized = row.key.toLowerCase();
 
     const scored = allProducts.map((p) => {
-      const skuNorm = p.sku.toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
-      const nameNorm = p.name.toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
+      // NULL-SAFE normalization
+      const skuNorm = (p.sku ?? "").toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
+      const nameNorm = (p.name ?? "").toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
 
       let score = 0;
       if (skuNorm.includes(normalized) || normalized.includes(skuNorm)) score += 0.8;

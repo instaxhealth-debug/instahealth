@@ -31,17 +31,23 @@ export interface ProductMatchResult {
 }
 
 /**
- * Normalize a string for matching:
+ * Normalize a string for matching (NULL-SAFE):
+ * - handles null/undefined values
+ * - converts to string
  * - lowercase
  * - remove file extensions
  * - replace non-alphanumeric with spaces
  * - collapse whitespace
  * - trim
  */
-export function normalizeForMatching(input: string): string {
+export function normalizeForMatching(input?: string | null): string {
+  // Defensive: handle null, undefined, or non-string values
   if (!input) return "";
 
-  return input
+  const safe = String(input);
+  if (!safe) return "";
+
+  return safe
     .toLowerCase()
     .replace(/\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff?)$/i, "")
     .replace(/[^a-z0-9]+/g, " ")
@@ -50,10 +56,11 @@ export function normalizeForMatching(input: string): string {
 }
 
 /**
- * Tokenize a normalized string into unique words
+ * Tokenize a normalized string into unique words (NULL-SAFE)
  */
-function tokenize(text: string): Set<string> {
+function tokenize(text?: string | null): Set<string> {
   const normalized = normalizeForMatching(text);
+  if (!normalized) return new Set<string>();
   return new Set(normalized.split(" ").filter((token) => token.length > 0));
 }
 
