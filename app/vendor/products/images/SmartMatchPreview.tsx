@@ -1,42 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, Check, AlertCircle } from "lucide-react";
-import type {
-  ProductMatchResult,
-  VendorProduct,
-} from "@/lib/matching/product-image-matcher";
+import type { VendorProduct } from "@/lib/matching/product-image-matcher";
+
+interface SmartMatchRow {
+  file: File;
+  filename: string;
+  key: string;
+  resolvedSku: string | null;
+  confidence: "high" | "medium" | "low" | "none";
+  score: number;
+}
 
 interface SmartMatchPreviewProps {
-  matchResults: ProductMatchResult[];
+  smartMatchRows: SmartMatchRow[];
   allProducts: VendorProduct[];
-  onMatchUpdate: (filename: string, selectedProduct: VendorProduct) => void;
+  onMatchUpdate: (filename: string, sku: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function SmartMatchPreview({
-  matchResults,
+  smartMatchRows,
   allProducts,
   onMatchUpdate,
   onConfirm,
   onCancel,
 }: SmartMatchPreviewProps) {
   const [searchTerms, setSearchTerms] = useState<Map<string, string>>(new Map());
-  const [selectedProducts, setSelectedProducts] = useState<Map<string, VendorProduct>>(
-    new Map(
-      matchResults
-        .filter((r) => r.suggestedProduct)
-        .map((r) => [r.filename, r.suggestedProduct!])
-    )
-  );
 
-  const handleProductSelect = (filename: string, product: VendorProduct) => {
-    setSelectedProducts((prev) => new Map(prev).set(filename, product));
-    onMatchUpdate(filename, product);
+  const handleProductSelect = (filename: string, sku: string) => {
+    onMatchUpdate(filename, sku);
   };
 
   const handleSearchChange = (filename: string, term: string) => {
@@ -55,7 +53,15 @@ export function SmartMatchPreview({
     );
   };
 
-  const allResolved = matchResults.every((r) => selectedProducts.has(r.filename));
+  const allResolved = useMemo(
+    () => smartMatchRows.every((row) => row.resolvedSku !== null),
+    [smartMatchRows]
+  );
+
+  const resolvedCount = useMemo(
+    () => smartMatchRows.filter((row) => row.resolvedSku !== null).length,
+    [smartMatchRows]
+  );
 
   const getConfidenceBadge = (confidence: string) => {
     switch (confidence) {
@@ -68,6 +74,29 @@ export function SmartMatchPreview({
       default:
         return <Badge variant="destructive">None</Badge>;
     }
+  };
+
+  // Get top 3 matching products for each row based on normalized name/sku matching
+  const getTopMatches = (row: SmartMatchRow): VendorProduct[] => {
+    const normalized = row.key.toLowerCase();
+
+    const scored = allProducts.map((p) => {
+      const skuNorm = p.sku.toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
+      const nameNorm = p.name.toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
+
+      let score = 0;
+      if (skuNorm.includes(normalized) || normalized.includes(skuNorm)) score += 0.8;
+      if (nameNorm.includes(normalized) || normalized.includes(nameNorm)) score += 0.6;
+      if (skuNorm === normalized || nameNorm === normalized) score = 1.0;
+
+      return { product: p, score };
+    });
+
+    return scored
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((s) => s.product);
   };
 
   return (
@@ -86,7 +115,7 @@ export function SmartMatchPreview({
             <AlertCircle className="h-5 w-5 text-orange-600" />
           )}
           <span className="text-sm">
-            {selectedProducts.size}/{matchResults.length} resolved
+            {resolvedCount}/{smartMatchRows.length} resolved
           </span>
         </div>
       </div>
@@ -105,17 +134,20 @@ export function SmartMatchPreview({
               </tr>
             </thead>
             <tbody>
-              {matchResults.map((result) => {
-                const selectedProduct = selectedProducts.get(result.filename);
-                const isAutoAccepted = result.autoAccept;
+              {smartMatchRows.map((row) => {
+                const topMatches = getTopMatches(row);
+                const selectedProduct = row.resolvedSku
+                  ? allProducts.find((p) => p.sku === row.resolvedSku)
+                  : null;
+                const isAutoAccepted = row.resolvedSku !== null && row.confidence === "high";
 
                 return (
-                  <tr key={result.filename} className="border-t hover:bg-muted/50">
+                  <tr key={row.filename} className="border-t hover:bg-muted/50">
                     {/* Filename */}
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate max-w-[200px]">
-                          {result.filename}
+                          {row.filename}
                         </span>
                         {isAutoAccepted && (
                           <Badge variant="outline" className="text-xs">
@@ -124,31 +156,34 @@ export function SmartMatchPreview({
                         )}
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        Key: {result.candidateKey}
+                        Key: {row.key}
                       </span>
                     </td>
 
                     {/* Suggested Match Dropdown */}
                     <td className="p-3">
                       <select
-                        value={selectedProduct?.id || ""}
+                        value={row.resolvedSku || ""}
                         onChange={(e) => {
-                          const product = allProducts.find((p) => p.id === e.target.value);
-                          if (product) {
-                            handleProductSelect(result.filename, product);
+                          if (e.target.value) {
+                            handleProductSelect(row.filename, e.target.value);
                           }
                         }}
                         className="w-full text-sm border rounded-md p-2 bg-background"
                       >
-                        {!selectedProduct && (
+                        {!row.resolvedSku && (
                           <option value="">Select a product...</option>
                         )}
-                        {result.topCandidates.map((candidate) => (
-                          <option key={candidate.product.id} value={candidate.product.id}>
-                            {candidate.product.name} ({candidate.product.sku}) -{" "}
-                            {(candidate.score * 100).toFixed(0)}%
+                        {topMatches.map((product) => (
+                          <option key={product.id} value={product.sku}>
+                            {product.name} ({product.sku})
                           </option>
                         ))}
+                        {topMatches.length === 0 && row.resolvedSku && (
+                          <option value={row.resolvedSku}>
+                            {selectedProduct?.name || row.resolvedSku} ({row.resolvedSku})
+                          </option>
+                        )}
                       </select>
                       {selectedProduct && (
                         <div className="text-xs text-muted-foreground mt-1">
@@ -158,12 +193,12 @@ export function SmartMatchPreview({
                     </td>
 
                     {/* Confidence Badge */}
-                    <td className="p-3">{getConfidenceBadge(result.confidence)}</td>
+                    <td className="p-3">{getConfidenceBadge(row.confidence)}</td>
 
                     {/* Score */}
                     <td className="p-3">
                       <span className="text-sm font-mono">
-                        {(result.score * 100).toFixed(0)}%
+                        {(row.score * 100).toFixed(0)}%
                       </span>
                     </td>
 
@@ -173,20 +208,20 @@ export function SmartMatchPreview({
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Search products..."
-                          value={searchTerms.get(result.filename) || ""}
+                          value={searchTerms.get(row.filename) || ""}
                           onChange={(e) =>
-                            handleSearchChange(result.filename, e.target.value)
+                            handleSearchChange(row.filename, e.target.value)
                           }
                           className="pl-8 text-sm h-9"
                         />
-                        {searchTerms.get(result.filename) && (
+                        {searchTerms.get(row.filename) && (
                           <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                            {getFilteredProducts(result.filename).map((product) => (
+                            {getFilteredProducts(row.filename).map((product) => (
                               <button
                                 key={product.id}
                                 onClick={() => {
-                                  handleProductSelect(result.filename, product);
-                                  handleSearchChange(result.filename, "");
+                                  handleProductSelect(row.filename, product.sku);
+                                  handleSearchChange(row.filename, "");
                                 }}
                                 className="w-full text-left p-2 hover:bg-muted text-sm border-b last:border-b-0"
                               >
@@ -196,7 +231,7 @@ export function SmartMatchPreview({
                                 </div>
                               </button>
                             ))}
-                            {getFilteredProducts(result.filename).length === 0 && (
+                            {getFilteredProducts(row.filename).length === 0 && (
                               <div className="p-3 text-sm text-muted-foreground text-center">
                                 No products found
                               </div>

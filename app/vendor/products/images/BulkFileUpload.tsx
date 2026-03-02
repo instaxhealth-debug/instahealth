@@ -37,6 +37,15 @@ interface UploadResult {
   wasAutoAssigned?: boolean;
 }
 
+interface SmartMatchRow {
+  file: File;
+  filename: string;
+  key: string;
+  resolvedSku: string | null;
+  confidence: "high" | "medium" | "low" | "none";
+  score: number;
+}
+
 const MAX_FILES_PER_BATCH = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -63,8 +72,7 @@ export function BulkFileUpload() {
   // Smart Match state
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [smartMatchResults, setSmartMatchResults] = useState<ProductMatchResult[] | null>(null);
-  const [smartMatchMapping, setSmartMatchMapping] = useState<Map<string, VendorProduct>>(new Map());
+  const [smartMatchRows, setSmartMatchRows] = useState<SmartMatchRow[]>([]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -105,7 +113,7 @@ export function BulkFileUpload() {
 
     setFiles((prev) => [...prev, ...validFiles]);
     setResults(null);
-    setSmartMatchResults(null); // Reset smart match on new file selection
+    setSmartMatchRows([]); // Reset smart match on new file selection
   };
 
   const fetchVendorProducts = useCallback(async () => {
@@ -135,20 +143,22 @@ export function BulkFileUpload() {
   }, [toast]);
 
   const performSmartMatch = useCallback(() => {
-    const matchResults = files.map((file) =>
-      findProductMatch(file.name, vendorProducts)
-    );
+    const rows: SmartMatchRow[] = files.map((file) => {
+      const matchResult = findProductMatch(file.name, vendorProducts);
 
-    setSmartMatchResults(matchResults);
-
-    // Pre-populate mapping with auto-accepted matches
-    const initialMapping = new Map<string, VendorProduct>();
-    matchResults.forEach((result) => {
-      if (result.autoAccept && result.suggestedProduct) {
-        initialMapping.set(result.filename, result.suggestedProduct);
-      }
+      return {
+        file,
+        filename: file.name,
+        key: matchResult.candidateKey,
+        resolvedSku: matchResult.autoAccept && matchResult.suggestedSku
+          ? matchResult.suggestedSku
+          : null,
+        confidence: matchResult.confidence,
+        score: matchResult.score,
+      };
     });
-    setSmartMatchMapping(initialMapping);
+
+    setSmartMatchRows(rows);
   }, [files, vendorProducts]);
 
   // Fetch vendor products when Smart Match mode is selected
@@ -165,19 +175,30 @@ export function BulkFileUpload() {
     }
   }, [files, vendorProducts, mappingMode, performSmartMatch]);
 
-  const handleSmartMatchUpdate = (filename: string, product: VendorProduct) => {
-    setSmartMatchMapping((prev) => new Map(prev).set(filename, product));
+  const handleSmartMatchUpdate = (filename: string, sku: string) => {
+    setSmartMatchRows((prev) =>
+      prev.map((row) =>
+        row.filename === filename ? { ...row, resolvedSku: sku } : row
+      )
+    );
   };
 
   const handleSmartMatchConfirm = () => {
-    // Convert smart match mapping to proceed with upload
-    // This will be used in uploadSingleFile
+    // All rows must have resolvedSku before upload
+    const allResolved = smartMatchRows.every((row) => row.resolvedSku !== null);
+    if (!allResolved) {
+      toast({
+        title: "Cannot upload",
+        description: "All files must have a resolved product match",
+        variant: "destructive",
+      });
+      return;
+    }
     handleUpload();
   };
 
   const handleSmartMatchCancel = () => {
-    setSmartMatchResults(null);
-    setSmartMatchMapping(new Map());
+    setSmartMatchRows([]);
     setFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -264,15 +285,15 @@ export function BulkFileUpload() {
    */
   const uploadSingleFile = async (
     file: File,
-    vendorId: string
+    vendorId: string,
+    resolvedSku?: string | null
   ): Promise<UploadResult> => {
     let sku = "";
     try {
       // Determine SKU based on mapping mode
       if (mappingMode === "smart") {
-        // Smart Match mode: use resolved product from mapping
-        const matchedProduct = smartMatchMapping.get(file.name);
-        if (!matchedProduct) {
+        // Smart Match mode: use resolved SKU passed from preview
+        if (!resolvedSku) {
           return {
             filename: file.name,
             sku: "",
@@ -280,7 +301,7 @@ export function BulkFileUpload() {
             error: "Product not resolved in Smart Match preview",
           };
         }
-        sku = matchedProduct.sku;
+        sku = resolvedSku;
       } else if (mappingMode === "csv" && csvMapping) {
         const mappedSku = csvMapping.get(file.name);
         if (!mappedSku) {
@@ -465,7 +486,13 @@ export function BulkFileUpload() {
         const batch = files.slice(currentIndex, currentIndex + MAX_CONCURRENT_UPLOADS);
 
         const batchResults = await Promise.all(
-          batch.map((file) => uploadSingleFile(file, vendorId))
+          batch.map((file) => {
+            // For Smart Match mode, get resolvedSku from smartMatchRows
+            const resolvedSku = mappingMode === "smart"
+              ? smartMatchRows.find((row) => row.filename === file.name)?.resolvedSku
+              : null;
+            return uploadSingleFile(file, vendorId, resolvedSku);
+          })
         );
 
         uploadResults.push(...batchResults);
@@ -618,9 +645,9 @@ export function BulkFileUpload() {
       )}
 
       {/* Smart Match Preview */}
-      {mappingMode === "smart" && smartMatchResults && !results && (
+      {mappingMode === "smart" && smartMatchRows.length > 0 && !results && (
         <SmartMatchPreview
-          matchResults={smartMatchResults}
+          smartMatchRows={smartMatchRows}
           allProducts={vendorProducts}
           onMatchUpdate={handleSmartMatchUpdate}
           onConfirm={handleSmartMatchConfirm}
@@ -629,7 +656,7 @@ export function BulkFileUpload() {
       )}
 
       {/* Options (only show if not in Smart Match preview mode) */}
-      {!(mappingMode === "smart" && smartMatchResults && !results) && (
+      {!(mappingMode === "smart" && smartMatchRows.length > 0 && !results) && (
         <div className="space-y-3">
           <div className="flex items-center justify-between border rounded-md p-3">
             <div className="space-y-0.5">
@@ -666,7 +693,7 @@ export function BulkFileUpload() {
       )}
 
       {/* Upload Button (only show if not in Smart Match preview mode) */}
-      {!(mappingMode === "smart" && smartMatchResults && !results) && (
+      {!(mappingMode === "smart" && smartMatchRows.length > 0 && !results) && (
         <Button
           onClick={handleUpload}
           disabled={isUploading || files.length === 0 || (mappingMode === "csv" && !csvMapping)}

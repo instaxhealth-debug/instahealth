@@ -63,7 +63,10 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteFromStorage, setDeleteFromStorage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -154,6 +157,60 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    if (!product || !form.imageUrl) return;
+
+    // Get SKU from first variant (for products) or use product ID as fallback
+    const sku = variants.length > 0 ? variants[0].sku : product.id;
+
+    if (!sku) {
+      toast({
+        title: "Cannot delete image",
+        description: "No SKU found for this product",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeletingImage(true);
+    try {
+      const res = await fetch("/api/vendor/products/images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku,
+          deleteBlob: deleteFromStorage,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to delete image");
+      }
+
+      updateForm({ imageUrl: "" });
+      setShowDeleteConfirm(false);
+      setDeleteFromStorage(false);
+
+      toast({
+        title: "Image deleted",
+        description: deleteFromStorage
+          ? "Image removed from product and storage"
+          : "Image removed from product",
+      });
+
+      router.refresh();
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingImage(false);
     }
   };
 
@@ -376,6 +433,16 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                 >
                   {isUploading ? "Uploading..." : "Upload Image"}
                 </Button>
+                {product && form.imageUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeletingImage}
+                  >
+                    Delete Image
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -394,6 +461,49 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
                   placeholder="https://... or /products/..."
                 />
               )}
+
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <div className="border rounded-lg p-4 bg-muted/50 space-y-3">
+                  <p className="text-sm font-medium">Delete product image?</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="deleteFromStorage"
+                      checked={deleteFromStorage}
+                      onChange={(e) => setDeleteFromStorage(e.target.checked)}
+                      className="rounded"
+                    />
+                    <label htmlFor="deleteFromStorage" className="text-sm cursor-pointer">
+                      Also delete from storage (permanent)
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteImage}
+                      disabled={isDeletingImage}
+                    >
+                      {isDeletingImage ? "Deleting..." : "Confirm Delete"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setDeleteFromStorage(false);
+                      }}
+                      disabled={isDeletingImage}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {fieldErrors.imageUrl && (
                 <p className="text-xs text-red-600">{fieldErrors.imageUrl.join(", ")}</p>
               )}
