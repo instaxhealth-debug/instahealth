@@ -17,6 +17,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Parse request body for handleUpload
     const body = (await request.json()) as HandleUploadBody;
 
+    // Parse client payload to get replaceExisting flag
+    let replaceExisting = false;
+    try {
+      // body.payload can be string or complex object
+      // If it's in the initial request, it will be clientPayload string
+      const payload = body as any;
+      if (payload.clientPayload && typeof payload.clientPayload === 'string') {
+        const clientPayload = JSON.parse(payload.clientPayload);
+        replaceExisting = clientPayload.replaceExisting === true;
+      }
+    } catch (e) {
+      console.warn("[UPLOAD_TOKEN] Failed to parse clientPayload:", e);
+    }
+
+    console.log("[UPLOAD_TOKEN] Processing upload:", {
+      vendorId,
+      replaceExisting,
+      hasPayload: !!body.payload,
+    });
+
     // Use handleUpload to securely generate client upload token
     // Token is scoped to specific path/file restrictions
     const jsonResponse = await handleUpload({
@@ -32,6 +52,14 @@ export async function POST(request: Request): Promise<NextResponse> {
           );
         }
 
+        console.log("[UPLOAD_TOKEN] Generating token:", {
+          vendorId,
+          pathname,
+          replaceExisting,
+          allowOverwrite: replaceExisting,
+          addRandomSuffix: false,
+        });
+
         // Return token configuration with restrictions
         return {
           // Allowed content types (images only)
@@ -42,10 +70,17 @@ export async function POST(request: Request): Promise<NextResponse> {
           ],
           // Maximum file size: 5MB
           maximumSizeInBytes: 5 * 1024 * 1024,
+          // Overwrite behavior based on replaceExisting flag
+          allowOverwrite: replaceExisting,
+          // NEVER add random suffix - prevent storage landfill
+          // If replaceExisting=false and blob exists, upload will fail
+          // This is intentional - client should check first
+          addRandomSuffix: false,
           // Token metadata (will be passed back to client)
           tokenPayload: JSON.stringify({
             vendorId,
             uploadedAt: new Date().toISOString(),
+            replaceExisting,
           }),
         };
       },

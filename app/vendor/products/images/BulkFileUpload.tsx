@@ -198,6 +198,35 @@ export function BulkFileUpload() {
         sku = extractSkuFromFilename(file.name);
       }
 
+      // ✅ PRE-CHECK: Call can-upload endpoint BEFORE uploading bytes
+      // This prevents storage landfill by blocking uploads that would fail anyway
+      const canUploadResponse = await fetch(
+        `/api/vendor/products/images/can-upload?sku=${encodeURIComponent(sku)}&replaceExisting=${replaceExisting}`
+      );
+
+      if (!canUploadResponse.ok) {
+        const errorData = await canUploadResponse.json();
+        return {
+          filename: file.name,
+          sku,
+          success: false,
+          error: errorData.error || "Failed to check upload permission",
+        };
+      }
+
+      const canUploadData = await canUploadResponse.json();
+
+      // If upload is blocked (product already has image and Replace is OFF)
+      if (!canUploadData.ok) {
+        return {
+          filename: file.name,
+          sku,
+          success: false,
+          error: canUploadData.reason,
+        };
+      }
+
+      // Only proceed to upload if pre-check passed
       // Construct blob path: vendors/{vendorId}/products/{sku}.{ext}
       // This path will be validated server-side in handleUpload
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -206,9 +235,11 @@ export function BulkFileUpload() {
       // Upload directly to Blob using secure handleUpload pattern
       // handleUploadUrl calls our endpoint which uses handleUpload()
       // This does NOT expose BLOB_READ_WRITE_TOKEN to browser
+      // clientPayload passes replaceExisting flag to server
       const blob = await upload(blobPath, file, {
         access: "public",
         handleUploadUrl: "/api/vendor/products/images/upload-token",
+        clientPayload: JSON.stringify({ replaceExisting }),
       });
 
       // Update database via small JSON endpoint with fuzzy matching
@@ -264,11 +295,18 @@ export function BulkFileUpload() {
       };
     } catch (error) {
       console.error(`[BULK_UPLOAD] Error uploading ${file.name}:`, error);
+
+      // Check if this is a "blob already exists" error
+      let errorMessage = error instanceof Error ? error.message : "Upload failed";
+      if (errorMessage.includes("blob already exists") || errorMessage.includes("already exists")) {
+        errorMessage = "Image already exists in storage. Toggle 'Replace Existing Images' to overwrite.";
+      }
+
       return {
         filename: file.name,
         sku: sku || extractSkuFromFilename(file.name),
         success: false,
-        error: error instanceof Error ? error.message : "Upload failed",
+        error: errorMessage,
       };
     }
   };
