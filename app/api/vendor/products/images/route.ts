@@ -10,7 +10,7 @@ import { del } from "@vercel/blob";
  * Optionally delete blob from storage
  *
  * Body:
- * - sku (required): Product SKU
+ * - productId (required): Product ID
  * - deleteBlob (optional): true to also delete blob from storage
  */
 export async function DELETE(req: NextRequest) {
@@ -18,29 +18,27 @@ export async function DELETE(req: NextRequest) {
     const { vendorId } = await requireVendor();
 
     const body = await req.json();
-    const { sku, deleteBlob = false } = body;
+    const { productId, deleteBlob = false } = body;
 
-    if (!sku) {
-      console.error("[DELETE_IMAGE] Missing SKU:", { vendorId });
+    if (!productId) {
+      console.error("[DELETE_IMAGE] Missing productId:", { vendorId });
       return NextResponse.json(
-        { error: "Missing required parameter: sku" },
+        { error: "Missing required parameter: productId" },
         { status: 400 }
       );
     }
 
-    console.log("[DELETE_IMAGE] Delete request:", {
+    console.log("[DELETE_IMAGE] 🗑️ Request:", {
       vendorId,
-      sku,
+      productId,
       deleteBlob,
     });
 
-    // Find product by vendor-scoped SKU
+    // Find product by ID (vendor-scoped)
     const product = await prisma.product.findUnique({
       where: {
-        vendorId_sku: {
-          vendorId,
-          sku,
-        },
+        id: productId,
+        vendorId,
       },
       select: {
         id: true,
@@ -51,35 +49,40 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!product) {
-      console.error("[DELETE_IMAGE] Product not found:", {
+      console.error("[DELETE_IMAGE] ❌ NOT FOUND:", {
         vendorId,
-        sku,
+        productId,
       });
       return NextResponse.json(
-        { error: `Product not found for SKU: ${sku}` },
+        { error: `Product not found for ID: ${productId}` },
         { status: 404 }
       );
     }
 
     const oldImageUrl = product.imageUrl;
+    const hadImage = !!oldImageUrl;
+
+    // Determine expected blob pathname for this product
+    const expectedPathPattern = `vendors/${vendorId}/products/${productId}.`;
 
     // Set imageUrl to null in database
     await prisma.product.update({
       where: {
-        vendorId_sku: {
-          vendorId,
-          sku,
-        },
+        id: productId,
       },
       data: {
         imageUrl: null,
       },
     });
 
-    console.log("[DELETE_IMAGE] Database updated:", {
+    console.log("[DELETE_IMAGE] 📝 DB Updated:", {
       vendorId,
-      sku,
-      oldImageUrl,
+      productId,
+      productName: product.name,
+      sku: product.sku || "NO SKU",
+      hadImageUrl: hadImage,
+      willDeleteBlob: deleteBlob && hadImage,
+      expectedPathPattern,
     });
 
     // Optionally delete blob from storage
@@ -94,13 +97,15 @@ export async function DELETE(req: NextRequest) {
           await del(oldImageUrl);
           console.log("[DELETE_IMAGE] Blob deleted:", {
             vendorId,
-            sku,
+            productId,
+            productSku: product.sku || "NO SKU",
             url: oldImageUrl,
           });
         } else {
           console.warn("[DELETE_IMAGE] Skipping blob deletion (not vendor-scoped or not Vercel Blob):", {
             vendorId,
-            sku,
+            productId,
+            productSku: product.sku || "NO SKU",
             url: oldImageUrl,
             isVercelBlob,
             belongsToVendor,
@@ -110,22 +115,27 @@ export async function DELETE(req: NextRequest) {
         // Log error but don't fail request - DB was updated successfully
         console.error("[DELETE_IMAGE] Blob deletion failed:", {
           vendorId,
-          sku,
+          productId,
+          productSku: product.sku || "NO SKU",
           url: oldImageUrl,
           error: blobError.message,
         });
       }
     }
 
-    console.log("[DELETE_IMAGE] Success:", {
+    console.log("[DELETE_IMAGE] ✅ SUCCESS:", {
       vendorId,
-      sku,
-      deletedBlob: deleteBlob && oldImageUrl,
+      productId,
+      productName: product.name,
+      sku: product.sku || "NO SKU",
+      dbImageUrlCleared: true,
+      blobDeleted: deleteBlob && oldImageUrl,
     });
 
     return NextResponse.json({
       success: true,
-      sku,
+      productId,
+      sku: product.sku,
       productName: product.name,
       deletedImageUrl: oldImageUrl,
       deletedBlob: deleteBlob && oldImageUrl,

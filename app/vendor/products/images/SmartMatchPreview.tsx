@@ -4,15 +4,16 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Check, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Check, AlertCircle, AlertTriangle } from "lucide-react";
 import type { VendorProduct } from "@/lib/matching/product-image-matcher";
 
 interface SmartMatchRow {
   file: File;
   filename: string;
   key: string;
-  resolvedProductId: string | null;  // Product ID for dropdown value
-  resolvedSku: string | null;        // Actual SKU for upload
+  resolvedProductId: string | null;  // Product ID (REQUIRED for upload)
+  resolvedSku: string | null;        // SKU for display only (optional, may be null)
   confidence: "high" | "medium" | "low" | "none";
   score: number;
 }
@@ -33,6 +34,8 @@ export function SmartMatchPreview({
   onCancel,
 }: SmartMatchPreviewProps) {
   const [searchTerms, setSearchTerms] = useState<Map<string, string>>(new Map());
+  const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
+  const [confirmedLowConfidence, setConfirmedLowConfidence] = useState<Set<string>>(new Set());
 
   const handleProductSelect = (filename: string, productId: string) => {
     onMatchUpdate(filename, productId);
@@ -61,14 +64,14 @@ export function SmartMatchPreview({
     );
   };
 
-  // ✅ Resolved ONLY if both productId AND sku exist (real SKU, not just label)
+  // ✅ Resolved if productId exists (SKU is optional for display only)
   const allResolved = useMemo(
-    () => smartMatchRows.every((row) => row.resolvedProductId && row.resolvedSku && row.resolvedSku.trim() !== ""),
+    () => smartMatchRows.every((row) => row.resolvedProductId),
     [smartMatchRows]
   );
 
   const resolvedCount = useMemo(
-    () => smartMatchRows.filter((row) => row.resolvedProductId && row.resolvedSku && row.resolvedSku.trim() !== "").length,
+    () => smartMatchRows.filter((row) => row.resolvedProductId).length,
     [smartMatchRows]
   );
 
@@ -86,6 +89,9 @@ export function SmartMatchPreview({
   };
 
   // Get top 3 matching products for each row based on normalized name/sku matching
+  // RANKING RULES:
+  // 1. Exact name/SKU match > fuzzy match
+  // 2. TIE-BREAKER: Products WITH SKU rank higher than products without SKU
   const getTopMatches = (row: SmartMatchRow): VendorProduct[] => {
     const normalized = row.key.toLowerCase();
 
@@ -95,11 +101,26 @@ export function SmartMatchPreview({
       const nameNorm = (p.name ?? "").toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
 
       let score = 0;
-      if (skuNorm.includes(normalized) || normalized.includes(skuNorm)) score += 0.8;
-      if (nameNorm.includes(normalized) || normalized.includes(nameNorm)) score += 0.6;
-      if (skuNorm === normalized || nameNorm === normalized) score = 1.0;
 
-      return { product: p, score };
+      // Exact match gets highest score
+      if (skuNorm === normalized || nameNorm === normalized) {
+        score = 1.0;
+      } else {
+        // Fuzzy matching
+        if (skuNorm && (skuNorm.includes(normalized) || normalized.includes(skuNorm))) {
+          score += 0.8;
+        }
+        if (nameNorm.includes(normalized) || normalized.includes(nameNorm)) {
+          score += 0.6;
+        }
+      }
+
+      // TIE-BREAKER: Add small bonus for products WITH SKU
+      // This ensures that if two products have same match score,
+      // the one with SKU appears first
+      const hasSkuBonus = p.sku ? 0.01 : 0;
+
+      return { product: p, score: score + hasSkuBonus };
     });
 
     return scored
@@ -109,6 +130,167 @@ export function SmartMatchPreview({
       .map((s) => s.product);
   };
 
+  const handleProceedToConfirmation = () => {
+    setShowFinalConfirmation(true);
+  };
+
+  const handleBackToPreview = () => {
+    setShowFinalConfirmation(false);
+  };
+
+  const handleFinalConfirm = () => {
+    // Check that all low-confidence rows have been manually confirmed
+    const lowConfidenceRows = smartMatchRows.filter(
+      (row) => row.confidence === "low" || row.confidence === "medium"
+    );
+
+    const unconfirmedLowConfidence = lowConfidenceRows.filter(
+      (row) => !confirmedLowConfidence.has(row.filename)
+    );
+
+    if (unconfirmedLowConfidence.length > 0) {
+      return; // Don't proceed if low-confidence rows aren't confirmed
+    }
+
+    onConfirm();
+  };
+
+  const toggleLowConfidenceConfirm = (filename: string) => {
+    setConfirmedLowConfidence((prev) => {
+      const next = new Set(prev);
+      if (next.has(filename)) {
+        next.delete(filename);
+      } else {
+        next.add(filename);
+      }
+      return next;
+    });
+  };
+
+  // Count low/medium confidence rows that need manual confirmation
+  const lowConfidenceCount = useMemo(
+    () => smartMatchRows.filter((row) => row.confidence === "low" || row.confidence === "medium").length,
+    [smartMatchRows]
+  );
+
+  // If showing final confirmation screen
+  if (showFinalConfirmation) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">⚠️ Final Confirmation</h3>
+            <p className="text-sm text-muted-foreground">
+              Review the exact matches before uploading. Confirm low-confidence matches.
+            </p>
+          </div>
+        </div>
+
+        {/* Final Confirmation Table */}
+        <div className="border rounded-md overflow-hidden">
+          <div className="max-h-96 overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="text-left p-3 text-sm font-medium">Filename</th>
+                  <th className="text-left p-3 text-sm font-medium">→</th>
+                  <th className="text-left p-3 text-sm font-medium">Product</th>
+                  <th className="text-left p-3 text-sm font-medium">SKU</th>
+                  <th className="text-left p-3 text-sm font-medium">Product ID</th>
+                  <th className="text-left p-3 text-sm font-medium">Confidence</th>
+                  <th className="text-left p-3 text-sm font-medium">Confirm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {smartMatchRows.map((row) => {
+                  const product = allProducts.find((p) => p.id === row.resolvedProductId);
+                  const isLowConfidence = row.confidence === "low" || row.confidence === "medium";
+                  const isConfirmed = confirmedLowConfidence.has(row.filename);
+
+                  return (
+                    <tr
+                      key={row.filename}
+                      className={`border-t hover:bg-muted/50 ${
+                        isLowConfidence && !isConfirmed ? "bg-orange-50 dark:bg-orange-950/20" : ""
+                      }`}
+                    >
+                      <td className="p-3 text-sm font-medium truncate max-w-[150px]">
+                        {row.filename}
+                      </td>
+                      <td className="p-3 text-center text-muted-foreground">→</td>
+                      <td className="p-3 text-sm">{product?.name || "Unknown"}</td>
+                      <td className="p-3 text-sm font-mono">
+                        {product?.sku ? (
+                          <span className="text-green-700 dark:text-green-400">{product.sku}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic">No SKU</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs font-mono text-muted-foreground truncate max-w-[120px]">
+                        {row.resolvedProductId}
+                      </td>
+                      <td className="p-3">{getConfidenceBadge(row.confidence)}</td>
+                      <td className="p-3">
+                        {isLowConfidence ? (
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={isConfirmed}
+                              onCheckedChange={() => toggleLowConfidenceConfirm(row.filename)}
+                            />
+                            <span className="text-xs text-orange-600">Required</span>
+                          </div>
+                        ) : (
+                          <Check className="h-4 w-4 text-green-600" />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Warning for low-confidence items */}
+        {lowConfidenceCount > 0 && (
+          <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-md">
+            <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-orange-900 dark:text-orange-100">
+                {lowConfidenceCount} low/medium confidence matches require manual confirmation
+              </p>
+              <p className="text-orange-700 dark:text-orange-300 mt-1">
+                Please review and check the boxes to confirm these matches are correct.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between border-t pt-4">
+          <Button variant="outline" onClick={handleBackToPreview}>
+            ← Back to Preview
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFinalConfirm}
+              disabled={
+                lowConfidenceCount > 0 &&
+                confirmedLowConfidence.size < lowConfidenceCount
+              }
+            >
+              Confirm & Upload ({smartMatchRows.length} files)
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original preview screen
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -186,23 +368,18 @@ export function SmartMatchPreview({
                         )}
                         {topMatches.map((product) => (
                           <option key={product.id} value={product.id}>
-                            {product.name} ({product.sku || "NO SKU"})
+                            {product.name} {product.sku ? `(${product.sku})` : "(No SKU)"}
                           </option>
                         ))}
                         {topMatches.length === 0 && row.resolvedProductId && (
                           <option value={row.resolvedProductId}>
-                            {selectedProduct?.name || "Unknown"} ({row.resolvedSku || "NO SKU"})
+                            {selectedProduct?.name || "Unknown"} {row.resolvedSku ? `(${row.resolvedSku})` : "(No SKU)"}
                           </option>
                         )}
                       </select>
                       {selectedProduct && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          SKU: {selectedProduct.sku || "⚠️ NO SKU"}
-                        </div>
-                      )}
-                      {row.resolvedProductId && (!row.resolvedSku || row.resolvedSku.trim() === "") && (
-                        <div className="text-xs text-red-600 mt-1">
-                          ⚠️ This product has no SKU
+                          SKU: {selectedProduct.sku || <span className="italic">No SKU</span>}
                         </div>
                       )}
                     </td>
@@ -242,7 +419,7 @@ export function SmartMatchPreview({
                               >
                                 <div className="font-medium">{product.name}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  SKU: {product.sku || "⚠️ NO SKU"}
+                                  SKU: {product.sku || <span className="italic">No SKU</span>}
                                 </div>
                               </button>
                             ))}
@@ -277,8 +454,8 @@ export function SmartMatchPreview({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={!allResolved}>
-            Confirm & Upload
+          <Button onClick={handleProceedToConfirmation} disabled={!allResolved}>
+            Next: Review Matches →
           </Button>
         </div>
       </div>

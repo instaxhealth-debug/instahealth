@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
  * Checks if product exists and whether it already has an image
  *
  * Query params:
- * - sku (required): Product SKU
+ * - productId (required): Product ID
  * - replaceExisting (optional): "true" or "false"
  *
  * Returns:
@@ -22,24 +22,22 @@ export async function GET(req: NextRequest) {
     const { vendorId } = await requireVendor();
 
     const { searchParams } = new URL(req.url);
-    const sku = searchParams.get("sku");
+    const productId = searchParams.get("productId");
     const replaceExistingParam = searchParams.get("replaceExisting");
     const replaceExisting = replaceExistingParam === "true";
 
-    if (!sku) {
+    if (!productId) {
       return NextResponse.json(
-        { error: "Missing required parameter: sku" },
+        { error: "Missing required parameter: productId" },
         { status: 400 }
       );
     }
 
-    // Look up product by vendor-scoped SKU
+    // Look up product by ID (vendor-scoped)
     const product = await prisma.product.findUnique({
       where: {
-        vendorId_sku: {
-          vendorId,
-          sku,
-        },
+        id: productId,
+        vendorId,
       },
       select: {
         id: true,
@@ -51,24 +49,28 @@ export async function GET(req: NextRequest) {
 
     if (!product) {
       return NextResponse.json(
-        { error: `Product not found for SKU: ${sku}` },
+        { error: `Product not found for ID: ${productId}` },
         { status: 404 }
       );
     }
 
     // If product already has an image and replaceExisting is false, block upload
     if (product.imageUrl && !replaceExisting) {
-      console.log("[CAN_UPLOAD] Blocked:", {
+      console.log("[CAN_UPLOAD] ❌ BLOCKED:", {
         vendorId,
-        sku,
-        hasImage: true,
-        replaceExisting: false,
+        productId,
+        productName: product.name,
+        sku: product.sku || "NO SKU",
+        hasImageUrl: !!product.imageUrl,
+        replaceExisting,
+        reason: "Product already has image and replaceExisting=false",
       });
 
       return NextResponse.json({
         ok: false,
         reason: "Product already has an image. Toggle 'Replace Existing Images' to overwrite.",
         product: {
+          id: product.id,
           sku: product.sku,
           name: product.name,
           currentImageUrl: product.imageUrl,
@@ -77,16 +79,20 @@ export async function GET(req: NextRequest) {
     }
 
     // Upload is allowed
-    console.log("[CAN_UPLOAD] Allowed:", {
+    console.log("[CAN_UPLOAD] ✅ ALLOWED:", {
       vendorId,
-      sku,
-      hasImage: !!product.imageUrl,
+      productId,
+      productName: product.name,
+      sku: product.sku || "NO SKU",
+      hasImageUrl: !!product.imageUrl,
       replaceExisting,
+      willOverwrite: !!product.imageUrl && replaceExisting,
     });
 
     return NextResponse.json({
       ok: true,
       product: {
+        id: product.id,
         sku: product.sku,
         name: product.name,
         currentImageUrl: product.imageUrl,

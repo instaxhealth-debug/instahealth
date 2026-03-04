@@ -18,7 +18,11 @@
       "Bash(npx prisma:*)",
       "Bash(git status:*)",
       "Bash(npm install libphonenumber-js)",
-      "Read(//Users/cruzfrangieh/Desktop/InstaXHealth/**)"
+      "Read(//Users/cruzfrangieh/Desktop/InstaXHealth/**)",
+      "Bash(npm install @radix-ui/react-checkbox)",
+      "Bash(chmod +x scripts/verify-bulletproof-upload.sh)",
+      "Bash(./scripts/verify-bulletproof-upload.sh)",
+      "Bash(git add .)"
     ]
   },
   "enableAllProjectMcpServers": true,

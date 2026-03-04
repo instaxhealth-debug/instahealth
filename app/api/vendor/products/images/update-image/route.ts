@@ -13,7 +13,7 @@ import {
  * Update a product's imageUrl after client-side upload to Blob
  * This is a TINY JSON request - no file bytes
  *
- * Supports fuzzy SKU matching with optional auto-assignment
+ * Uses productId for all operations (no SKU dependency)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -22,27 +22,24 @@ export async function POST(req: NextRequest) {
     // Parse request body (small JSON payload)
     const body = await req.json();
     const {
-      sku,
+      productId,
       imageUrl,
       replaceExisting,
       filename, // optional: for logging
-      allowFuzzyMatch = false, // enable fuzzy matching
     } = body;
 
-    if (!sku || !imageUrl) {
+    if (!productId || !imageUrl) {
       return NextResponse.json(
-        { error: "Missing required fields: sku, imageUrl" },
+        { error: "Missing required fields: productId, imageUrl" },
         { status: 400 }
       );
     }
 
-    // Try exact match first (vendor-scoped)
-    let product = await prisma.product.findUnique({
+    // Look up product by ID (vendor-scoped)
+    const product = await prisma.product.findUnique({
       where: {
-        vendorId_sku: {
-          vendorId,
-          sku,
-        },
+        id: productId,
+        vendorId,
       },
       select: {
         id: true,
@@ -52,121 +49,39 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    let matchScore = 1.0;
-    let matchMethod: "exact" | "normalized" | "fuzzy" | "none" = "exact";
-    let suggestedMatches: any[] = [];
-
-    // If no exact match, try fuzzy matching (if enabled)
-    if (!product && allowFuzzyMatch) {
-      // Fetch all vendor products for fuzzy matching (filter out null SKUs)
-      const vendorProducts = await prisma.product.findMany({
-        where: {
-          vendorId,
-          sku: { not: null },
-        },
-        select: {
-          id: true,
-          sku: true,
-          name: true,
-        },
-      });
-
-      // Filter and cast to ensure SKU is never null
-      const validProducts = vendorProducts
-        .filter((p) => p.sku !== null)
-        .map((p) => ({
-          id: p.id,
-          sku: p.sku as string,
-          name: p.name,
-        }));
-
-      const matches = findSkuMatches(sku, validProducts, 3);
-
-      if (matches.length > 0) {
-        const bestMatch = matches[0];
-        matchScore = bestMatch.score;
-
-        // Check if this is a normalized exact match
-        if (bestMatch.isExactMatch) {
-          matchMethod = "normalized";
-          // Auto-assign for normalized exact matches
-          product = await prisma.product.findUnique({
-            where: {
-              vendorId_sku: {
-                vendorId,
-                sku: bestMatch.sku,
-              },
-            },
-            select: {
-              id: true,
-              sku: true,
-              name: true,
-              imageUrl: true,
-            },
-          });
-        } else if (isSafeAutoAssignment(matches)) {
-          // Safe to auto-assign fuzzy match
-          matchMethod = "fuzzy";
-          product = await prisma.product.findUnique({
-            where: {
-              vendorId_sku: {
-                vendorId,
-                sku: bestMatch.sku,
-              },
-            },
-            select: {
-              id: true,
-              sku: true,
-              name: true,
-              imageUrl: true,
-            },
-          });
-        } else {
-          // Not safe - return suggestions for manual confirmation
-          suggestedMatches = matches;
-        }
-      }
-    }
-
-    // Log the match attempt (no secrets)
-    console.log("[UPDATE_IMAGE] Match attempt:", {
-      vendorId,
-      filename: filename || "unknown",
-      derivedSku: sku,
-      normalizedDerivedSku: normalizeSkuCandidate(sku),
-      chosenSku: product?.sku || null,
-      matchMethod,
-      matchScore: matchScore.toFixed(3),
-      fuzzyMatchEnabled: allowFuzzyMatch,
-      suggestionsCount: suggestedMatches.length,
-    });
-
-    // If still no product, return error with suggestions
+    // If product not found, return error
     if (!product) {
-      if (suggestedMatches.length > 0) {
-        return NextResponse.json(
-          {
-            error: `Product not found for SKU: ${sku}`,
-            requiresConfirmation: true,
-            suggestions: suggestedMatches.map((m) => ({
-              sku: m.sku,
-              productName: m.productName,
-              score: m.score,
-              scorePercent: `${(m.score * 100).toFixed(1)}%`,
-            })),
-          },
-          { status: 404 }
-        );
-      }
-
+      console.error("[UPDATE_IMAGE] ❌ NOT FOUND:", {
+        vendorId,
+        productId,
+        filename: filename || "unknown",
+      });
       return NextResponse.json(
-        { error: `Product not found for SKU: ${sku}` },
+        { error: `Product not found for ID: ${productId}` },
         { status: 404 }
       );
     }
 
+    // Log the update attempt (no secrets)
+    console.log("[UPDATE_IMAGE] 📝 Attempt:", {
+      vendorId,
+      productId,
+      productName: product.name,
+      sku: product.sku || "NO SKU",
+      filename: filename || "unknown",
+      hasImageUrl: !!product.imageUrl,
+      replaceExisting,
+      willOverwrite: !!product.imageUrl && replaceExisting,
+      // NO imageUrl logged - it's a full URL that may contain tokens
+    });
+
     // Check if image already exists
     if (product.imageUrl && !replaceExisting) {
+      console.log("[UPDATE_IMAGE] ❌ CONFLICT:", {
+        vendorId,
+        productId,
+        reason: "Product already has image and replaceExisting=false",
+      });
       return NextResponse.json(
         {
           error: `Product already has an image. Enable "Replace existing" to overwrite.`,
@@ -182,25 +97,22 @@ export async function POST(req: NextRequest) {
     });
 
     // Log successful update
-    console.log("[UPDATE_IMAGE] Success:", {
+    console.log("[UPDATE_IMAGE] ✅ SUCCESS:", {
       vendorId,
+      productId,
+      productName: product.name,
+      sku: product.sku || "NO SKU",
       filename: filename || "unknown",
-      derivedSku: sku,
-      actualSku: product.sku,
-      matchMethod,
-      matchScore: matchScore.toFixed(3),
-      imageUrl,
+      operation: product.imageUrl ? "OVERWRITE" : "NEW",
+      // NO imageUrl logged - it's a full URL
     });
 
     return NextResponse.json({
       success: true,
-      sku: product.sku, // Return actual SKU (may differ from input if fuzzy matched)
-      derivedSku: sku, // Original derived SKU
+      productId: product.id,
+      sku: product.sku,
       imageUrl,
       productName: product.name,
-      matchMethod,
-      matchScore,
-      wasAutoAssigned: matchMethod !== "exact",
     });
   } catch (error: any) {
     console.error("[UPDATE_IMAGE] Error:", error);

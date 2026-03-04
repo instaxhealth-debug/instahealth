@@ -41,8 +41,8 @@ interface SmartMatchRow {
   file: File;
   filename: string;
   key: string;
-  resolvedProductId: string | null;  // Product ID for dropdown value
-  resolvedSku: string | null;        // Actual SKU for upload
+  resolvedProductId: string | null;  // Product ID (REQUIRED for upload)
+  resolvedSku: string | null;        // SKU for display only (optional, may be null)
   confidence: "high" | "medium" | "low" | "none";
   score: number;
 }
@@ -147,10 +147,35 @@ export function BulkFileUpload() {
     const rows: SmartMatchRow[] = files.map((file) => {
       const matchResult = findProductMatch(file.name, vendorProducts);
 
-      // Auto-accept: populate both product ID and SKU
-      const autoAcceptProduct = matchResult.autoAccept && matchResult.suggestedProduct
-        ? matchResult.suggestedProduct
-        : null;
+      // Smart auto-accept logic:
+      // 1. Only auto-accept if confidence is "high" (score >= 0.85)
+      // 2. Prefer products WITH SKU over products without SKU
+      // 3. If multiple high-confidence matches, prefer the one with SKU
+      let autoAcceptProduct: VendorProduct | null = null;
+
+      if (matchResult.autoAccept && matchResult.suggestedProduct) {
+        // If confidence is high AND product has SKU, auto-accept
+        if (matchResult.confidence === "high" && matchResult.suggestedProduct.sku) {
+          autoAcceptProduct = matchResult.suggestedProduct;
+        } else if (matchResult.confidence === "high" && !matchResult.suggestedProduct.sku) {
+          // High confidence but no SKU - check if there's a similar product WITH SKU
+          const alternativeMatches = vendorProducts.filter((p) => {
+            if (!p.sku) return false; // Must have SKU
+            const nameMatch = p.name.toLowerCase().includes(matchResult.candidateKey.toLowerCase()) ||
+                             matchResult.candidateKey.toLowerCase().includes(p.name.toLowerCase());
+            return nameMatch;
+          });
+
+          if (alternativeMatches.length === 0) {
+            // No alternative with SKU, auto-accept the no-SKU product
+            autoAcceptProduct = matchResult.suggestedProduct;
+          } else {
+            // Alternative with SKU exists, don't auto-accept - force manual selection
+            autoAcceptProduct = null;
+          }
+        }
+        // If confidence is medium or low, never auto-accept
+      }
 
       return {
         file,
@@ -199,30 +224,16 @@ export function BulkFileUpload() {
   };
 
   const handleSmartMatchConfirm = () => {
-    // HARD GUARD: All rows must have BOTH resolvedProductId AND resolvedSku
+    // HARD GUARD: All rows must have resolvedProductId (SKU is optional, only for display)
     const unresolvedRows = smartMatchRows.filter(
-      (row) => !row.resolvedProductId || !row.resolvedSku
+      (row) => !row.resolvedProductId
     );
 
     if (unresolvedRows.length > 0) {
       const filenames = unresolvedRows.map((r) => r.filename).join(", ");
       toast({
         title: "Cannot upload",
-        description: `All files must have a valid product with SKU. Missing SKU for: ${filenames}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Additional check: verify all SKUs are non-empty strings
-    const invalidSkuRows = smartMatchRows.filter(
-      (row) => !row.resolvedSku || row.resolvedSku.trim() === ""
-    );
-
-    if (invalidSkuRows.length > 0) {
-      toast({
-        title: "Invalid SKU",
-        description: "Some matched products have empty SKUs. Fix product SKU or use manual override.",
+        description: `All files must have a matched product. Missing match for: ${filenames}`,
         variant: "destructive",
       });
       return;
@@ -316,26 +327,31 @@ export function BulkFileUpload() {
    * Upload a single file directly to Blob, then update DB
    * NO file bytes pass through Next.js API routes
    * Uses secure handleUpload pattern (token NOT exposed to browser)
+   * NOW USES PRODUCTID - SKU is completely optional
    */
   const uploadSingleFile = async (
     file: File,
     vendorId: string,
-    resolvedSku?: string | null
+    resolvedProductId?: string | null
   ): Promise<UploadResult> => {
+    let productId = "";
     let sku = "";
     try {
-      // Determine SKU based on mapping mode
+      // Determine productId based on mapping mode
       if (mappingMode === "smart") {
-        // HARD GUARD: Smart Match mode requires valid resolvedSku
-        if (!resolvedSku || resolvedSku.trim() === "") {
+        // HARD GUARD: Smart Match mode requires valid resolvedProductId
+        if (!resolvedProductId || resolvedProductId.trim() === "") {
           return {
             filename: file.name,
             sku: "",
             success: false,
-            error: "No SKU found for matched product. Fix product SKU or use manual override.",
+            error: "No product selected. Please select a product from the dropdown.",
           };
         }
-        sku = resolvedSku.trim();
+        productId = resolvedProductId.trim();
+        // Get SKU for display (optional)
+        const product = vendorProducts.find((p) => p.id === productId);
+        sku = product?.sku || "NO SKU";
       } else if (mappingMode === "csv" && csvMapping) {
         const mappedSku = csvMapping.get(file.name);
         if (!mappedSku) {
@@ -347,15 +363,36 @@ export function BulkFileUpload() {
           };
         }
         sku = mappedSku;
+        // For CSV mode, we still need to look up productId by SKU
+        const product = vendorProducts.find((p) => p.sku === mappedSku);
+        if (!product) {
+          return {
+            filename: file.name,
+            sku: mappedSku,
+            success: false,
+            error: `Product not found for SKU: ${mappedSku}`,
+          };
+        }
+        productId = product.id;
       } else {
         // filename mode: extract SKU from filename
         sku = extractSkuFromFilename(file.name);
+        const product = vendorProducts.find((p) => p.sku === sku);
+        if (!product) {
+          return {
+            filename: file.name,
+            sku,
+            success: false,
+            error: `Product not found for SKU: ${sku}`,
+          };
+        }
+        productId = product.id;
       }
 
       // ✅ PRE-CHECK: Call can-upload endpoint BEFORE uploading bytes
       // This prevents storage landfill by blocking uploads that would fail anyway
       const canUploadResponse = await fetch(
-        `/api/vendor/products/images/can-upload?sku=${encodeURIComponent(sku)}&replaceExisting=${replaceExisting}`
+        `/api/vendor/products/images/can-upload?productId=${encodeURIComponent(productId)}&replaceExisting=${replaceExisting}`
       );
 
       if (!canUploadResponse.ok) {
@@ -381,10 +418,10 @@ export function BulkFileUpload() {
       }
 
       // Only proceed to upload if pre-check passed
-      // Construct blob path: vendors/{vendorId}/products/{sku}.{ext}
+      // Construct blob path: vendors/{vendorId}/products/{productId}.{ext}
       // This path will be validated server-side in handleUpload
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const blobPath = `vendors/${vendorId}/products/${sku}.${ext}`;
+      const blobPath = `vendors/${vendorId}/products/${productId}.${ext}`;
 
       // Upload directly to Blob using secure handleUpload pattern
       // handleUploadUrl calls our endpoint which uses handleUpload()
@@ -396,16 +433,15 @@ export function BulkFileUpload() {
         clientPayload: JSON.stringify({ replaceExisting }),
       });
 
-      // Update database via small JSON endpoint with fuzzy matching
+      // Update database via small JSON endpoint (productId-based)
       const updateResponse = await fetch("/api/vendor/products/images/update-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sku,
+          productId,
           imageUrl: blob.url,
           replaceExisting,
           filename: file.name,
-          allowFuzzyMatch: enableFuzzyMatch,
         }),
       });
 
@@ -521,11 +557,11 @@ export function BulkFileUpload() {
 
         const batchResults = await Promise.all(
           batch.map((file) => {
-            // For Smart Match mode, get resolvedSku from smartMatchRows
-            const resolvedSku = mappingMode === "smart"
-              ? smartMatchRows.find((row) => row.filename === file.name)?.resolvedSku
+            // For Smart Match mode, get resolvedProductId from smartMatchRows
+            const resolvedProductId = mappingMode === "smart"
+              ? smartMatchRows.find((row) => row.filename === file.name)?.resolvedProductId
               : null;
-            return uploadSingleFile(file, vendorId, resolvedSku);
+            return uploadSingleFile(file, vendorId, resolvedProductId);
           })
         );
 

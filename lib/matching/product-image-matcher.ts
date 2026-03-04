@@ -31,11 +31,31 @@ export interface ProductMatchResult {
 }
 
 /**
+ * Stopwords to ignore during matching (vendor product reality)
+ */
+const STOPWORDS = new Set([
+  "mg",
+  "ml",
+  "vial",
+  "pack",
+  "kit",
+  "bundle",
+  "drip",
+  "iv",
+  "injection",
+  "capsule",
+  "tablet",
+  "bottle",
+]);
+
+/**
  * Normalize a string for matching (NULL-SAFE):
  * - handles null/undefined values
  * - converts to string
  * - lowercase
  * - remove file extensions
+ * - normalize numbers: "10mg" -> "10 mg"
+ * - remove stopwords
  * - replace non-alphanumeric with spaces
  * - collapse whitespace
  * - trim
@@ -47,12 +67,21 @@ export function normalizeForMatching(input?: string | null): string {
   const safe = String(input);
   if (!safe) return "";
 
-  return safe
+  let normalized = safe
     .toLowerCase()
     .replace(/\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff?)$/i, "")
+    // Normalize numbers: "10mg" -> "10 mg"
+    .replace(/(\d+)(mg|ml|mcg|iu|g|kg)/gi, "$1 $2")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  // Remove stopwords
+  const tokens = normalized.split(" ").filter((token) => {
+    return token.length > 0 && !STOPWORDS.has(token);
+  });
+
+  return tokens.join(" ");
 }
 
 /**
@@ -117,6 +146,9 @@ function levenshteinSimilarity(s1: string, s2: string): number {
 
 /**
  * Match a product using multiple strategies and return score
+ * RANKING RULES:
+ * 1. Exact token match > fuzzy match
+ * 2. Tie-breaker: prefer sku != null
  */
 function matchProduct(
   candidateKey: string,
@@ -130,7 +162,7 @@ function matchProduct(
   let bestScore = 0;
   let matchType: ProductMatchCandidate["matchType"] = "fuzzy";
 
-  // Strategy 1: Exact match on normalized strings
+  // Strategy 1: Exact match on normalized strings (HIGHEST PRIORITY)
   if (
     normalizedCandidate === normalizedSku ||
     normalizedCandidate === normalizedName ||
@@ -139,7 +171,7 @@ function matchProduct(
     bestScore = 1.0;
     matchType = "exact";
   } else {
-    // Strategy 2: Token overlap (Jaccard)
+    // Strategy 2: Token overlap (Jaccard) - prefer exact token matches
     const candidateTokens = tokenize(candidateKey);
     const skuTokens = tokenize(product.sku);
     const nameTokens = tokenize(product.name);
@@ -189,6 +221,11 @@ function matchProduct(
       }
     }
   }
+
+  // TIE-BREAKER: Add small bonus for products with SKU
+  // This ensures products WITH SKU rank higher than products without SKU
+  const hasSkuBonus = product.sku ? 0.005 : 0;
+  bestScore = Math.min(1.0, bestScore + hasSkuBonus);
 
   // Determine confidence level
   let confidence: ProductMatchCandidate["confidence"];
@@ -264,10 +301,24 @@ export function findProductMatch(
   const bestMatch = topCandidates[0];
   const secondBest = topCandidates[1];
 
-  // Auto-accept criteria
+  // Auto-accept criteria (STRICT):
+  // - Best score >= 0.92 (high confidence)
+  // - Gap between best and second >= 0.15 (clear winner, not ambiguous)
+  // - If multiple candidates within small delta (< 0.05), DO NOT auto-pick
   const bestScore = bestMatch.score;
   const gap = secondBest ? bestScore - secondBest.score : 1.0;
-  const autoAccept = bestScore >= 0.92 && gap >= 0.08;
+
+  // Check if there are multiple close candidates (ambiguous)
+  const ambiguousCandidates = topCandidates.filter(
+    (c) => Math.abs(c.score - bestScore) < 0.05
+  );
+  const isAmbiguous = ambiguousCandidates.length > 1;
+
+  // Auto-accept only if:
+  // 1. Score is high enough (>= 0.92)
+  // 2. Gap is large enough (>= 0.15)
+  // 3. Not ambiguous (no multiple close candidates)
+  const autoAccept = bestScore >= 0.92 && gap >= 0.15 && !isAmbiguous;
 
   return {
     filename,
