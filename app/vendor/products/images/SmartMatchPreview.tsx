@@ -11,10 +11,9 @@ import type { VendorProduct } from "@/lib/matching/product-image-matcher";
 interface SmartMatchRow {
   file: File;
   filename: string;
-  key: string;
-  resolvedProductId: string | null;  // Product ID (REQUIRED for upload)
-  resolvedSku: string | null;        // SKU for display only (optional, may be null)
-  confidence: "high" | "medium" | "low" | "none";
+  resolvedProductId: string | null;
+  productName: string | null;
+  confidence: "exact_sku" | "exact_name" | "high" | "medium" | "none";
   score: number;
 }
 
@@ -75,14 +74,15 @@ export function SmartMatchPreview({
     [smartMatchRows]
   );
 
-  const getConfidenceBadge = (confidence: string) => {
+  const getConfidenceBadge = (confidence: "exact_sku" | "exact_name" | "high" | "medium" | "none") => {
     switch (confidence) {
+      case "exact_sku":
+      case "exact_name":
+        return <Badge className="bg-green-600">Exact Match</Badge>;
       case "high":
         return <Badge className="bg-green-600">High</Badge>;
       case "medium":
         return <Badge className="bg-yellow-600">Medium</Badge>;
-      case "low":
-        return <Badge className="bg-orange-600">Low</Badge>;
       default:
         return <Badge variant="destructive">None</Badge>;
     }
@@ -93,7 +93,7 @@ export function SmartMatchPreview({
   // 1. Exact name/SKU match > fuzzy match
   // 2. TIE-BREAKER: Products WITH SKU rank higher than products without SKU
   const getTopMatches = (row: SmartMatchRow): VendorProduct[] => {
-    const normalized = row.key.toLowerCase();
+    const normalized = row.filename.toLowerCase().replace(/\.(jpg|jpeg|png|webp)$/i, "");
 
     const scored = allProducts.map((p) => {
       // NULL-SAFE normalization
@@ -139,9 +139,9 @@ export function SmartMatchPreview({
   };
 
   const handleFinalConfirm = () => {
-    // Check that all low-confidence rows have been manually confirmed
+    // Check that all medium-confidence rows have been manually confirmed
     const lowConfidenceRows = smartMatchRows.filter(
-      (row) => row.confidence === "low" || row.confidence === "medium"
+      (row) => row.confidence === "medium" || row.confidence === "none"
     );
 
     const unconfirmedLowConfidence = lowConfidenceRows.filter(
@@ -167,9 +167,9 @@ export function SmartMatchPreview({
     });
   };
 
-  // Count low/medium confidence rows that need manual confirmation
+  // Count medium/none confidence rows that need manual confirmation
   const lowConfidenceCount = useMemo(
-    () => smartMatchRows.filter((row) => row.confidence === "low" || row.confidence === "medium").length,
+    () => smartMatchRows.filter((row) => row.confidence === "medium" || row.confidence === "none").length,
     [smartMatchRows]
   );
 
@@ -204,7 +204,7 @@ export function SmartMatchPreview({
               <tbody>
                 {smartMatchRows.map((row) => {
                   const product = allProducts.find((p) => p.id === row.resolvedProductId);
-                  const isLowConfidence = row.confidence === "low" || row.confidence === "medium";
+                  const isLowConfidence = row.confidence === "medium" || row.confidence === "none";
                   const isConfirmed = confirmedLowConfidence.has(row.filename);
 
                   return (
@@ -331,7 +331,7 @@ export function SmartMatchPreview({
                 const selectedProduct = row.resolvedProductId
                   ? allProducts.find((p) => p.id === row.resolvedProductId)
                   : null;
-                const isAutoAccepted = row.resolvedProductId !== null && row.resolvedSku !== null && row.confidence === "high";
+                const isAutoAccepted = row.resolvedProductId !== null && (row.confidence === "exact_sku" || row.confidence === "exact_name");
 
                 return (
                   <tr key={row.filename} className="border-t hover:bg-muted/50">
@@ -373,7 +373,7 @@ export function SmartMatchPreview({
                         ))}
                         {topMatches.length === 0 && row.resolvedProductId && (
                           <option value={row.resolvedProductId}>
-                            {selectedProduct?.name || "Unknown"} {row.resolvedSku ? `(${row.resolvedSku})` : "(No SKU)"}
+                            {selectedProduct?.name || "Unknown"}
                           </option>
                         )}
                       </select>
