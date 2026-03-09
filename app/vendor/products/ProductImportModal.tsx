@@ -19,6 +19,7 @@ interface PreviewRow {
   rowIndex: number;
   isValid: boolean;
   errors: string[];
+  warnings: string[];
   action: "create" | "update";
   rawCategory: string;
   mappedCategorySlug: string | null;
@@ -26,6 +27,7 @@ interface PreviewRow {
   mappingConfidence: string | null;
   missingCategory: boolean;
   peptideSubtype: "injectable" | "oral" | "nasal" | null;
+  computedSlug: string | null;
   data: { sku?: string; name: string; category: string; priceFils: number };
 }
 
@@ -41,34 +43,16 @@ interface PreviewData {
 interface ImportResult {
   ok: boolean;
   requestId: string;
-  createdCount: number;
-  updatedCount: number;
-  failedCount: number;
+  attempted: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  rowResults: Array<{ rowNumber: number; sku?: string | null; name: string; status: string; reason?: string }>;
   rowErrors: Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }>;
 }
 
 type State = "initial" | "uploading" | "preview" | "importing" | "complete";
-
-function dedupeRowErrors(
-  errors: Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }>
-): Array<{ rowNumber: number; sku?: string | null; name?: string | null; message: string }> {
-  const map = new Map<number, { rowNumber: number; sku?: string | null; name?: string | null; messages: string[] }>();
-  for (const err of errors) {
-    const existing = map.get(err.rowNumber);
-    if (existing) {
-      existing.messages.push(err.message);
-    } else {
-      map.set(err.rowNumber, { rowNumber: err.rowNumber, sku: err.sku, name: err.name, messages: [err.message] });
-    }
-  }
-  return Array.from(map.values()).map((v) => ({
-    rowNumber: v.rowNumber,
-    sku: v.sku,
-    name: v.name,
-    message: v.messages.join("; "),
-  }));
-}
-
 
 export function ProductImportModal() {
   const [open, setOpen] = useState(false);
@@ -224,23 +208,16 @@ export function ProductImportModal() {
         return;
       }
 
-      const hasFailures = data.failedCount > 0;
-      if (hasFailures) {
-        setResult(data);
-        setState("complete");
-        toast({
-          title: "Imported with warnings",
-          description: `Imported with warnings: ${data.createdCount} created, ${data.updatedCount} updated, ${data.failedCount} failed`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Import complete",
-          description: `Imported ${data.createdCount + data.updatedCount} products`,
-        });
-        reset();
-        setOpen(false);
-      }
+      // Always show detailed results
+      setResult(data);
+      setState("complete");
+      
+      const hasProblems = data.skipped > 0 || data.failed > 0;
+      toast({
+        title: hasProblems ? "Import completed with issues" : "Import complete",
+        description: `${data.created} created, ${data.updated} updated${data.skipped > 0 ? `, ${data.skipped} skipped` : ""}${data.failed > 0 ? `, ${data.failed} failed` : ""}`,
+        variant: hasProblems ? "destructive" : "default",
+      });
       router.refresh();
     } catch {
       // Network error or timeout — force re-preview
@@ -443,7 +420,7 @@ export function ProductImportModal() {
                       <th className="px-3 py-2 text-left w-16">Action</th>
                       <th className="px-3 py-2 text-left">Name</th>
                       <th className="px-3 py-2 text-left">Category</th>
-                      <th className="px-3 py-2 text-left">Errors</th>
+                      <th className="px-3 py-2 text-left">Issues</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -500,7 +477,16 @@ export function ProductImportModal() {
                               <span className="text-amber-600 italic">missing</span>
                             ) : null}
                           </td>
-                          <td className="px-3 py-2 text-red-600 text-xs">{row.errors.join("; ")}</td>
+                          <td className="px-3 py-2 text-xs">
+                            <div className="flex flex-col gap-1">
+                              {row.errors.length > 0 && (
+                                <span className="text-red-600">{row.errors.join("; ")}</span>
+                              )}
+                              {row.warnings && row.warnings.length > 0 && (
+                                <span className="text-amber-600">{row.warnings.join("; ")}</span>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -574,92 +560,56 @@ export function ProductImportModal() {
         {state === "complete" && result && (
           <div className="space-y-4">
             <div className="text-center">
-              <CheckCircle2 className="h-14 w-14 text-green-600 mx-auto mb-3" />
+              <CheckCircle2 className={`h-14 w-14 mx-auto mb-3 ${result.failed > 0 || result.skipped > 0 ? "text-amber-600" : "text-green-600"}`} />
               <h3 className="text-lg font-semibold">Import Complete</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Attempted: {result.attempted} rows
+                          </p>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Created" value={result.createdCount} className="bg-green-50 text-green-700" />
-              <StatCard label="Updated" value={result.updatedCount} className="bg-blue-50 text-blue-700" />
-              <StatCard label="Failed" value={result.failedCount} className="bg-red-50 text-red-700" />
+            <div className="grid grid-cols-4 gap-3">
+              <StatCard label="Created" value={result.created} className="bg-green-50 text-green-700" />
+              <StatCard label="Updated" value={result.updated} className="bg-blue-50 text-blue-700" />
+              <StatCard label="Skipped" value={result.skipped} className="bg-amber-50 text-amber-700" />
+              <StatCard label="Failed" value={result.failed} className="bg-red-50 text-red-700" />
             </div>
-            {result.rowErrors.length > 0 && (
+            
+            {/* Detailed Results Table */}
+            {(result.skipped > 0 || result.failed > 0) && (
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      const dedupedRows = dedupeRowErrors(result.rowErrors);
-                      const header = "rowNumber,sku,name,message";
-                      const lines = dedupedRows.map((e) => {
-                        const values = [
-                          String(e.rowNumber),
-                          e.sku ?? "",
-                          e.name ?? "",
-                          e.message,
-                        ];
-                        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
-                      });
-                      const text = [header, ...lines].join("\n");
-                      try {
-                        await navigator.clipboard.writeText(text);
-                        toast({ title: "Copied failed rows" });
-                      } catch {
-                        toast({ title: "Copy failed", description: "Please try again.", variant: "destructive" });
-                      }
-                    }}
-                  >
-                    Copy failed rows
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const dedupedRows = dedupeRowErrors(result.rowErrors);
-                      const header = "rowNumber,sku,name,message";
-                      const lines = dedupedRows.map((e) => {
-                        const values = [
-                          String(e.rowNumber),
-                          e.sku ?? "",
-                          e.name ?? "",
-                          e.message,
-                        ];
-                        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
-                      });
-                      const text = [header, ...lines].join("\n");
-                      const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = "failed-rows.csv";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    Download failed rows
-                  </Button>
-                </div>
-                <div className="border rounded-lg p-3 max-h-[200px] overflow-y-auto text-xs">
+                <h4 className="text-sm font-semibold">Import Details</h4>
+                <div className="border rounded-lg p-3 max-h-[280px] overflow-y-auto text-xs">
                   <table className="w-full text-left">
-                    <thead className="text-muted-foreground">
+                    <thead className="text-muted-foreground sticky top-0 bg-background">
                       <tr>
                         <th className="py-1 pr-2">Row</th>
-                        <th className="py-1 pr-2">SKU</th>
+                        <th className="py-1 pr-2">Status</th>
                         <th className="py-1 pr-2">Name</th>
-                        <th className="py-1">Error</th>
+                        <th className="py-1 pr-2">SKU</th>
+                        <th className="py-1">Reason</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dedupeRowErrors(result.rowErrors).map((e, i) => (
-                        <tr key={`${e.rowNumber}-${i}`} className="border-t">
-                          <td className="py-1 pr-2 text-muted-foreground">{e.rowNumber}</td>
-                          <td className="py-1 pr-2">{e.sku || "-"}</td>
-                          <td className="py-1 pr-2">{e.name || "-"}</td>
-                          <td className="py-1 text-red-600">{e.message}</td>
-                        </tr>
-                      ))}
+                      {result.rowResults
+                        .filter((r) => r.status === "skipped" || r.status === "failed")
+                        .map((r, i) => (
+                          <tr key={`${r.rowNumber}-${i}`} className="border-t">
+                            <td className="py-1 pr-2 text-muted-foreground">{r.rowNumber}</td>
+                            <td className="py-1 pr-2">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  r.status === "skipped"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="py-1 pr-2 truncate max-w-[120px]">{r.name}</td>
+                            <td className="py-1 pr-2">{r.sku || "-"}</td>
+                            <td className="py-1 text-muted-foreground">{r.reason || "-"}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>

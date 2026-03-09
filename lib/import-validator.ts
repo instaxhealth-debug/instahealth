@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/slugify";
 import {
   isServiceCategory,
   isValidBookingUrl,
@@ -19,6 +20,7 @@ export interface ValidationResult {
   rowIndex: number;
   isValid: boolean;
   errors: string[];
+    warnings: string[];
   action: "create" | "update";
   rawCategory: string;
   mappedCategorySlug: string | null;
@@ -26,6 +28,7 @@ export interface ValidationResult {
   mappingConfidence: MappingConfidence | null;
   missingCategory: boolean;
   peptideSubtype: PeptideSubtype;
+    computedSlug: string | null;
   data: {
     sku?: string;
     name: string;
@@ -66,6 +69,7 @@ export async function validateProductRow(
   bulkCategory?: string,
 ): Promise<ValidationResult> {
   const errors: string[] = [];
+    const warnings: string[] = [];
   const rawCategory = (row.category || "").trim();
   let mappedSlug: string | null = null;
   let mappingReason: MappingReason | null = null;
@@ -85,6 +89,7 @@ export async function validateProductRow(
       rowIndex,
       isValid: false,
       errors,
+        warnings: [],
       action: "create",
       rawCategory,
       mappedCategorySlug: null,
@@ -92,6 +97,7 @@ export async function validateProductRow(
       mappingConfidence: null,
       missingCategory: true,
       peptideSubtype: null,
+        computedSlug: null,
       data: {} as any,
     };
   }
@@ -205,9 +211,13 @@ export async function validateProductRow(
     ? Array.from(new Set([...csvTags, peptideSubtype])) // Add subtype tag if not already present
     : csvTags;
 
+  // Compute slug for duplicate detection
+  const computedSlug = row.name ? slugify(row.name) : null;
+
   return {
     rowIndex,
     isValid: errors.length === 0,
+      warnings,
     errors,
     action,
     rawCategory,
@@ -216,6 +226,7 @@ export async function validateProductRow(
     mappingConfidence,
     missingCategory,
     peptideSubtype,
+      computedSlug,
     data: {
       sku: row.sku || undefined,
       name: row.name || "",

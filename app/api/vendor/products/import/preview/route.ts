@@ -92,6 +92,65 @@ export async function POST(request: Request) {
     const willUpdate = results.filter((r) => r.isValid && r.action === "update").length;
     const missingCategoryCount = results.filter((r) => r.missingCategory).length;
 
+    // Detect duplicate slugs within CSV
+    const slugCounts = new Map<string, number[]>();
+    const skuCounts = new Map<string, number[]>();
+    
+    for (const result of results) {
+      if (result.computedSlug) {
+        const rows = slugCounts.get(result.computedSlug) || [];
+        rows.push(result.rowIndex);
+        slugCounts.set(result.computedSlug, rows);
+      }
+      if (result.data.sku) {
+        const rows = skuCounts.get(result.data.sku) || [];
+        rows.push(result.rowIndex);
+        skuCounts.set(result.data.sku, rows);
+      }
+    }
+
+    // Mark duplicate slugs with warnings
+    for (const [slug, rowIndexes] of slugCounts.entries()) {
+      if (rowIndexes.length > 1) {
+        for (const result of results) {
+          if (result.computedSlug === slug) {
+            result.warnings.push(`Duplicate slug "${slug}" in rows: ${rowIndexes.join(", ")}`);
+          }
+        }
+      }
+    }
+
+    // Mark duplicate SKUs with warnings
+    for (const [sku, rowIndexes] of skuCounts.entries()) {
+      if (rowIndexes.length > 1) {
+        for (const result of results) {
+          if (result.data.sku === sku) {
+            result.warnings.push(`Duplicate SKU "${sku}" in rows: ${rowIndexes.join(", ")}`);
+          }
+        }
+      }
+    }
+
+    // Check for existing slugs in DB (batch query)
+    const allSlugs = Array.from(slugCounts.keys());
+    if (allSlugs.length > 0) {
+      const existingProducts = await prisma.product.findMany({
+        where: { slug: { in: allSlugs } },
+        select: { slug: true, name: true, vendorId: true },
+      });
+      const existingSlugMap = new Map(existingProducts.map((p) => [p.slug, p]));
+      
+      for (const result of results) {
+        if (result.computedSlug && existingSlugMap.has(result.computedSlug)) {
+          const existing = existingSlugMap.get(result.computedSlug)!;
+          const isSameVendor = existing.vendorId === vendorId;
+          result.warnings.push(
+            `Slug "${result.computedSlug}" already exists${isSameVendor ? " in your products" : " (another vendor)"}: "${existing.name}"`
+          );
+        }
+      }
+    }
+
     const previewId = computePreviewId(fileContentHash, vendorId, vendor.allowedCategories, bulkCategory);
 
     return NextResponse.json({
@@ -109,12 +168,15 @@ export async function POST(request: Request) {
           rowIndex: r.rowIndex,
           isValid: r.isValid,
           errors: r.errors,
+                    warnings: r.warnings,
           action: r.action,
           rawCategory: r.rawCategory,
           mappedCategorySlug: r.mappedCategorySlug,
           mappingReason: r.mappingReason,
           mappingConfidence: r.mappingConfidence,
           missingCategory: r.missingCategory,
+                    peptideSubtype: r.peptideSubtype,
+                    computedSlug: r.computedSlug,
           data: {
             sku: r.data.sku,
             name: r.data.name,

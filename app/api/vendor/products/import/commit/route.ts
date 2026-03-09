@@ -14,6 +14,14 @@ const BATCH_SIZE = 50;
 const IMPORT_SCHEMA_VERSION = 1;
 const MAX_SLUG_RETRIES = 10;
 
+type RowImportResult = {
+  rowNumber: number;
+  sku?: string | null;
+  name: string;
+  status: "created" | "updated" | "skipped" | "failed";
+  reason?: string;
+};
+
 /** Compute deterministic importKey for products without SKU */
 function computeImportKey(name: string, category: string, priceFils: number): string {
   const normalized = name.toLowerCase().trim().replace(/\s+/g, " ");
@@ -111,9 +119,7 @@ export async function POST(request: Request) {
     const invalidResults = results.filter((r) => !r.isValid);
 
     const importStart = Date.now();
-    let created = 0;
-    let updated = 0;
-    let failed = 0;
+    const rowResults: RowImportResult[] = [];
     const rowErrors: Array<{
       rowNumber: number;
       sku?: string | null;
@@ -123,6 +129,13 @@ export async function POST(request: Request) {
 
     // Add invalid row errors
     for (const inv of invalidResults) {
+            rowResults.push({
+              rowNumber: inv.rowIndex,
+              sku: inv.data.sku ?? null,
+              name: inv.data.name || "Unknown",
+              status: "failed",
+              reason: inv.errors.join("; "),
+            });
       for (const errMsg of inv.errors) {
           rowErrors.push({
             rowNumber: inv.rowIndex,
@@ -180,11 +193,22 @@ export async function POST(request: Request) {
             data: { name, category, priceFils, ...rest },
             // slug and importKey intentionally not updated — preserve existing values
           });
-          updated++;
+          rowResults.push({
+            rowNumber: result.rowIndex,
+            sku: result.data.sku ?? null,
+            name: result.data.name,
+            status: "updated",
+          });
         } catch (rowErr: unknown) {
-          failed++;
           const msg = (rowErr as Error).message || "Database write failed";
           console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+          rowResults.push({
+            rowNumber: result.rowIndex,
+            sku: result.data.sku ?? null,
+            name: result.data.name,
+            status: "failed",
+            reason: msg,
+          });
           rowErrors.push({
             rowNumber: result.rowIndex,
             sku: result.data.sku ?? null,
@@ -196,32 +220,40 @@ export async function POST(request: Request) {
 
       // Batch creates using createMany with skipDuplicates (idempotent)
       if (toCreate.length > 0) {
-        const createData: Prisma.ProductCreateManyInput[] = [];
+        // Individual creates with row-level tracking
         for (const result of toCreate) {
           const { sku, name, category, priceFils, ...rest } = result.data;
           if (!sku) continue;
-          const slug = slugify(name);
-          createData.push({ vendorId, sku, name, slug, category, priceFils, ...rest });
-        }
-        
-        try {
-          const createResult = await prisma.product.createMany({
-            data: createData,
-            skipDuplicates: true,
-          });
-          created += createResult.count;
-        } catch (batchErr: unknown) {
-          // Fallback: try individual creates with slug retry
-          for (const result of toCreate) {
-            const { sku, name, category, priceFils, ...rest } = result.data;
-            if (!sku) continue;
-            try {
-              await createProductWithSlugRetry({ vendorId, sku, name, category, priceFils, ...rest });
-              created++;
-            } catch (rowErr: unknown) {
-              failed++;
-              const msg = (rowErr as Error).message || "Database write failed";
-              console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+          try {
+            await createProductWithSlugRetry({ vendorId, sku, name, category, priceFils, ...rest });
+            rowResults.push({
+              rowNumber: result.rowIndex,
+              sku: result.data.sku ?? null,
+              name: result.data.name,
+              status: "created",
+            });
+          } catch (rowErr: unknown) {
+            const prismaErr = rowErr as { code?: string; meta?: { target?: string[] } };
+            let msg = (rowErr as Error).message || "Database write failed";
+            let status: "skipped" | "failed" = "failed";
+            
+            // P2002 = unique constraint violation (duplicate)
+            if (prismaErr.code === "P2002") {
+              const target = prismaErr.meta?.target?.join(", ") || "unknown field";
+              msg = `Duplicate ${target} conflict`;
+              status = "skipped";
+            }
+            
+            console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} status=${status} errMessage=${msg}`);
+            rowResults.push({
+              rowNumber: result.rowIndex,
+              sku: result.data.sku ?? null,
+              name: result.data.name,
+              status,
+              reason: msg,
+            });
+            
+            if (status === "failed") {
               rowErrors.push({
                 rowNumber: result.rowIndex,
                 sku: result.data.sku ?? null,
@@ -277,11 +309,22 @@ export async function POST(request: Request) {
             data: { name, category, priceFils, ...rest },
             // slug and importKey preserved
           });
-          updated++;
+          rowResults.push({
+            rowNumber: result.rowIndex,
+            sku: result.data.sku ?? null,
+            name: result.data.name,
+            status: "updated",
+          });
         } catch (rowErr: unknown) {
-          failed++;
           const msg = (rowErr as Error).message || "Database write failed";
           console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+          rowResults.push({
+            rowNumber: result.rowIndex,
+            sku: result.data.sku ?? null,
+            name: result.data.name,
+            status: "failed",
+            reason: msg,
+          });
           rowErrors.push({
             rowNumber: result.rowIndex,
             sku: result.data.sku ?? null,
@@ -293,30 +336,39 @@ export async function POST(request: Request) {
 
       // Batch creates using createMany with skipDuplicates (idempotent)
       if (toCreate.length > 0) {
-        const createData: Prisma.ProductCreateManyInput[] = [];
+        // Individual creates with row-level tracking
         for (const { result, importKey } of toCreate) {
           const { name, category, priceFils, ...rest } = result.data;
-          const slug = slugify(name);
-          createData.push({ vendorId, importKey, name, slug, category, priceFils, ...rest });
-        }
-        
-        try {
-          const createResult = await prisma.product.createMany({
-            data: createData,
-            skipDuplicates: true,
-          });
-          created += createResult.count;
-        } catch (batchErr: unknown) {
-          // Fallback: try individual creates with slug retry
-          for (const { result, importKey } of toCreate) {
-            const { name, category, priceFils, ...rest } = result.data;
-            try {
-              await createProductWithSlugRetry({ vendorId, importKey, name, category, priceFils, ...rest });
-              created++;
-            } catch (rowErr: unknown) {
-              failed++;
-              const msg = (rowErr as Error).message || "Database write failed";
-              console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} errMessage=${msg}`);
+          try {
+            await createProductWithSlugRetry({ vendorId, importKey, name, category, priceFils, ...rest });
+            rowResults.push({
+              rowNumber: result.rowIndex,
+              sku: result.data.sku ?? null,
+              name: result.data.name,
+              status: "created",
+            });
+          } catch (rowErr: unknown) {
+            const prismaErr = rowErr as { code?: string; meta?: { target?: string[] } };
+            let msg = (rowErr as Error).message || "Database write failed";
+            let status: "skipped" | "failed" = "failed";
+            
+            // P2002 = unique constraint violation (duplicate)
+            if (prismaErr.code === "P2002") {
+              const target = prismaErr.meta?.target?.join(", ") || "unknown field";
+              msg = `Duplicate ${target} conflict`;
+              status = "skipped";
+            }
+            
+            console.error(`[PRODUCT_IMPORT_ERROR] requestId=${requestId} row=${result.rowIndex} status=${status} errMessage=${msg}`);
+            rowResults.push({
+              rowNumber: result.rowIndex,
+              sku: result.data.sku ?? null,
+              name: result.data.name,
+              status,
+              reason: msg,
+            });
+            
+            if (status === "failed") {
               rowErrors.push({
                 rowNumber: result.rowIndex,
                 sku: result.data.sku ?? null,
@@ -337,17 +389,27 @@ export async function POST(request: Request) {
     revalidatePath("/marketplace", "layout");
     revalidatePath("/vendor/products", "page");
 
+  // Compute final counts from rowResults
+  const created = rowResults.filter((r) => r.status === "created").length;
+  const updated = rowResults.filter((r) => r.status === "updated").length;
+  const skipped = rowResults.filter((r) => r.status === "skipped").length;
+  const failed = rowResults.filter((r) => r.status === "failed").length;
+  const attempted = rowResults.length;
+
     const totalMs = Date.now() - importStart;
     console.log(
-      `[PRODUCT_IMPORT] requestId=${requestId} created=${created} updated=${updated} failed=${failed} totalMs=${totalMs}`,
+      `[PRODUCT_IMPORT] requestId=${requestId} attempted=${attempted} created=${created} updated=${updated} skipped=${skipped} failed=${failed} totalMs=${totalMs}`,
     );
 
     return NextResponse.json({
       ok: true,
       requestId,
-      createdCount: created,
-      updatedCount: updated,
-      failedCount: failed + invalidResults.length,
+      attempted,
+      created,
+      updated,
+      skipped,
+      failed,
+      rowResults,
       rowErrors,
     });
   } catch (error: unknown) {
