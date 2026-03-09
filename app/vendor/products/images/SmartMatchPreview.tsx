@@ -348,7 +348,7 @@ export function SmartMatchPreview({
                         )}
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        Key: {row.key}
+                        File: {row.filename}
                       </span>
                     </td>
 
