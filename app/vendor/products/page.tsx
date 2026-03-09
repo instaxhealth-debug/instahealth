@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { isServiceCategory } from "@/lib/vendor-categories";
 import { ProductImportModal } from "./ProductImportModal";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, X } from "lucide-react";
 import { ProductListActions } from "./ProductListActions";
 
 type ProductRow = {
   id: string;
   name: string;
+  sku: string | null;
   category: string;
+  tags: string[];
   updatedAt: Date;
   active: boolean;
   published: boolean;
@@ -39,22 +41,29 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
   const vendor = await getVendorContext();
   const query = (searchParams?.q || "").trim();
 
+  // Build search conditions
+  const searchConditions = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { sku: { contains: query, mode: "insensitive" as const } },
+          { category: { contains: query, mode: "insensitive" as const } },
+          { tags: { hasSome: [query] } }, // Exact match in tags array
+        ],
+      }
+    : {};
+
   const products: ProductRow[] = await prisma.product.findMany({
     where: {
       vendorId: vendor.vendorId,
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" } },
-              { category: { contains: query, mode: "insensitive" } },
-            ],
-          }
-        : {}),
+      ...searchConditions,
     },
     select: {
       id: true,
       name: true,
+      sku: true,
       category: true,
+      tags: true,
       updatedAt: true,
       active: true,
       published: true,
@@ -89,13 +98,29 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
       </div>
 
       <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          name="q"
-          defaultValue={query}
-          placeholder="Search by name or category"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-        <Button type="submit" size="sm">
+        <div className="relative flex-1">
+          <input
+            name="q"
+            defaultValue={query}
+            placeholder="Search by name, SKU, category, or tags..."
+            className="w-full rounded border px-3 py-2 pr-10 text-sm"
+          />
+          {query && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              asChild
+            >
+              <Link href="/vendor/products">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Clear search</span>
+              </Link>
+            </Button>
+          )}
+        </div>
+        <Button type="submit" size="sm" className="sm:w-auto w-full">
           Search
         </Button>
       </form>
@@ -106,7 +131,20 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {products.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No items found.</div>
+            <div className="text-sm text-muted-foreground text-center py-8">
+              {query ? (
+                <>
+                  No products found for <strong>&ldquo;{query}&rdquo;</strong>.
+                  <div className="mt-2">
+                    <Button variant="link" size="sm" asChild>
+                      <Link href="/vendor/products">Clear search</Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                "No items found."
+              )}
+            </div>
           ) : (
             products.map((product) => {
               const isService = isServiceCategory(product.category);

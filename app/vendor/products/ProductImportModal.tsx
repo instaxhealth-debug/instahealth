@@ -25,6 +25,7 @@ interface PreviewRow {
   mappingReason: string | null;
   mappingConfidence: string | null;
   missingCategory: boolean;
+  peptideSubtype: "injectable" | "oral" | "nasal" | null;
   data: { sku?: string; name: string; category: string; priceFils: number };
 }
 
@@ -82,6 +83,11 @@ export function ProductImportModal() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Pagination & filter state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filter, setFilter] = useState<"all" | "valid" | "invalid" | "creates" | "updates">("all");
+  const rowsPerPage = 50;
+
   function reset() {
     setState("initial");
     setFile(null);
@@ -89,8 +95,35 @@ export function ProductImportModal() {
     setResult(null);
     setBulkCategory("");
     setPreviewId("");
+    setCurrentPage(1);
+    setFilter("all");
     if (inputRef.current) inputRef.current.value = "";
   }
+
+  // Filter rows based on active filter
+  const filteredRows = preview?.rows.filter((row) => {
+    if (filter === "valid") return row.isValid;
+    if (filter === "invalid") return !row.isValid;
+    if (filter === "creates") return row.action === "create";
+    if (filter === "updates") return row.action === "update";
+    return true; // "all"
+  }) || [];
+
+  // Paginate filtered rows
+  const totalFilteredRows = filteredRows.length;
+  const totalPages = Math.ceil(totalFilteredRows / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedRows = filteredRows.slice(startIndex, endIndex);
+
+  // Jump to first invalid row
+  const jumpToFirstInvalid = () => {
+    const firstInvalidIndex = preview?.rows.findIndex((row) => !row.isValid);
+    if (firstInvalidIndex !== undefined && firstInvalidIndex >= 0) {
+      setFilter("invalid");
+      setCurrentPage(1);
+    }
+  };
 
   const fetchPreview = useCallback(async (f: File, bulkCat?: string) => {
     const formData = new FormData();
@@ -297,6 +330,7 @@ export function ProductImportModal() {
         {/* PREVIEW */}
         {state === "preview" && preview && (
           <div className="space-y-4">
+            {/* Summary Stats */}
             <div className="grid grid-cols-4 gap-3">
               <StatCard label="Total" value={preview.totalRows} />
               <StatCard label="Valid" value={preview.validRows} className="bg-green-50 text-green-700" />
@@ -336,6 +370,69 @@ export function ProductImportModal() {
               </div>
             )}
 
+            {/* Quick Jump to Invalid */}
+            {preview.invalidRows > 0 && filter !== "invalid" && (
+              <div className="flex items-center justify-between px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <span className="text-xs text-red-700 font-medium">
+                    {preview.invalidRows} invalid row{preview.invalidRows > 1 ? "s" : ""} found
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={jumpToFirstInvalid}
+                  className="text-xs h-7"
+                >
+                  Show Invalid Only
+                </Button>
+              </div>
+            )}
+
+            {/* Filter Tabs */}
+            <div className="flex gap-2 border-b">
+              {(["all", "valid", "invalid", "creates", "updates"] as const).map((f) => {
+                const counts = {
+                  all: preview.totalRows,
+                  valid: preview.validRows,
+                  invalid: preview.invalidRows,
+                  creates: preview.counts.willCreate,
+                  updates: preview.counts.willUpdate,
+                };
+                return (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      setFilter(f);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                      filter === f
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Page Range Summary */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Showing {startIndex + 1}–{Math.min(endIndex, totalFilteredRows)} of {totalFilteredRows} rows
+                {filter !== "all" && ` (${preview.totalRows} total)`}
+              </span>
+              {totalPages > 1 && (
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+              )}
+            </div>
+
+            {/* Table */}
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-[280px] overflow-y-auto">
                 <table className="w-full text-sm">
@@ -350,57 +447,117 @@ export function ProductImportModal() {
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.rows.map((row) => (
-                      <tr key={row.rowIndex} className="border-t">
-                        <td className="px-3 py-2 text-muted-foreground">{row.rowIndex}</td>
-                        <td className="px-3 py-2">
-                          {row.isValid ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          )}
+                    {paginatedRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                          No rows match this filter
                         </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`text-xs px-1.5 py-0.5 rounded ${
-                              row.action === "create"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {row.action}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 truncate max-w-[140px]">{row.data.name}</td>
-                        <td className="px-3 py-2 text-xs">
-                          {row.mappedCategorySlug ? (
-                            <span className="text-green-700">
-                              {row.mappedCategorySlug}
-                              {row.mappingConfidence === "MEDIUM" && (
-                                <span className="text-amber-600 ml-1" title={`Matched via ${row.mappingReason}`}>~</span>
-                              )}
-                            </span>
-                          ) : row.missingCategory ? (
-                            <span className="text-amber-600 italic">missing</span>
-                          ) : null}
-                          {row.rawCategory && row.mappedCategorySlug && row.rawCategory !== row.mappedCategorySlug && (
-                            <span className="text-muted-foreground ml-1">
-                              ← {row.rawCategory}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-red-600 text-xs">{row.errors.join("; ")}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      paginatedRows.map((row) => (
+                        <tr key={row.rowIndex} className="border-t">
+                          <td className="px-3 py-2 text-muted-foreground">{row.rowIndex}</td>
+                          <td className="px-3 py-2">
+                            {row.isValid ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`text-xs px-1.5 py-0.5 rounded ${
+                                row.action === "create"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {row.action}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 truncate max-w-[140px]">{row.data.name}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {row.mappedCategorySlug ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-green-700">
+                                  {row.mappedCategorySlug}
+                                  {row.peptideSubtype && (
+                                    <span className="text-blue-600 ml-1">
+                                      → {row.peptideSubtype}
+                                    </span>
+                                  )}
+                                  {row.mappingConfidence === "MEDIUM" && (
+                                    <span className="text-amber-600 ml-1" title={`Matched via ${row.mappingReason}`}>~</span>
+                                  )}
+                                </span>
+                                {row.rawCategory && row.mappedCategorySlug && row.rawCategory !== row.mappedCategorySlug && (
+                                  <span className="text-muted-foreground text-[10px]">
+                                    ← {row.rawCategory}
+                                  </span>
+                                )}
+                              </div>
+                            ) : row.missingCategory ? (
+                              <span className="text-amber-600 italic">missing</span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-red-600 text-xs">{row.errors.join("; ")}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {preview.rows.length < preview.totalRows && (
-              <p className="text-xs text-muted-foreground text-center">
-                Showing {preview.rows.length} of {preview.totalRows} rows
-              </p>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Show first 2, last 2, and current page context
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded text-xs font-medium ${
+                          currentPage === pageNum
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted hover:bg-muted/80"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             )}
           </div>
         )}

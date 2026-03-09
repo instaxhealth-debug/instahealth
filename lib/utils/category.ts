@@ -197,8 +197,44 @@ export function normalizeCategory(input: string): CategorySlug {
   return CATEGORY_SLUGS.BLOOD_TESTS; // Default fallback
 }
 
-// TODO: future enhancement — support tags/subCategory for sublabels like "Injectable Peptides"
-// These should map to category=peptides with a tag "injectable" rather than creating new categories.
+// Extract peptide subtype from raw category string
+export type PeptideSubtype = "injectable" | "oral" | "nasal" | null;
+
+export function extractPeptideSubtype(rawCategory: string, mappedSlug: CategorySlug | null): PeptideSubtype {
+  if (mappedSlug !== CATEGORY_SLUGS.PEPTIDES) return null;
+  
+  const normalized = normalizeCategoryInput(rawCategory);
+  
+  // Check for injectable keywords
+  if (
+    normalized.includes("injectable") ||
+    normalized.includes("injection") ||
+    normalized.includes("injections") ||
+    normalized.includes("shots")
+  ) {
+    return "injectable";
+  }
+  
+  // Check for oral keywords
+  if (
+    normalized.includes("oral") ||
+    normalized.includes("capsule") ||
+    normalized.includes("caps") ||
+    normalized.includes("pill")
+  ) {
+    return "oral";
+  }
+  
+  // Check for nasal keywords
+  if (
+    normalized.includes("nasal") ||
+    normalized.includes("spray")
+  ) {
+    return "nasal";
+  }
+  
+  return null;
+}
 
 // Validate category slug is canonical
 export function isValidCategorySlug(slug: string): slug is CategorySlug {

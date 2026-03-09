@@ -7,7 +7,6 @@ import { isValidCategorySlug, formatAllowedCategories } from "@/lib/utils/catego
 import crypto from "crypto";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_PREVIEW_ROWS = 50;
 const IMPORT_SCHEMA_VERSION = 1;
 
 /** Deterministic hash for TOCTOU protection between preview and commit */
@@ -106,7 +105,7 @@ export async function POST(request: Request) {
         invalidRows: invalidCount,
         missingCategoryCount,
         counts: { willCreate, willUpdate },
-        rows: results.slice(0, MAX_PREVIEW_ROWS).map((r) => ({
+        rows: results.map((r) => ({
           rowIndex: r.rowIndex,
           isValid: r.isValid,
           errors: r.errors,

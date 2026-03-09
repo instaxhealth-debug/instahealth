@@ -7,9 +7,11 @@ import {
   mapCategoryToSlug,
   formatAllowedCategories,
   CATEGORY_DISPLAY_NAMES,
+  extractPeptideSubtype,
   type MappingReason,
   type MappingConfidence,
   type CategorySlug,
+  type PeptideSubtype,
 } from "@/lib/utils/category";
 import type { ParsedRow } from "./csv-parser";
 
@@ -23,6 +25,7 @@ export interface ValidationResult {
   mappingReason: MappingReason | null;
   mappingConfidence: MappingConfidence | null;
   missingCategory: boolean;
+  peptideSubtype: PeptideSubtype;
   data: {
     sku?: string;
     name: string;
@@ -88,6 +91,7 @@ export async function validateProductRow(
       mappingReason: null,
       mappingConfidence: null,
       missingCategory: true,
+      peptideSubtype: null,
       data: {} as any,
     };
   }
@@ -163,6 +167,9 @@ export async function validateProductRow(
 
   const category = mappedSlug || "";
 
+  // Extract peptide subtype if applicable
+  const peptideSubtype = extractPeptideSubtype(rawCategory, mappedSlug as CategorySlug | null);
+
   // Service-specific
   const isService = category ? isServiceCategory(category) : false;
   const bookingUrl = row.bookingUrl || null;
@@ -192,6 +199,12 @@ export async function validateProductRow(
     if (existing) action = "update";
   }
 
+  // Parse tags from CSV and add peptide subtype if applicable
+  const csvTags = parseTags(row.tags);
+  const finalTags = peptideSubtype
+    ? Array.from(new Set([...csvTags, peptideSubtype])) // Add subtype tag if not already present
+    : csvTags;
+
   return {
     rowIndex,
     isValid: errors.length === 0,
@@ -202,6 +215,7 @@ export async function validateProductRow(
     mappingReason,
     mappingConfidence,
     missingCategory,
+    peptideSubtype,
     data: {
       sku: row.sku || undefined,
       name: row.name || "",
@@ -209,7 +223,7 @@ export async function validateProductRow(
       priceFils,
       description: row.description || null,
       imageUrl: row.imageUrl || null,
-      tags: parseTags(row.tags),
+      tags: finalTags,
       published: parseBoolean(row.published, true),
       active,
       inStock: isService ? true : parseBoolean(row.inStock, true),
