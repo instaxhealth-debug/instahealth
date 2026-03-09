@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { isServiceCategory, normalizeCategory, PRODUCT_CATEGORIES, SERVICE_CATEGORIES } from "@/lib/vendor-categories";
 import Image from "next/image";
+import { DeleteProductModal } from "./DeleteProductModal";
 
 interface VariantForm {
   id?: string;
@@ -690,25 +691,35 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={isSaving} onClick={() => submit()}>
-          Save
-        </Button>
-        <Button variant="outline" disabled={isSaving} onClick={() => submit({ published: false })}>
-          Save Draft
-        </Button>
-        <Button variant="outline" disabled={isSaving} onClick={() => triggerPublish(true)}>
-          Publish
-        </Button>
-        {product?.published && (
-          <Button variant="outline" disabled={isSaving} onClick={() => triggerPublish(false)}>
-            Unpublish
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={isSaving} onClick={() => submit()}>
+            Save
           </Button>
-        )}
+          <Button variant="outline" disabled={isSaving} onClick={() => submit({ published: false })}>
+            Save Draft
+          </Button>
+          <Button variant="outline" disabled={isSaving} onClick={() => triggerPublish(true)}>
+            Publish
+          </Button>
+          {product?.published && (
+            <Button variant="outline" disabled={isSaving} onClick={() => triggerPublish(false)}>
+              Unpublish
+            </Button>
+          )}
+          {product && (
+            <Button variant="destructive" disabled={isSaving} onClick={() => submit({ active: false })}>
+              Deactivate
+            </Button>
+          )}
+        </div>
+
         {product && (
-          <Button variant="destructive" disabled={isSaving} onClick={() => submit({ active: false })}>
-            Deactivate
-          </Button>
+          <DeleteProductModal
+            productId={product.id}
+            productName={product.name}
+            redirectAfterDelete={true}
+          />
         )}
       </div>
     </div>

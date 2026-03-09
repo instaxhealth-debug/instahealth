@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { isServiceCategory } from "@/lib/vendor-categories";
 import { ProductImportModal } from "./ProductImportModal";
 import { ImagePlus } from "lucide-react";
+import { ProductListActions } from "./ProductListActions";
 
 type ProductRow = {
   id: string;
@@ -129,6 +130,10 @@ export default async function VendorProductsPage({ searchParams }: PageProps) {
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/vendor/products/${product.id}`}>Manage</Link>
                       </Button>
+                      <ProductListActions
+                        productId={product.id}
+                        productName={product.name}
+                      />
                     </div>
                   </div>
 

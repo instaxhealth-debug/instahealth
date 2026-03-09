@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/auth/requireVendor";
 import { isServiceCategory, isValidBookingUrl, normalizeCategory } from "@/lib/vendor-categories";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { del } from "@vercel/blob";
 
 function revalidateMarketplace(category: string, vendorId: string) {
   revalidateTag("products");
@@ -176,5 +177,141 @@ export async function PATCH(
     }
 
     return NextResponse.json({ error: error.message || "Failed to update item" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/vendor/products/[id]
+ *
+ * Production-ready deletion with archive logic:
+ * - If product has order history → archive (set active=false, published=false)
+ * - If product has no order history → hard delete (delete variants, blob, product row)
+ *
+ * Safety:
+ * - requireVendor() enforces authentication
+ * - Product must belong to session vendorId
+ * - Blob deletion only for vendor-owned paths
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { vendorId } = await requireVendor();
+
+    // Verify product exists and belongs to this vendor
+    const product = await prisma.product.findFirst({
+      where: { id: params.id, vendorId },
+      select: {
+        id: true,
+        vendorId: true,
+        category: true,
+        imageUrl: true,
+        name: true,
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Check if product has order history (via OrderItem references)
+    const orderItemCount = await prisma.orderItem.count({
+      where: {
+        OR: [
+          { productId: product.id },
+          {
+            variantId: {
+              in: await prisma.productVariant
+                .findMany({
+                  where: { productId: product.id },
+                  select: { id: true },
+                })
+                .then(variants => variants.map(v => v.id))
+            }
+          }
+        ]
+      },
+    });
+
+    const hasOrderHistory = orderItemCount > 0;
+
+    if (hasOrderHistory) {
+      // ARCHIVE: Product has order history, cannot hard delete
+      await prisma.product.update({
+        where: { id: product.id },
+        data: {
+          active: false,
+          published: false,
+          inventoryStatus: "out",
+          inStock: false,
+        },
+      });
+
+      // Also deactivate all variants
+      await prisma.productVariant.updateMany({
+        where: { productId: product.id },
+        data: { active: false, inStock: false },
+      });
+
+      revalidateMarketplace(product.category, product.vendorId);
+
+      return NextResponse.json({
+        success: true,
+        action: "archived",
+        message: "Product archived because it has order history",
+      });
+    } else {
+      // HARD DELETE: Product has no order history, safe to delete
+
+      // 1. Delete variants
+      await prisma.productVariant.deleteMany({
+        where: { productId: product.id },
+      });
+
+      // 2. Delete blob image if it exists and is vendor-owned
+      if (product.imageUrl) {
+        const isBlobUrl = product.imageUrl.includes("vercel-storage.com") ||
+                         product.imageUrl.includes("blob.vercel-storage.com");
+        const isVendorPath = product.imageUrl.includes(`vendors/${vendorId}/products/`);
+
+        if (isBlobUrl && isVendorPath) {
+          try {
+            await del(product.imageUrl);
+            console.log(`[DELETE] Deleted blob: ${product.imageUrl}`);
+          } catch (blobError) {
+            // Log but don't fail - blob might already be deleted
+            console.warn(`[DELETE] Failed to delete blob (non-fatal):`, blobError);
+          }
+        }
+      }
+
+      // 3. Delete product row
+      await prisma.product.delete({
+        where: { id: product.id },
+      });
+
+      revalidateMarketplace(product.category, product.vendorId);
+
+      return NextResponse.json({
+        success: true,
+        action: "deleted",
+        message: "Product permanently deleted",
+      });
+    }
+  } catch (error: any) {
+    console.error("[DELETE /api/vendor/products/[id]] Error:", error);
+
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden - No vendor account" }, { status: 403 });
+    }
+
+    return NextResponse.json({
+      error: error.message || "Failed to delete product",
+      success: false,
+    }, { status: 500 });
   }
 }
