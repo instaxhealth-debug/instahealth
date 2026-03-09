@@ -14,6 +14,7 @@ export const SERVICE_CATEGORIES = [
 
 export const PRODUCT_CATEGORIES = [
   "peptides",
+  "amino-acids",
   "supplements",
   "physical-products",
   "hormones",

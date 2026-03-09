@@ -4,6 +4,7 @@ export const CATEGORY_SLUGS = {
   IV_DRIPS: "iv-drips",
   SUPPLEMENTS: "supplements",
   PEPTIDES: "peptides",
+  AMINO_ACIDS: "amino-acids",
   HORMONES: "hormones",
   CONSULTATIONS: "consultations",
   INSURANCE: "insurance",
@@ -19,6 +20,7 @@ export const CATEGORY_DISPLAY_NAMES: Record<CategorySlug, string> = {
   [CATEGORY_SLUGS.IV_DRIPS]: "IV Drips",
   [CATEGORY_SLUGS.SUPPLEMENTS]: "Supplements",
   [CATEGORY_SLUGS.PEPTIDES]: "Peptides",
+  [CATEGORY_SLUGS.AMINO_ACIDS]: "Amino Acids",
   [CATEGORY_SLUGS.HORMONES]: "Hormones",
   [CATEGORY_SLUGS.CONSULTATIONS]: "Consultations",
   [CATEGORY_SLUGS.INSURANCE]: "Insurance",
@@ -35,6 +37,10 @@ const CATEGORY_ALIASES: Record<CategorySlug, string[]> = {
     "peptides capsules", "capsules", "caps", "oral capsules", "capsule",
     "nasal peptides", "peptide nasal", "nasal spray", "peptide nasal spray",
     "nasal",
+  ],
+  [CATEGORY_SLUGS.AMINO_ACIDS]: [
+    "amino acid", "amino acids", "aminoacids", "amino", "aminos",
+    "essential amino acids", "eaa", "bcaa", "branched chain amino acids",
   ],
   [CATEGORY_SLUGS.BLOOD_TESTS]: [
     "blood test", "lab tests", "lab test", "pathology", "labs",
