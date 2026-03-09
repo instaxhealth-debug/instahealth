@@ -22,7 +22,8 @@
       "Bash(npm install @radix-ui/react-checkbox)",
       "Bash(chmod +x scripts/verify-bulletproof-upload.sh)",
       "Bash(./scripts/verify-bulletproof-upload.sh)",
-      "Bash(git add .)"
+      "Bash(git add .)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nRefactor bulk upload to Smart Match 2.0 (deterministic matching system)\n\n- Remove \"Filename = SKU\" mode entirely (single matching paradigm)\n- Implement layered deterministic matching with confidence levels:\n  • EXACT_SKU/EXACT_NAME → auto-confirmed\n  • HIGH (≥80% token overlap) → auto-selected\n  • MEDIUM (≥50%) → manual confirmation required\n  • NONE (< 50%) → user must choose\n- Clean SKU display (show \"No SKU\" when absent, not alarming noise)\n- Update result taxonomy: uploaded | skipped | needs_confirmation | error\n- Redesign as 3-step wizard: Select → Review → Upload\n- Maintain productId-based backend pipeline (no backend changes)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ]
   },
   "enableAllProjectMcpServers": true,
