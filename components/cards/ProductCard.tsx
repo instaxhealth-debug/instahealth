@@ -51,12 +51,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
   return (
     <Card
       className={cn(
-        "group overflow-hidden transition-all duration-200 hover:shadow-medium border-border/50",
+        "group overflow-hidden transition-all duration-200 hover:shadow-medium border-border/50 flex flex-col h-full",
         className
       )}
     >
-      <a href={`/product/${product.slug}`}>
-        <CardContent className="p-0">
+      <a href={`/product/${product.slug}`} className="flex flex-col h-full">
+        <CardContent className="p-0 flex flex-col h-full">
           <div className="relative aspect-square overflow-hidden bg-muted">
             {product.image && 
              !product.image.startsWith("/Users") && 
@@ -96,37 +96,39 @@ export function ProductCard({ product, className }: ProductCardProps) {
               </div>
             )}
           </div>
-          <div className="p-3 md:p-4 space-y-2">
-            <div>
-              <h3 className="font-semibold text-sm md:text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+          <div className="p-3 md:p-4 flex flex-col flex-1">
+            <div className="flex-1 space-y-2">
+              <h3 className="font-semibold text-sm md:text-base leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                 {product.name}
               </h3>
               {product.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-1 hidden md:block">
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
                   {product.description}
                 </p>
               )}
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <p className="text-xl md:text-lg font-bold">{product.priceDisplay}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {deliveryTime}
-                  </span>
+            <div className="space-y-2 pt-3 mt-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg md:text-xl font-bold">{product.priceDisplay}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {deliveryTime}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <Button
+                onClick={handleAddToCart}
+                className="w-full"
+                size="sm"
+                variant="default"
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Add to cart
+              </Button>
             </div>
-            <Button
-              onClick={handleAddToCart}
-              className="w-full mt-2"
-              size="sm"
-              variant="default"
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Add to cart
-            </Button>
           </div>
         </CardContent>
       </a>

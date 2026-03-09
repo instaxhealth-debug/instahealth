@@ -245,7 +245,7 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
         )}
 
         {/* Product Count */}
-        <p className="text-muted-foreground mb-4">
+        <p className="text-muted-foreground mb-2">
           {searchQuery && storefrontProducts.length === 0
             ? `No products found for "${searchQuery}"`
             : storefrontProducts.length > 0
@@ -254,21 +254,21 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
         </p>
 
         {/* Search Bar */}
-        <form method="get" className="flex gap-2 max-w-lg">
+        <form method="get" className="flex gap-2 mb-6 max-w-lg">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               name="q"
               defaultValue={searchQuery}
               placeholder={`Search ${vendor.name} ${categoryTitle.toLowerCase()}...`}
-              className="w-full rounded-lg border border-input bg-background pl-10 pr-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="w-full rounded-lg border border-input bg-background pl-10 pr-10 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
             />
             {searchQuery && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 hover:bg-muted"
                 asChild
               >
                 <a href={`/shop/${params.vendorSlug}/${categorySlug}`}>
@@ -278,7 +278,7 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
               </Button>
             )}
           </div>
-          <Button type="submit" size="default">
+          <Button type="submit" size="default" className="px-6">
             Search
           </Button>
         </form>
