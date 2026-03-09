@@ -391,107 +391,135 @@ export function BulkFileUpload() {
    * RENDER
    */
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* STEP INDICATOR */}
-      <div className="flex items-center gap-4 pb-6 border-b">
-        <div className={`flex items-center gap-2 ${currentStep === "select" ? "font-semibold" : "text-muted-foreground"}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "select" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            1
+      <div className="flex items-center justify-center gap-2 px-6 py-8">
+        <div className={`flex items-center gap-3 transition-all ${currentStep === "select" ? "font-medium" : "text-muted-foreground"}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+            currentStep === "select" 
+              ? "bg-primary text-primary-foreground border-primary" 
+              : "bg-background border-muted-foreground/40"
+          }`}>
+            <span className="text-sm font-semibold">1</span>
           </div>
-          <span>Select</span>
+          <span className="text-sm">Select</span>
         </div>
-        <div className="flex-1 h-px bg-border" />
-        <div className={`flex items-center gap-2 ${currentStep === "review" ? "font-semibold" : "text-muted-foreground"}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "review" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            2
+        <div className={`w-16 h-[2px] mx-2 transition-colors ${
+          currentStep === "review" || currentStep === "upload" ? "bg-primary" : "bg-border"
+        }`} />
+        <div className={`flex items-center gap-3 transition-all ${currentStep === "review" ? "font-medium" : "text-muted-foreground"}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+            currentStep === "review" 
+              ? "bg-primary text-primary-foreground border-primary" 
+              : "bg-background border-muted-foreground/40"
+          }`}>
+            <span className="text-sm font-semibold">2</span>
           </div>
-          <span>Review</span>
+          <span className="text-sm">Review</span>
         </div>
-        <div className="flex-1 h-px bg-border" />
-        <div className={`flex items-center gap-2 ${currentStep === "upload" ? "font-semibold" : "text-muted-foreground"}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "upload" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            3
+        <div className={`w-16 h-[2px] mx-2 transition-colors ${
+          currentStep === "upload" ? "bg-primary" : "bg-border"
+        }`} />
+        <div className={`flex items-center gap-3 transition-all ${currentStep === "upload" ? "font-medium" : "text-muted-foreground"}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+            currentStep === "upload" 
+              ? "bg-primary text-primary-foreground border-primary" 
+              : "bg-background border-muted-foreground/40"
+          }`}>
+            <span className="text-sm font-semibold">3</span>
           </div>
-          <span>Upload</span>
+          <span className="text-sm">Upload</span>
         </div>
       </div>
 
       {/* STEP 1: SELECT FILES */}
       {currentStep === "select" && (
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="image-files">Select Images (max {MAX_FILES_PER_BATCH})</Label>
-            <Input
-              id="image-files"
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={handleFileSelect}
-            />
-            <p className="text-xs text-muted-foreground">
-              Max {MAX_FILES_PER_BATCH} files • Max 5MB per file • JPEG, PNG, WebP only
-            </p>
-          </div>
-
-          {files.length > 0 && (
-            <div className="space-y-3">
-              <Label>Selected Files ({files.length}/{MAX_FILES_PER_BATCH})</Label>
-              <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-2">
-                {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between text-sm bg-muted p-2 rounded"
-                  >
-                    <span className="truncate flex-1">{file.name}</span>
-                    <span className="text-muted-foreground text-xs mx-2">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(index)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border rounded-md p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="replace-existing">Replace Existing Images</Label>
+          <div className="bg-card border rounded-lg p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="image-files" className="text-base font-medium">Select Images</Label>
+              <Input
+                id="image-files"
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={handleFileSelect}
+                className="cursor-pointer"
+              />
               <p className="text-xs text-muted-foreground">
-                Overwrite images that are already set for products
+                Max {MAX_FILES_PER_BATCH} files · Max 5MB per file · JPEG, PNG, WebP
               </p>
             </div>
-            <Switch
-              id="replace-existing"
-              checked={replaceExisting}
-              onCheckedChange={setReplaceExisting}
-            />
+
+            {files.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Selected Files</Label>
+                  <span className="text-xs text-muted-foreground">{files.length}/{MAX_FILES_PER_BATCH}</span>
+                </div>
+                <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                  {files.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(file.size / 1024).toFixed(1)} KB · {file.type.split('/')[1].toUpperCase()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          <Button
-            onClick={handleProceedToReview}
-            disabled={files.length === 0 || isLoadingProducts}
-            className="w-full"
-            size="lg"
-          >
-            {isLoadingProducts ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading products...
-              </>
-            ) : (
-              <>
-                Proceed to Review ({files.length} files)
-              </>
-            )}
-          </Button>
+          <div className="bg-card border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="replace-existing" className="text-sm font-medium cursor-pointer">Replace Existing Images</Label>
+                <p className="text-xs text-muted-foreground">
+                  Overwrite images already set for products
+                </p>
+              </div>
+              <Switch
+                id="replace-existing"
+                checked={replaceExisting}
+                onCheckedChange={setReplaceExisting}
+              />
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 pt-4 pb-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t">
+            <Button
+              onClick={handleProceedToReview}
+              disabled={files.length === 0 || isLoadingProducts}
+              className="w-full"
+              size="lg"
+            >
+              {isLoadingProducts ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading products...
+                </>
+              ) : (
+                <>
+                  Continue to Review · {files.length} {files.length === 1 ? 'file' : 'files'}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -508,46 +536,77 @@ export function BulkFileUpload() {
 
       {/* STEP 3: UPLOAD RESULTS */}
       {currentStep === "upload" && results && (
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Upload Results</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {results.map((result, index) => {
-              const isSuccess = result.status === "uploaded";
-              const isSkipped = result.status === "skipped";
-              const isError = result.status === "error";
+        <div className="space-y-6">
+          <div className="bg-card border rounded-lg p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Upload Complete</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {results.filter(r => r.status === "uploaded").length} uploaded, 
+                  {results.filter(r => r.status === "skipped").length} skipped, 
+                  {results.filter(r => r.status === "error").length} failed
+                </p>
+              </div>
+              
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                {results.map((result, index) => {
+                  const isSuccess = result.status === "uploaded";
+                  const isSkipped = result.status === "skipped";
+                  const isError = result.status === "error";
 
-              return (
-                <div
-                  key={index}
-                  className={`p-3 rounded-md border ${
-                    isSuccess
-                      ? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
-                      : isSkipped
-                      ? "bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800"
-                      : "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    {isSuccess && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />}
-                    {isSkipped && <FileWarning className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />}
-                    {isError && <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />}
-                    <div className="flex-1 text-sm space-y-1">
-                      <p className="font-medium">
-                        {result.filename} → {result.productName}
-                      </p>
-                      {isSuccess && <p className="text-green-700 text-xs">✓ Uploaded successfully</p>}
-                      {isSkipped && result.error && <p className="text-yellow-700 text-xs">⏭ {result.error}</p>}
-                      {isError && result.error && <p className="text-red-700 text-xs">✗ {result.error}</p>}
+                  return (
+                    <div
+                      key={index}
+                      className={`rounded-lg border p-4 transition-colors ${
+                        isSuccess
+                          ? "bg-green-50/50 border-green-200/60 dark:bg-green-950/20 dark:border-green-800/40"
+                          : isSkipped
+                          ? "bg-amber-50/50 border-amber-200/60 dark:bg-amber-950/20 dark:border-amber-800/40"
+                          : "bg-red-50/50 border-red-200/60 dark:bg-red-950/20 dark:border-red-800/40"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 rounded-full p-1 ${
+                          isSuccess 
+                            ? "bg-green-100 dark:bg-green-900/40"
+                            : isSkipped
+                            ? "bg-amber-100 dark:bg-amber-900/40"
+                            : "bg-red-100 dark:bg-red-900/40"
+                        }`}>
+                          {isSuccess && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                          {isSkipped && <FileWarning className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                          {isError && <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium leading-tight">{result.productName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{result.filename}</p>
+                            </div>
+                          </div>
+                          {isSuccess && (
+                            <p className="text-xs text-green-700 dark:text-green-400">Successfully uploaded</p>
+                          )}
+                          {isSkipped && result.error && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400">{result.error}</p>
+                          )}
+                          {isError && result.error && (
+                            <p className="text-xs text-red-700 dark:text-red-400">{result.error}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <Button onClick={handleStartOver} variant="outline" className="w-full">
-            Upload More Images
-          </Button>
+          <div className="sticky bottom-0 pt-4 pb-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t">
+            <Button onClick={handleStartOver} variant="outline" className="w-full" size="lg">
+              Upload More Images
+            </Button>
+          </div>
         </div>
       )}
     </div>
