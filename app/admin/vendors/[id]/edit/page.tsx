@@ -24,6 +24,11 @@ async function updateVendor(formData: FormData) {
   const ratingCount = formData.get("ratingCount") ? parseInt(formData.get("ratingCount") as string) : null;
   const isHouseBrand = formData.get("isHouseBrand") === "on";
   const complianceAccepted = formData.get("complianceAccepted") === "on";
+  const allowedCategoriesRaw = (formData.get("allowedCategories") as string) || "";
+  const allowedCategories = allowedCategoriesRaw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   if (!id || !name || !email) {
     throw new Error("ID, name, and email are required");
@@ -68,6 +73,7 @@ async function updateVendor(formData: FormData) {
       rating,
       ratingCount,
       isHouseBrand,
+      allowedCategories,
     },
   });
 
@@ -225,6 +231,19 @@ export default async function EditVendorPage({ params }: { params: { id: string 
               placeholder="Everything Peptides"
               className="w-full rounded border px-3 py-2"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Allowed Categories</label>
+            <input
+              name="allowedCategories"
+              defaultValue={vendor.allowedCategories.join(", ")}
+              placeholder="peptides, amino-acids, supplements"
+              className="w-full rounded border px-3 py-2"
+            />
+            <p className="text-xs text-gray-500">
+              Comma-separated category slugs (e.g., peptides, amino-acids). Leave empty to allow all categories.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

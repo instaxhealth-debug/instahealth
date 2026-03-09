@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { upload } from '@vercel/blob/client';
+import { BUSINESS_CATEGORIES } from '@/lib/constants/vendor-categories';
 
 export default function VendorApplyPage() {
   const router = useRouter();
@@ -470,24 +471,13 @@ export default function VendorApplyPage() {
                     Marketplace Categories * (Select all that apply)
                   </label>
                   <div className="space-y-2">
-                    {[
-                      { value: 'blood-tests', label: 'Blood testing packages', description: 'Blood testing packages' },
-                      { value: 'iv-drips', label: 'IV Drips', description: 'IV therapy and wellness drips' },
-                      { value: 'clinics', label: 'Clinics', description: 'Medical clinics and healthcare facilities' },
-                      { value: 'peptides', label: 'Peptides', description: 'Peptide products from verified vendors' },
-                      { value: 'hormones', label: 'Hormones', description: 'Hormone optimization' },
-                      { value: 'consultations', label: 'Consultations', description: 'Consult with health pros' },
-                      { value: 'insurance', label: 'Insurance', description: 'Health insurance plans' },
-                      { value: 'supplements', label: 'Supplements', description: 'Vitamins and supplements' },
-                      { value: 'haircare', label: 'Haircare', description: 'Hair wellness products' },
-                      { value: 'pets', label: 'Pets', description: 'Pet health and wellness' },
-                    ].map((cat) => (
-                      <label key={cat.value} className="flex items-start gap-2">
+                    {BUSINESS_CATEGORIES.map((cat) => (
+                      <label key={cat.slug} className="flex items-start gap-2">
                         <input
                           type="checkbox"
                           name="selectedCategories"
-                          value={cat.value}
-                          checked={formData.selectedCategories.includes(cat.value)}
+                          value={cat.slug}
+                          checked={formData.selectedCategories.includes(cat.slug)}
                           onChange={handleInputChange}
                           className="w-4 h-4 mt-1"
                         />
