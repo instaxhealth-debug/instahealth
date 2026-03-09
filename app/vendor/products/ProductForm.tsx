@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -344,6 +345,29 @@ export function ProductForm({ vendor, product }: VendorProductFormProps) {
 
   return (
     <div className="space-y-6">
+      {/* Back Button */}
+      {product && (
+        <Button variant="ghost" size="sm" asChild className="gap-2">
+          <Link href="/vendor/products">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+            Back to Products
+          </Link>
+        </Button>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>{product ? "Edit Item" : "New Item"}</CardTitle>

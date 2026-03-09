@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ProductCard } from "@/components/cards/ProductCard";
 import { WhatsAppCTAButton } from "@/components/shop/WhatsAppCTAButton";
 import { unstable_noStore as noStore } from "next/cache";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPriceAED } from "@/lib/utils/price";
 import { getSelectedLocationId, getSelectedLocation } from "@/lib/location";
@@ -43,13 +44,17 @@ interface VendorShopPageProps {
     vendorSlug: string;
     category: string;
   };
+  searchParams?: {
+    q?: string;
+  };
 }
 
-export default async function VendorShopPage({ params }: VendorShopPageProps) {
+export default async function VendorShopPage({ params, searchParams }: VendorShopPageProps) {
   noStore();
 
   const categorySlug = params.category;
   const canonicalCategory = categoryMap[categorySlug];
+  const searchQuery = (searchParams?.q || "").trim();
 
   if (!canonicalCategory) {
     notFound();
@@ -131,18 +136,32 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
   });
   console.log(`[VENDOR SHOP] activeInStockCategoryForVendor (${canonicalCategory}):`, activeInStockCategoryForVendor);
 
+  // Build search conditions (vendor-scoped, category-scoped)
+  const searchConditions = searchQuery
+    ? {
+        OR: [
+          { name: { contains: searchQuery, mode: "insensitive" as const } },
+          { sku: { contains: searchQuery, mode: "insensitive" as const } },
+          { tags: { hasSome: [searchQuery] } },
+          { description: { contains: searchQuery, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+
   // Query products with location visibility rules
   // Product is visible if:
   // - vendorId matches
   // - category matches
   // - active=true AND inStock=true
   // - isGlobal=true OR ProductLocation exists for selectedLocationId
+  // - search conditions (if query provided)
   const products = await prisma.product.findMany({
     where: {
       vendorId: vendor.id,
       active: true,
       inStock: true,
       category: canonicalCategory,
+      ...searchConditions,
       OR: [
         { isGlobal: true },
         ...(selectedLocationId
@@ -203,27 +222,66 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
         </Button>
       </div>
 
-      {/* Vendor Header */}
-      <div className="mb-8">
+      {/* Vendor Header with Logo */}
+      <div className="mb-6">
         {resolvedLogoUrl ? (
-          <div className="mb-2">
-            <img
-              src={resolvedLogoUrl}
-              alt={`${vendor.name} logo`}
-              className="max-h-20 w-auto"
-            />
+          <div className="mb-4">
+            <div className="relative h-24 w-auto max-w-xs">
+              <Image
+                src={resolvedLogoUrl}
+                alt={`${vendor.name} logo`}
+                fill
+                className="object-contain object-left"
+                sizes="(max-width: 768px) 200px, 300px"
+                priority
+              />
+            </div>
           </div>
         ) : (
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">{vendor.name}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">{vendor.name}</h1>
         )}
         {vendor.tagline && (
-          <p className="text-muted-foreground mb-2">{vendor.tagline}</p>
+          <p className="text-muted-foreground mb-3">{vendor.tagline}</p>
         )}
-        <p className="text-muted-foreground">
-          {storefrontProducts.length > 0
-            ? `${storefrontProducts.length} ${storefrontProducts.length === 1 ? 'product' : 'products'} available in ${selectedLocation?.name || "your location"}`
+
+        {/* Product Count */}
+        <p className="text-muted-foreground mb-4">
+          {searchQuery && storefrontProducts.length === 0
+            ? `No products found for "${searchQuery}"`
+            : storefrontProducts.length > 0
+            ? `${storefrontProducts.length} ${storefrontProducts.length === 1 ? 'product' : 'products'} ${searchQuery ? `matching "${searchQuery}"` : `available in ${selectedLocation?.name || "your location"}`}`
             : "Products coming soon"}
         </p>
+
+        {/* Search Bar */}
+        <form method="get" className="flex gap-2 max-w-lg">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              name="q"
+              defaultValue={searchQuery}
+              placeholder={`Search ${vendor.name} ${categoryTitle.toLowerCase()}...`}
+              className="w-full rounded-lg border border-input bg-background pl-10 pr-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            {searchQuery && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                asChild
+              >
+                <a href={`/shop/${params.vendorSlug}/${categorySlug}`}>
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Clear search</span>
+                </a>
+              </Button>
+            )}
+          </div>
+          <Button type="submit" size="default">
+            Search
+          </Button>
+        </form>
       </div>
 
       {/* Products Grid / Special Content */}
@@ -232,16 +290,27 @@ export default async function VendorShopPage({ params }: VendorShopPageProps) {
         <WhatsAppCTAButton />
       ) : storefrontProducts.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-12 text-center space-y-3">
-          <div className="text-4xl">🛍️</div>
+          <div className="text-4xl">{searchQuery ? "🔍" : "🛍️"}</div>
           <div className="text-lg font-semibold text-slate-900">
-            Products coming soon
+            {searchQuery
+              ? `No products found for "${searchQuery}"`
+              : "Products coming soon"}
           </div>
           <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            {vendor.name} is preparing their {categoryTitle.toLowerCase()} catalog. Check back soon!
+            {searchQuery
+              ? `No ${categoryTitle.toLowerCase()} from ${vendor.name} match your search. Try a different search term or browse all products.`
+              : `${vendor.name} is preparing their ${categoryTitle.toLowerCase()} catalog. Check back soon!`}
           </p>
 
-          {/* Back to category */}
-          <div className="pt-4">
+          {/* Actions */}
+          <div className="pt-4 flex gap-2 justify-center">
+            {searchQuery && (
+              <Button asChild variant="default">
+                <a href={`/shop/${params.vendorSlug}/${categorySlug}`}>
+                  Clear Search
+                </a>
+              </Button>
+            )}
             <Button asChild variant="outline">
               <Link href={`/marketplace/${categorySlug}`}>
                 Browse Other {categoryTitle} Vendors
