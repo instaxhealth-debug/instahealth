@@ -3,12 +3,13 @@
  *
  * Initiates Shopify OAuth flow by redirecting to Shopify authorization URL
  * ✅ SECURITY FIX: Server-generated cryptographic nonce for state parameter
+ * ✅ AUTH FIX: Use auth() instead of broken getServerSession() wrapper
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "@/lib/auth-server";
+import { auth } from "@/lib/auth";
 
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const SHOPIFY_SCOPES = "read_products,read_inventory,read_orders";
@@ -16,9 +17,10 @@ const SHOPIFY_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL + "/api/shopify/cal
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await getServerSession();
+    // Check authentication - use auth() from NextAuth v5
+    const session = await auth();
     if (!session?.user?.id) {
+      console.error("[SHOPIFY_CONNECT] Auth failed - no session or user ID");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

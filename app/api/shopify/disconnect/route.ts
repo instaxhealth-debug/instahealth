@@ -2,17 +2,19 @@
  * Shopify Disconnect API Route
  *
  * Allows vendors to disconnect their Shopify store
+ * ✅ AUTH FIX: Use auth() instead of broken getServerSession() wrapper
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "@/lib/auth-server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await getServerSession();
+    // Check authentication - use auth() from NextAuth v5
+    const session = await auth();
     if (!session?.user?.id) {
+      console.error("[SHOPIFY_DISCONNECT] Auth failed - no session or user ID");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
