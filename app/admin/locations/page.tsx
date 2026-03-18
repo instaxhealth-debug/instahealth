@@ -19,7 +19,12 @@ async function createLocation(formData: FormData) {
   await prisma.location.upsert({
     where: { name },
     update: {},
-    create: { name, slug },
+    create: {
+      id: crypto.randomUUID(),
+      name,
+      slug,
+      updatedAt: new Date(),
+    },
   });
 
   revalidatePath("/admin/locations");

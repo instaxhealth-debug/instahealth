@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ShoppingBag, Package, CheckCircle, Clock, ArrowUpRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ShopifyConnection } from "@/components/vendor/ShopifyConnection";
 type VendorOrderStatus =
   | "NEW"
   | "READY_FOR_FULFILLMENT"
@@ -49,6 +50,8 @@ export default async function VendorDashboard() {
     todayOrders,
     pendingList,
     acceptedList,
+    vendorData,
+    productCounts,
   ] = await Promise.all([
     prisma.vendorOrder.count({
       where: { vendorId: vendor.vendorId },
@@ -105,6 +108,24 @@ export default async function VendorDashboard() {
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       take: 20,
     }) as Promise<AcceptedOrderRow[]>,
+    prisma.vendor.findUnique({
+      where: { id: vendor.vendorId },
+      select: {
+        id: true,
+        shopifyConnected: true,
+        shopifyShopDomain: true,
+        shopifyLastSyncAt: true,
+        shopifySyncStatus: true,
+      },
+    }),
+    Promise.all([
+      prisma.product.count({
+        where: { vendorId: vendor.vendorId },
+      }),
+      prisma.product.count({
+        where: { vendorId: vendor.vendorId, source: "shopify" },
+      }),
+    ]).then(([total, shopify]) => ({ total, shopify })),
   ]);
 
   const STATUS_COLORS: Record<VendorOrderStatus, string> = {
@@ -177,6 +198,11 @@ export default async function VendorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Shopify Integration */}
+      {vendorData && (
+        <ShopifyConnection vendor={vendorData} productCount={productCounts} />
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2">

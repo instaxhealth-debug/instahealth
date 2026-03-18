@@ -1,32 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(lighthouse http://localhost:3000/marketplace/labs --output=json --output=html --output-path=docs/performance-audits/marketplace --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
-      "Bash(lighthouse http://localhost:3000/cart --output=json --output=html --output-path=docs/performance-audits/cart --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
-      "Bash(curl -s http://localhost:3000/cart -I)",
-      "Bash(curl -s http://localhost:3000 -I)",
-      "Bash(lsof -ti:3000)",
-      "Bash(xargs kill -9)",
-      "Bash(lighthouse http://localhost:3000/cart --output=json --output-path=docs/performance-audits/cart-after.report.json --chrome-flags=\"--headless --no-sandbox\" --only-categories=performance --quiet)",
-      "Bash(awk '{print \"\"\"\"✓ Cart audit complete (AFTER fixes):\"\"\"\", $5}')",
-      "Bash(node -e \"\nconst fs = require(''fs'');\nconst before = JSON.parse(fs.readFileSync(''docs/performance-audits/cart.report.json'', ''utf8''));\nconst after = JSON.parse(fs.readFileSync(''docs/performance-audits/cart-after.report.json'', ''utf8''));\n\nfunction compare(data, label) {\n  const m = data.audits;\n  const requests = m[''network-requests'']?.details?.items || [];\n  \n  return {\n    label,\n    score: (data.categories.performance.score * 100).toFixed(0),\n    lcp: m[''largest-contentful-paint''].numericValue,\n    tbt: m[''total-blocking-time''].numericValue,\n    requests: requests.length,\n    transfer: m[''total-byte-weight''].numericValue,\n  };\n}\n\nconst beforeMetrics = compare(before, ''BEFORE'');\nconst afterMetrics = compare(after, ''AFTER'');\n\nconsole.log(''========== CART PAGE: BEFORE VS AFTER ==========\\n'');\nconsole.log(''Performance Score:'');\nconsole.log(''  Before:'', beforeMetrics.score);\nconsole.log(''  After: '', afterMetrics.score);\nconsole.log(''  Change:'', (afterMetrics.score - beforeMetrics.score > 0 ? ''+'' : '''') + (afterMetrics.score - beforeMetrics.score));\nconsole.log('''');\nconsole.log(''LCP (Largest Contentful Paint):'');\nconsole.log(''  Before:'', (beforeMetrics.lcp / 1000).toFixed(2) + ''s'');\nconsole.log(''  After: '', (afterMetrics.lcp / 1000).toFixed(2) + ''s'');\nconsole.log(''  Change:'', ((afterMetrics.lcp - beforeMetrics.lcp) / 1000).toFixed(2) + ''s'', ''('' + ((afterMetrics.lcp / beforeMetrics.lcp - 1) * 100).toFixed(1) + ''%)'');\nconsole.log('''');\nconsole.log(''TBT (Total Blocking Time):'');\nconsole.log(''  Before:'', beforeMetrics.tbt.toFixed(0) + ''ms'');\nconsole.log(''  After: '', afterMetrics.tbt.toFixed(0) + ''ms'');\nconsole.log(''  Change:'', (afterMetrics.tbt - beforeMetrics.tbt).toFixed(0) + ''ms'', ''('' + ((afterMetrics.tbt / beforeMetrics.tbt - 1) * 100).toFixed(1) + ''%)'');\nconsole.log('''');\nconsole.log(''Network Requests:'');\nconsole.log(''  Before:'', beforeMetrics.requests);\nconsole.log(''  After: '', afterMetrics.requests);\nconsole.log(''  Change:'', (afterMetrics.requests - beforeMetrics.requests));\nconsole.log('''');\nconsole.log(''Total Transfer Size:'');\nconsole.log(''  Before:'', (beforeMetrics.transfer / 1024).toFixed(0) + '' KB'');\nconsole.log(''  After: '', (afterMetrics.transfer / 1024).toFixed(0) + '' KB'');\nconsole.log(''  Change:'', ((afterMetrics.transfer - beforeMetrics.transfer) / 1024).toFixed(0) + '' KB'', ''('' + ((afterMetrics.transfer / beforeMetrics.transfer - 1) * 100).toFixed(1) + ''%)'');\n\")",
-      "Bash(npm install @vercel/blob)",
-      "Bash(npm run build)",
-      "Bash(npx prisma migrate dev --name add_logo_and_categories_to_vendor_application --create-only)",
-      "Bash(npx prisma migrate deploy)",
-      "Bash(cat package.json)",
-      "Bash(npx prisma:*)",
-      "Bash(git status:*)",
-      "Bash(npm install libphonenumber-js)",
-      "Read(//Users/cruzfrangieh/Desktop/InstaXHealth/**)",
-      "Bash(npm install @radix-ui/react-checkbox)",
-      "Bash(chmod +x scripts/verify-bulletproof-upload.sh)",
-      "Bash(./scripts/verify-bulletproof-upload.sh)",
-      "Bash(git add .)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nRefactor bulk upload to Smart Match 2.0 (deterministic matching system)\n\n- Remove \"Filename = SKU\" mode entirely (single matching paradigm)\n- Implement layered deterministic matching with confidence levels:\n  • EXACT_SKU/EXACT_NAME → auto-confirmed\n  • HIGH (≥80% token overlap) → auto-selected\n  • MEDIUM (≥50%) → manual confirmation required\n  • NONE (< 50%) → user must choose\n- Clean SKU display (show \"No SKU\" when absent, not alarming noise)\n- Update result taxonomy: uploaded | skipped | needs_confirmation | error\n- Redesign as 3-step wizard: Select → Review → Upload\n- Maintain productId-based backend pipeline (no backend changes)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(npm install @radix-ui/react-alert-dialog)",
-      "Bash(node -e \"\nconst { PrismaClient } = require(''@prisma/client'');\nconst prisma = new PrismaClient();\n\nprisma.vendor.findUnique({\n  where: { slug: ''instapepz'' },\n  select: { id: true, name: true, slug: true, allowedCategories: true }\n}).then(vendor => {\n  console.log(''✅ InstaPepz vendor permissions:'');\n  console.log(JSON.stringify(vendor, null, 2));\n  console.log(''\\n📋 Summary:'');\n  console.log(''  Vendor:'', vendor.name);\n  console.log(''  Allowed Categories:'', vendor.allowedCategories.join('', ''));\n  console.log(''  Can import peptides:'', vendor.allowedCategories.includes(''peptides'') ? ''✅ YES'' : ''❌ NO'');\n  console.log(''  Can import amino-acids:'', vendor.allowedCategories.includes(''amino-acids'') ? ''✅ YES'' : ''❌ NO'');\n  prisma.$disconnect();\n}).catch(err => {\n  console.error(''Error:'', err.message);\n  prisma.$disconnect();\n  process.exit(1);\n});\n\")"
-    ]
+      "Bash(npx tsx scripts/reindex-clean.ts)",
+      "Bash(npm run build 2)",
+      "Bash(1)",
+      "Bash(timeout 120 npm run build)"
+    ],
+    "deny": [],
+    "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [

@@ -78,6 +78,7 @@ export async function getProductsFromPrisma(
       where: {
         active: true,
         inStock: true,
+        deletedAt: null, // ✅ Exclude soft-deleted products
         ...vendorWhere,
       },
       include: {
@@ -114,6 +115,7 @@ export async function getProductsByCategoryFromPrisma(
         active: true,
         inStock: true,
         category: category,
+        deletedAt: null, // ✅ Exclude soft-deleted products
         ...vendorWhere,
       },
       include: {
@@ -154,6 +156,7 @@ export async function getProductsByVendorIdFromPrisma(
         active: true,
         inStock: true,
         vendorId: vendorId,
+        deletedAt: null, // ✅ Exclude soft-deleted products
         ...vendorWhere,
       },
       include: {
@@ -192,6 +195,7 @@ export async function getProductBySlugFromPrisma(
     const prismaProduct = await prisma.product.findFirst({
       where: {
         slug: slug,
+        deletedAt: null, // ✅ Exclude soft-deleted products
         active: true,
         inStock: true,
         ...vendorWhere,

@@ -130,7 +130,7 @@ export default async function ProductsPage() {
                   <div>
                     <div className="font-semibold">{product.name}</div>
                     <div className="text-gray-600 text-xs">
-                      Vendor: {product.vendor?.name || "-"} • AED {(product.priceFils / 100).toFixed(2)} • {product.category}
+                      vendor: {product.vendor?.name || "-"} • AED {(product.priceFils / 100).toFixed(2)} • {product.category}
                     </div>
                     <div className="text-gray-500 text-xs mt-1">
                       Status: {product.active ? "Active" : "Inactive"} • Stock: {product.inStock ? "Yes" : "No"} • Visible in: {visibilityText}

@@ -20,6 +20,7 @@ export async function GET(
       vendorId: true,
       active: true,
       published: true,
+      deletedAt: true, // ✅ Check if soft-deleted
       bookingUrl: true,
       vendor: {
         select: {
@@ -29,7 +30,7 @@ export async function GET(
     },
   });
 
-  if (!product || !product.active || !product.published) {
+  if (!product || !product.active || !product.published || product.deletedAt) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

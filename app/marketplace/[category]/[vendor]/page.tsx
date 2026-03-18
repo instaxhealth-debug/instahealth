@@ -93,6 +93,7 @@ export default async function MarketplaceVendorPage({
     where: {
       active: true,
       published: true,
+      deletedAt: null, // ✅ Exclude soft-deleted products
       ...(isService ? {} : { inStock: true }),
       vendorId: vendorId,
       category: canonicalCategory, // Exact canonical slug match

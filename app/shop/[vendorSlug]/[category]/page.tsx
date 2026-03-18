@@ -160,6 +160,7 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
       vendorId: vendor.id,
       active: true,
       inStock: true,
+      deletedAt: null, // ✅ Exclude soft-deleted products
       category: canonicalCategory,
       ...searchConditions,
       OR: [

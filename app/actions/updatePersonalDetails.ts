@@ -61,7 +61,6 @@ export async function updatePersonalDetails(
       data: {
         name: data.name.trim(),
         phone,
-        countryCode: data.countryCode,
         email: data.email.trim(),
       },
     });

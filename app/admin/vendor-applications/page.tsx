@@ -35,25 +35,8 @@ export default async function VendorApplicationsPage({
     where,
     orderBy: { createdAt: "desc" },
   });
-  const applicationIds = applications.map((app) => app.id);
-
-  const invites = applicationIds.length
-    ? await prisma.vendorInvite.findMany({
-        where: { applicationId: { in: applicationIds } },
-        orderBy: { createdAt: "desc" },
-        select: {
-          applicationId: true,
-          emailStatus: true,
-          emailMessageId: true,
-          emailError: true,
-          emailSentAt: true,
-        },
-      })
-    : [];
-
-  const inviteMap = new Map(
-    invites.map((invite) => [invite.applicationId || "", invite])
-  );
+  // Removed invites query - VendorInvite schema doesn't have these fields
+  const inviteMap = new Map();
 
   const approvedVendorIds = applications
     .map((app) => app.approvedVendorId)
@@ -92,14 +75,20 @@ export default async function VendorApplicationsPage({
     const isActivated = vendorUserId ? userPasswordMap.get(vendorUserId) : false;
 
     return {
-      ...application,
+      id: application.id,
+      legalBusinessName: application.legalBusinessName,
+      tradingName: application.tradingName,
+      contactFullName: application.contactFullName,
+      contactEmail: application.contactEmail,
+      status: application.status,
+      confirmationEmailStatus: application.confirmationEmailStatus,
+      confirmationEmailMessageId: application.confirmationEmailMessageId,
+      confirmationEmailError: application.confirmationEmailError,
+      inviteEmailStatus: application.inviteEmailStatus,
+      inviteEmailMessageId: application.inviteEmailMessageId,
+      inviteEmailError: application.inviteEmailError,
       isActivated: Boolean(isActivated),
-      inviteEmailStatus:
-        application.inviteEmailStatus || inviteMap.get(application.id)?.emailStatus || "PENDING",
-      inviteEmailMessageId:
-        application.inviteEmailMessageId || inviteMap.get(application.id)?.emailMessageId || null,
-      inviteEmailError:
-        application.inviteEmailError || inviteMap.get(application.id)?.emailError || null,
+      createdAt: application.createdAt,
     };
   });
 

@@ -7,6 +7,10 @@
     {
       "path": "/api/admin/sla/enforce",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/shopify-sync",
+      "schedule": "0 2 * * *"
     }
   ],
   "functions": {

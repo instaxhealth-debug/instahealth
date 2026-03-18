@@ -55,6 +55,11 @@ export default async function AdminOrderDetailPage({
       items: {
         include: {
           vendor: true,
+          product: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },
@@ -90,7 +95,7 @@ export default async function AdminOrderDetailPage({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal:</span>
-              <span>{formatPriceAED(order.subtotalFils)}</span>
+              <span>{formatPriceAED(order.totalFils)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Delivery:</span>
@@ -173,9 +178,9 @@ export default async function AdminOrderDetailPage({
           {order.items.map((item) => (
             <div key={item.id} className="flex justify-between items-start text-sm border-b pb-3">
               <div>
-                <p className="font-medium">{item.productName}</p>
+                <p className="font-medium">{item.product.name}</p>
                 <p className="text-gray-600 text-xs">
-                  Vendor: {item.vendorName} • Qty: {item.quantity} • Unit:{" "}
+                  vendor: {item.vendor.name} • Qty: {item.quantity} • Unit:{" "}
                   {formatPriceAED(item.unitPriceFils)}
                 </p>
               </div>

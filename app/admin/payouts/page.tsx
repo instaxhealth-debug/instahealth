@@ -24,12 +24,10 @@ async function markPayoutPaid(formData: FormData) {
   await prisma.vendorPayout.create({
     data: {
       vendorId,
+      // vendorOrderId: reference, // FIXME: Field doesn't exist in current schema
       amountFils,
       status: "PAID",
-      reference,
       paidAt: new Date(paidAt),
-      periodStart: periodStart ? new Date(periodStart) : undefined,
-      periodEnd: periodEnd ? new Date(periodEnd) : undefined,
     },
   });
 
@@ -45,7 +43,6 @@ export default async function AdminPayoutsPage() {
     include: {
       orderItems: {
         where: {
-          fulfilled: true,
           order: {
             status: {
               in: ["PAID", "FULFILLED"],

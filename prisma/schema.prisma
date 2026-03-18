@@ -140,6 +140,13 @@ model Vendor {
   serviceRadiusKm          Int                @default(25)
   userId                   String?            @unique
   allowedCategories        String[]
+  shopifyConnected         Boolean            @default(false)
+  shopifyShopDomain        String?
+  shopifyAccessToken       String?
+  shopifyScopes            String?
+  shopifyInstalledAt       DateTime?
+  shopifyLastSyncAt        DateTime?
+  shopifySyncStatus        String?
   cartItems                CartItem[]
   orderItems               OrderItem[]
   products                 Product[]
@@ -173,16 +180,22 @@ model Product {
   tags            String[]          @default([])
   bookingUrl      String?
   durationMinutes Int?
-  sku             String?
-  cartItems       CartItem[]
-  orderItems      OrderItem[]
-  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  locations       ProductLocation[]
-  variants        ProductVariant[]
-  serviceBookings ServiceBooking[]
+  sku                String?
+  externalId         String?
+  externalVariantId  String?
+  source             String?
+  syncStatus         String?
+  deletedAt          DateTime?
+  cartItems          CartItem[]
+  orderItems         OrderItem[]
+  vendor             Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  locations          ProductLocation[]
+  variants           ProductVariant[]
+  serviceBookings    ServiceBooking[]
 
   @@unique([vendorId, sku])
   @@unique([vendorId, importKey])
+  @@unique([vendorId, externalVariantId], name: "vendorId_externalVariantId")
   @@index([vendorId])
   @@index([isGlobal])
   @@index([featured])
@@ -611,4 +624,13 @@ model ServiceBooking {
 
   @@index([vendorId, createdAt])
   @@index([status, createdAt])
+}
+
+model ShopifyOAuthState {
+  nonce      String   @id
+  vendorId   String
+  timestamp  BigInt
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }
