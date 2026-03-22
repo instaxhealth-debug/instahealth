@@ -12,10 +12,19 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { exchangeCodeForToken } from "@/lib/shopify/client";
 import { syncShopifyProducts } from "@/lib/shopify/sync-service";
+import { registerWebhooks } from "@/lib/shopify/webhooks";
 
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
 const NONCE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+// ✅ FIX: Use same BASE_URL logic as connect route for consistent redirect URLs
+const BASE_URL =
+  process.env.SHOPIFY_REDIRECT_URI?.replace(/\/api\/shopify\/callback$/, "") ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXTAUTH_URL ||
+  "http://localhost:3000";
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,13 +36,13 @@ export async function GET(request: NextRequest) {
     // Validate parameters
     if (!code || !shop || !state) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=missing_parameters`
+        `${BASE_URL}/vendor/dashboard?error=missing_parameters`
       );
     }
 
     if (!SHOPIFY_CLIENT_ID || !SHOPIFY_CLIENT_SECRET) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=not_configured`
+        `${BASE_URL}/vendor/dashboard?error=not_configured`
       );
     }
 
@@ -45,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (!oauthState) {
       console.error("Invalid or expired OAuth state nonce");
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=invalid_state`
+        `${BASE_URL}/vendor/dashboard?error=invalid_state`
       );
     }
 
@@ -58,7 +67,7 @@ export async function GET(request: NextRequest) {
         where: { nonce: state },
       });
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=state_expired`
+        `${BASE_URL}/vendor/dashboard?error=state_expired`
       );
     }
 
@@ -76,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     if (!vendor) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=vendor_not_found`
+        `${BASE_URL}/vendor/dashboard?error=vendor_not_found`
       );
     }
 
@@ -100,6 +109,29 @@ export async function GET(request: NextRequest) {
         shopifySyncStatus: "pending",
       },
     });
+
+    // ✅ AUTO-REGISTER WEBHOOKS: Register webhooks immediately after OAuth
+    console.log(`[SHOPIFY_CALLBACK] Registering webhooks for vendor ${vendorId}, shop ${shop}`);
+    try {
+      const webhookResult = await registerWebhooks(shop, tokenResponse.access_token);
+
+      if (webhookResult.success) {
+        console.log(
+          `[SHOPIFY_CALLBACK] ✅ Webhooks registered successfully: ${webhookResult.registered.length} new, ${webhookResult.skipped.length} existing`
+        );
+      } else {
+        console.error(
+          `[SHOPIFY_CALLBACK] ⚠️ Webhook registration had errors: ${webhookResult.errors.join("; ")}`
+        );
+        // Don't fail OAuth if webhooks fail - they can be registered manually later
+      }
+    } catch (webhookError) {
+      console.error(
+        `[SHOPIFY_CALLBACK] ❌ Webhook registration failed:`,
+        webhookError
+      );
+      // Don't fail OAuth if webhooks fail
+    }
 
     // ✅ FIX: Trigger initial product sync and handle errors properly
     syncShopifyProducts(vendorId)
@@ -126,12 +158,12 @@ export async function GET(request: NextRequest) {
 
     // Redirect to vendor dashboard with success message
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?shopify=connected`
+      `${BASE_URL}/vendor/dashboard?shopify=connected`
     );
   } catch (error) {
     console.error("Shopify callback error:", error);
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/vendor/dashboard?error=callback_failed`
+      `${BASE_URL}/vendor/dashboard?error=callback_failed`
     );
   }
 }

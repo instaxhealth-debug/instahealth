@@ -13,7 +13,17 @@ import { auth } from "@/lib/auth";
 
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const SHOPIFY_SCOPES = "read_products,read_inventory,read_orders";
-const SHOPIFY_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL + "/api/shopify/callback";
+
+// ✅ FIX: Use correct env var (NEXT_PUBLIC_BASE_URL) with fallback chain
+// Priority: SHOPIFY_REDIRECT_URI (explicit) > NEXT_PUBLIC_APP_URL > NEXT_PUBLIC_BASE_URL > NEXTAUTH_URL
+const BASE_URL =
+  process.env.SHOPIFY_REDIRECT_URI?.replace(/\/api\/shopify\/callback$/, "") ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXTAUTH_URL ||
+  "http://localhost:3000";
+
+const SHOPIFY_REDIRECT_URI = BASE_URL + "/api/shopify/callback";
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,6 +75,15 @@ export async function GET(request: NextRequest) {
     // ✅ SECURITY FIX: Generate cryptographically secure random nonce
     const nonce = crypto.randomBytes(32).toString("hex");
 
+    // 🔍 DIAGNOSTIC LOGGING: Log exact redirect_uri being generated
+    console.log("[SHOPIFY_CONNECT] ===== OAUTH DIAGNOSTICS =====");
+    console.log("[SHOPIFY_CONNECT] shop =", shop);
+    console.log("[SHOPIFY_CONNECT] BASE_URL =", BASE_URL);
+    console.log("[SHOPIFY_CONNECT] SHOPIFY_REDIRECT_URI =", SHOPIFY_REDIRECT_URI);
+    console.log("[SHOPIFY_CONNECT] vendorId =", vendor.id);
+    console.log("[SHOPIFY_CONNECT] nonce =", nonce);
+    console.log("[SHOPIFY_CONNECT] ================================");
+
     // ✅ SECURITY FIX: Store nonce in database for single-use verification
     await prisma.shopifyOAuthState.create({
       data: {
@@ -80,6 +99,9 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set("scope", SHOPIFY_SCOPES);
     authUrl.searchParams.set("redirect_uri", SHOPIFY_REDIRECT_URI);
     authUrl.searchParams.set("state", nonce); // ✅ Use nonce as state
+
+    // 🔍 DIAGNOSTIC LOGGING: Log complete authorization URL
+    console.log("[SHOPIFY_CONNECT] Full authorization URL:", authUrl.toString());
 
     // Redirect to Shopify
     return NextResponse.redirect(authUrl.toString());

@@ -11,7 +11,9 @@ import { syncShopifyProduct, deleteShopifyProduct } from "@/lib/shopify/sync-ser
 import { prisma } from "@/lib/prisma";
 import type { ShopifyWebhookPayload } from "@/lib/shopify/types";
 
-const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET;
+// ✅ FIX: Shopify uses CLIENT_SECRET to sign webhooks (not a separate webhook secret)
+// Use SHOPIFY_CLIENT_SECRET directly for webhook HMAC verification
+const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,17 +37,19 @@ export async function POST(request: NextRequest) {
     // Get raw body for signature verification
     const body = await request.text();
 
-    // Verify webhook signature
+    // Verify webhook signature BEFORE parsing JSON
     if (!SHOPIFY_WEBHOOK_SECRET) {
-      console.error("SHOPIFY_WEBHOOK_SECRET not configured");
+      console.error("[WEBHOOK_VERIFY] Webhook secret not configured");
       return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
     }
 
+    console.log(`[WEBHOOK_VERIFY] Verifying signature for topic: ${topic}, shop: ${shopDomain}, body length: ${body.length} bytes`);
     const isValid = verifyWebhookSignature(body, hmac, SHOPIFY_WEBHOOK_SECRET);
     if (!isValid) {
-      console.error("Invalid webhook signature");
+      console.error(`[WEBHOOK_VERIFY] ❌ Signature verification failed for topic: ${topic}, shop: ${shopDomain}, body length: ${body.length} bytes`);
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
+    console.log(`[WEBHOOK_VERIFY] ✅ Signature verified for topic: ${topic}, shop: ${shopDomain}`);
 
     // Parse webhook payload
     const payload: ShopifyWebhookPayload = JSON.parse(body);

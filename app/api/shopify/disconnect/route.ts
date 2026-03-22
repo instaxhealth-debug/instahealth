@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteAllWebhooks } from "@/lib/shopify/webhooks";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,6 +34,24 @@ export async function POST(request: NextRequest) {
     // Parse request body for action
     const body = await request.json();
     const { keepProducts = false } = body;
+
+    // ✅ DELETE WEBHOOKS: Clean up webhooks before disconnecting
+    if (vendor.shopifyShopDomain && vendor.shopifyAccessToken) {
+      console.log(`[SHOPIFY_DISCONNECT] Deleting webhooks for shop ${vendor.shopifyShopDomain}`);
+      try {
+        const deletedCount = await deleteAllWebhooks(
+          vendor.shopifyShopDomain,
+          vendor.shopifyAccessToken
+        );
+        console.log(`[SHOPIFY_DISCONNECT] ✅ Deleted ${deletedCount} webhooks`);
+      } catch (webhookError) {
+        console.error(
+          `[SHOPIFY_DISCONNECT] ⚠️ Failed to delete webhooks:`,
+          webhookError
+        );
+        // Continue with disconnect even if webhook deletion fails
+      }
+    }
 
     // Disconnect Shopify
     await prisma.vendor.update({
