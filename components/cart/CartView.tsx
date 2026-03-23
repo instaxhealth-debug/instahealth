@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
+import { Trash2, ShoppingBag, Plus, Minus, Loader2 } from "lucide-react";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useLocationStore } from "@/lib/store/location-store";
 import { CartSkeleton } from "@/components/cart/CartSkeleton";
@@ -17,24 +18,34 @@ export function CartView() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Separate loading state for checkout navigation
+  const [isNavigatingToCheckout, setIsNavigatingToCheckout] = useState(false);
+
   // Single source of truth for total price from hook
   const total = getTotalPrice();
 
-  // Handle checkout navigation with debugging
-  const handleProceedToCheckout = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // Handle checkout navigation with robust error handling
+  const handleProceedToCheckout = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const DEBUG = process.env.NEXT_PUBLIC_DEBUG_CART === "true";
-    
+
     if (DEBUG) {
       console.log("[CART] Proceed to checkout clicked", {
         pathname: typeof window !== "undefined" ? window.location.pathname : "SSR",
         itemsCount: items.length,
         isLoading,
+        isNavigatingToCheckout,
         isLoggedIn,
         total
       });
+    }
+
+    // Prevent double-clicks
+    if (isNavigatingToCheckout) {
+      if (DEBUG) console.log("[CART] Blocked: already navigating");
+      return;
     }
 
     // Check if cart is empty
@@ -48,9 +59,42 @@ export function CartView() {
       return;
     }
 
-    // Navigate to checkout
-    if (DEBUG) console.log("[CART] Navigating to /checkout");
-    router.push("/checkout");
+    // Validate cart total
+    if (total <= 0) {
+      toast({
+        title: "Invalid cart total",
+        description: "There was an issue calculating your cart total. Please refresh and try again.",
+        variant: "destructive",
+      });
+      if (DEBUG) console.log("[CART] Blocked: invalid total", { total });
+      return;
+    }
+
+    // Set loading state and navigate
+    setIsNavigatingToCheckout(true);
+
+    try {
+      if (DEBUG) console.log("[CART] Navigating to /checkout");
+
+      // Use router.push with error handling
+      await router.push("/checkout");
+
+      // If we reach here, navigation started successfully
+      if (DEBUG) console.log("[CART] Navigation initiated successfully");
+
+    } catch (error) {
+      // Handle navigation errors
+      console.error("[CART] Navigation error:", error);
+      setIsNavigatingToCheckout(false);
+
+      toast({
+        title: "Navigation failed",
+        description: "Unable to proceed to checkout. Please try again.",
+        variant: "destructive",
+      });
+
+      if (DEBUG) console.error("[CART] Navigation error details:", error);
+    }
   };
 
   // PERFORMANCE FIX: Show skeleton during initial load
@@ -191,14 +235,26 @@ export function CartView() {
             <p className="text-xs text-muted-foreground text-center">
               Delivery address will be required at checkout
             </p>
-            <Button 
+            <Button
               type="button"
-              className="w-full rounded-full" 
-              size="lg" 
+              className="w-full rounded-full"
+              size="lg"
               onClick={handleProceedToCheckout}
-              disabled={isLoading || items.length === 0}
+              disabled={isLoading || isNavigatingToCheckout || items.length === 0 || total <= 0}
             >
-              {isLoading ? "Loading..." : "Proceed to Checkout"}
+              {isNavigatingToCheckout ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Proceeding to checkout...
+                </>
+              ) : isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading cart...
+                </>
+              ) : (
+                "Proceed to Checkout"
+              )}
             </Button>
             <Button variant="outline" className="w-full rounded-full" asChild>
               <Link href="/pepz">Continue Shopping</Link>
