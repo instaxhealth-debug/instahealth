@@ -25,7 +25,7 @@ export default async function VendorLayout({
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
       <header className="border-b border-border/50 bg-card">
-        <div className="container mx-auto px-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <Badge className="gap-2 px-3 py-1 text-xs bg-primary/10 text-primary border border-primary/30">
@@ -51,11 +51,11 @@ export default async function VendorLayout({
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
 
       {/* Footer */}
       <footer className="border-t border-border/50 mt-auto">
-        <div className="container mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-sm text-muted-foreground text-center">
             InstaHealth Vendor Portal
           </p>

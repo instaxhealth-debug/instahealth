@@ -142,7 +142,7 @@ export function BookingDetailClient({ booking }: BookingDetailClientProps) {
   const canRefund = ["PAID_AWAITING_SCHEDULE", "SCHEDULED"].includes(booking.status);
 
   return (
-    <div className="container max-w-4xl mx-auto py-8 px-4">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => router.back()}>
           ← Back to Bookings
