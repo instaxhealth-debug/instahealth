@@ -35,15 +35,17 @@ export async function GET(request: NextRequest) {
 
     // Validate parameters
     if (!code || !shop || !state) {
-      return NextResponse.redirect(
-        `${BASE_URL}/vendor/dashboard?error=missing_parameters`
-      );
+      const errorUrl = new URL(`${BASE_URL}/shopify`);
+      errorUrl.searchParams.set("shop", shop || "unknown");
+      errorUrl.searchParams.set("error", "missing_parameters");
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     if (!SHOPIFY_CLIENT_ID || !SHOPIFY_CLIENT_SECRET) {
-      return NextResponse.redirect(
-        `${BASE_URL}/vendor/dashboard?error=not_configured`
-      );
+      const errorUrl = new URL(`${BASE_URL}/shopify`);
+      errorUrl.searchParams.set("shop", shop);
+      errorUrl.searchParams.set("error", "not_configured");
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     // ✅ SECURITY FIX: Verify and consume nonce from database
@@ -53,9 +55,10 @@ export async function GET(request: NextRequest) {
 
     if (!oauthState) {
       console.error("Invalid or expired OAuth state nonce");
-      return NextResponse.redirect(
-        `${BASE_URL}/vendor/dashboard?error=invalid_state`
-      );
+      const errorUrl = new URL(`${BASE_URL}/shopify`);
+      errorUrl.searchParams.set("shop", shop);
+      errorUrl.searchParams.set("error", "invalid_state");
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     // ✅ SECURITY FIX: Verify nonce TTL (prevent replay attacks with old nonces)
@@ -66,9 +69,10 @@ export async function GET(request: NextRequest) {
       await prisma.shopifyOAuthState.delete({
         where: { nonce: state },
       });
-      return NextResponse.redirect(
-        `${BASE_URL}/vendor/dashboard?error=state_expired`
-      );
+      const errorUrl = new URL(`${BASE_URL}/shopify`);
+      errorUrl.searchParams.set("shop", shop);
+      errorUrl.searchParams.set("error", "state_expired");
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     const vendorId = oauthState.vendorId;
@@ -84,9 +88,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!vendor) {
-      return NextResponse.redirect(
-        `${BASE_URL}/vendor/dashboard?error=vendor_not_found`
-      );
+      const errorUrl = new URL(`${BASE_URL}/shopify`);
+      errorUrl.searchParams.set("shop", shop);
+      errorUrl.searchParams.set("error", "vendor_not_found");
+      return NextResponse.redirect(errorUrl.toString());
     }
 
     // Exchange authorization code for access token
@@ -156,14 +161,23 @@ export async function GET(request: NextRequest) {
         });
       });
 
-    // Redirect to vendor dashboard with success message
-    return NextResponse.redirect(
-      `${BASE_URL}/vendor/dashboard?shopify=connected`
-    );
+    // ✅ FIX: Redirect to embedded app home (Shopify requirement for public apps)
+    // Include shop and host params for Shopify embedded app context
+    const redirectUrl = new URL(`${BASE_URL}/shopify`);
+    redirectUrl.searchParams.set("shop", shop);
+    redirectUrl.searchParams.set("shopify", "connected");
+
+    console.log(`[SHOPIFY_CALLBACK] Redirecting to embedded app home: ${redirectUrl.toString()}`);
+
+    return NextResponse.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Shopify callback error:", error);
-    return NextResponse.redirect(
-      `${BASE_URL}/vendor/dashboard?error=callback_failed`
-    );
+    const errorUrl = new URL(`${BASE_URL}/shopify`);
+    const shop = searchParams.get("shop");
+    if (shop) {
+      errorUrl.searchParams.set("shop", shop);
+    }
+    errorUrl.searchParams.set("error", "callback_failed");
+    return NextResponse.redirect(errorUrl.toString());
   }
 }

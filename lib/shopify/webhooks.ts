@@ -10,12 +10,25 @@ const SHOPIFY_API_VERSION = "2024-01";
 
 /**
  * Webhook topics to register for each vendor
+ *
+ * MANDATORY COMPLIANCE WEBHOOKS (required for Shopify App Store):
+ * - customers/data_request (GDPR data access request)
+ * - customers/redact (GDPR customer deletion)
+ * - shop/redact (Shop data deletion after uninstall)
  */
 const WEBHOOK_TOPICS = [
+  // Product sync webhooks
   "products/create",
   "products/update",
   "products/delete",
+
+  // App lifecycle
   "app/uninstalled",
+
+  // ✅ MANDATORY GDPR/Privacy compliance webhooks
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact",
 ] as const;
 
 type WebhookTopic = (typeof WEBHOOK_TOPICS)[number];
@@ -48,9 +61,10 @@ interface ShopifyWebhookCreateResponse {
 }
 
 /**
- * Get webhook endpoint URL
+ * Get webhook endpoint URL for a specific topic
+ * GDPR/compliance webhooks use dedicated routes
  */
-function getWebhookUrl(): string {
+function getWebhookUrl(topic: WebhookTopic): string {
   // Use production URL if available, fallback to base URL
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -58,6 +72,19 @@ function getWebhookUrl(): string {
     process.env.NEXTAUTH_URL ||
     "https://instahealth.ae";
 
+  // Map GDPR topics to their dedicated endpoints (Shopify requirement)
+  const gdprEndpoints: Record<string, string> = {
+    "customers/data_request": "/api/shopify/gdpr/customers-data-request",
+    "customers/redact": "/api/shopify/gdpr/customers-redact",
+    "shop/redact": "/api/shopify/gdpr/shop-redact",
+  };
+
+  // Use dedicated GDPR endpoint if applicable
+  if (gdprEndpoints[topic]) {
+    return `${baseUrl}${gdprEndpoints[topic]}`;
+  }
+
+  // All other webhooks use the main webhook handler
   return `${baseUrl}/api/shopify/webhooks`;
 }
 
@@ -146,12 +173,9 @@ export async function registerWebhooks(
   };
 
   try {
-    const webhookUrl = getWebhookUrl();
-
     console.log(
       `[WEBHOOK_REGISTRATION] Starting webhook registration for ${shopDomain}`
     );
-    console.log(`[WEBHOOK_REGISTRATION] Webhook URL: ${webhookUrl}`);
 
     // Step 1: Fetch existing webhooks
     let existingWebhooks: ShopifyWebhook[] = [];
@@ -172,6 +196,11 @@ export async function registerWebhooks(
     // Step 2: Register each webhook topic
     for (const topic of WEBHOOK_TOPICS) {
       try {
+        // Get topic-specific webhook URL
+        const webhookUrl = getWebhookUrl(topic);
+
+        console.log(`[WEBHOOK_REGISTRATION] Registering ${topic} -> ${webhookUrl}`);
+
         // Check if webhook already exists for this topic + address
         const existingWebhook = existingWebhooks.find(
           (wh) => wh.topic === topic && wh.address === webhookUrl
