@@ -36,6 +36,9 @@ export function useEnhancedCart() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // CRITICAL: Track if we've made initial cart resolution attempt
+  // This prevents false positive "cart is hydrated" before first fetch
+  const [hasAttemptedInitialLoad, setHasAttemptedInitialLoad] = useState(false);
 
   // Fetch cart from database if logged in
   const fetchDBCart = useCallback(async () => {
@@ -60,11 +63,16 @@ export function useEnhancedCart() {
         setRefreshKey(prev => prev + 1);
       } else {
         if (DEBUG) console.log("[CART:UI] refreshCart failed:", await res.text());
+        // Even if fetch fails, we've attempted initial load
+        setDBCart({ id: '', userId: session.user.id, locationId: null, status: 'ACTIVE', createdAt: '', updatedAt: '', items: [] });
       }
     } catch (error) {
       console.error("[FETCH CART]", error);
+      // Even if error, we've attempted initial load - set empty cart
+      setDBCart({ id: '', userId: session.user.id, locationId: null, status: 'ACTIVE', createdAt: '', updatedAt: '', items: [] });
     }
     setIsLoading(false);
+    setHasAttemptedInitialLoad(true);  // Mark that we've attempted initial resolution
   }, [session?.user?.id]);
 
   // Merge guest cart into DB cart on login
@@ -79,6 +87,7 @@ export function useEnhancedCart() {
     }
 
     setIsMerging(true);
+    setHasAttemptedInitialLoad(false); // Reset during merge
     try {
       const guestCartItems = localItems.map((item) => ({
         productId: item.product.id,
@@ -96,12 +105,14 @@ export function useEnhancedCart() {
       if (res.ok) {
         if (DEBUG) console.log("[CART:MERGE] Merge succeeded, fetching fresh cart state...");
         localCart.clearCart();
-        await fetchDBCart();
+        await fetchDBCart();  // This will set hasAttemptedInitialLoad = true
       } else {
         if (DEBUG) console.log("[CART:MERGE] Merge failed:", await res.text());
+        setHasAttemptedInitialLoad(true);  // Even if merge fails, mark attempted
       }
     } catch (error) {
       console.error("[MERGE CART]", error);
+      setHasAttemptedInitialLoad(true);  // Even on error, mark attempted
     }
     setIsMerging(false);
   }, [session?.user?.id, localCart, isMerging, fetchDBCart]);
@@ -355,5 +366,15 @@ export function useEnhancedCart() {
     getTotalPrice,
     isLoggedIn: status === "authenticated",
     refreshKey, // Expose refresh key to force component re-renders
+
+    // CRITICAL FIX: Explicit hydration state with proper initial load tracking
+    // Previous bug: Used (!isLoading) which was TRUE before first fetch started
+    // New logic:
+    // - Guest users: Always hydrated (local cart)
+    // - Auth users: Only hydrated AFTER initial load attempt completes
+    // This prevents race condition where isHydrated === true before cart fetched
+    isHydrated: status === "authenticated"
+      ? hasAttemptedInitialLoad  // Only true after first fetch completes
+      : true,                     // Guest users always hydrated
   };
 }

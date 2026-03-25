@@ -116,11 +116,13 @@ export function CartView() {
   };
 
   // PERFORMANCE FIX: Show skeleton during initial load
-  if (isLoading && items.length === 0) {
+  // Also handles the race condition where dbCart hasn't loaded yet
+  if (isLoading) {
     return <CartSkeleton />;
   }
 
-  if (items.length === 0) {
+  // Only show "empty cart" message after loading is complete
+  if (items.length === 0 && !isLoading) {
     return (
       <div className="text-center py-16">
         <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />

@@ -15,9 +15,20 @@ import { AddressModal } from "@/components/account/AddressModal";
 import Link from "next/link";
 
 export default function CheckoutPage() {
+  console.log("🟣 CHECKOUT PAGE COMPONENT MOUNTED");
+
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { items, getTotalPrice, getTotalItems } = useEnhancedCart();
+  const { items, getTotalPrice, getTotalItems, isLoading: cartIsLoading, isHydrated } = useEnhancedCart();
+
+  console.log("🟣 CHECKOUT PAGE STATE", {
+    itemsLength: items.length,
+    sessionStatus,
+    cartIsLoading,
+    isHydrated,
+    hasSession: !!session,
+    pathname: typeof window !== "undefined" ? window.location.pathname : "SSR"
+  });
 
   const [addresses, setAddresses] = useState<Array<{
     id: string;
@@ -40,17 +51,40 @@ export default function CheckoutPage() {
 
   // Redirect if not authenticated
   useEffect(() => {
+    console.log("🔴 CHECKOUT AUTH GUARD CHECK", {
+      sessionStatus,
+      willRedirect: sessionStatus === "unauthenticated"
+    });
+
     if (sessionStatus === "unauthenticated") {
+      console.log("🔴 REDIRECTING TO LOGIN - user not authenticated");
       router.push("/login?next=/checkout");
     }
   }, [sessionStatus, router]);
 
-  // Redirect if cart is empty
+  // Redirect if cart is empty (FIXED: Wait for cart to actually load)
   useEffect(() => {
-    if (items.length === 0 && sessionStatus !== "loading") {
+    console.log("🟠 CHECKOUT CART GUARD CHECK", {
+      itemsLength: items.length,
+      sessionStatus,
+      cartIsLoading,
+      isHydrated,
+      sessionLoading: sessionStatus === "loading",
+      willRedirect: items.length === 0 && sessionStatus !== "loading" && isHydrated
+    });
+
+    // CRITICAL FIX: Wait for cart to be hydrated before checking if empty
+    // isHydrated: For auth users, true when dbCart loaded OR not loading
+    // This prevents redirect during the brief window when dbCart === null
+    if (items.length === 0 && sessionStatus !== "loading" && isHydrated) {
+      console.log("🟠 REDIRECTING TO CART - cart is genuinely empty", {
+        itemsLength: items.length,
+        sessionStatus,
+        isHydrated
+      });
       router.push("/cart");
     }
-  }, [items.length, sessionStatus, router]);
+  }, [items.length, sessionStatus, isHydrated, router]);
 
   // REMOVED: Location redirect check
   // Address will be required via AddressModal gating instead
@@ -205,8 +239,14 @@ export default function CheckoutPage() {
     }
   };
 
-  // Loading state
-  if (sessionStatus === "loading" || (items.length === 0 && sessionStatus === "authenticated")) {
+  // Loading state (FIXED: Wait for cart hydration)
+  if (sessionStatus === "loading" || !isHydrated) {
+    console.log("🟣 CHECKOUT SHOWING LOADING SCREEN", {
+      sessionStatus,
+      isHydrated,
+      cartIsLoading,
+      itemsLength: items.length
+    });
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
