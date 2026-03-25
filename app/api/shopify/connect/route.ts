@@ -25,6 +25,9 @@ const BASE_URL =
 
 const SHOPIFY_REDIRECT_URI = BASE_URL + "/api/shopify/callback";
 
+// Mark as dynamic route (uses auth() which reads headers)
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     // Check authentication - use auth() from NextAuth v5

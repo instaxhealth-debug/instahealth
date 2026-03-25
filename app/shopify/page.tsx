@@ -8,13 +8,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle2, AlertCircle, Package } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default function ShopifyAppHome() {
+function ShopifyAppContent() {
   const searchParams = useSearchParams();
   const [shop, setShop] = useState<string | null>(null);
   const [host, setHost] = useState<string | null>(null);
@@ -187,5 +187,22 @@ export default function ShopifyAppHome() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ShopifyAppHome() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-gray-600">Loading Shopify app...</p>
+          </div>
+        </div>
+      }
+    >
+      <ShopifyAppContent />
+    </Suspense>
   );
 }

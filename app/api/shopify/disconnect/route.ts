@@ -10,6 +10,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { deleteAllWebhooks } from "@/lib/shopify/webhooks";
 
+// Mark as dynamic route (uses auth() which reads headers)
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication - use auth() from NextAuth v5

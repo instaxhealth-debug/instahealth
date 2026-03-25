@@ -10,6 +10,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncShopifyProducts } from "@/lib/shopify/sync-service";
 
+// Mark as dynamic route (uses auth() which reads headers)
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication - use auth() from NextAuth v5
