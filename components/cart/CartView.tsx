@@ -24,8 +24,10 @@ export function CartView() {
   // Single source of truth for total price from hook
   const total = getTotalPrice();
 
-  // Handle checkout navigation with robust error handling
+  // Handle checkout navigation with authentication check
   const handleProceedToCheckout = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log("🔴 CHECKOUT BUTTON CLICKED - HANDLER FIRING");
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -70,14 +72,30 @@ export function CartView() {
       return;
     }
 
+    // CRITICAL FIX: Check authentication BEFORE navigating to checkout
+    // Checkout page has a useEffect that immediately redirects unauthenticated users to /login
+    // This causes the "button does nothing" bug because navigation is hijacked
+    if (!isLoggedIn) {
+      console.log("🟡 USER NOT LOGGED IN - redirecting to /login");
+      if (DEBUG) console.log("[CART] User not authenticated, redirecting to login with callback");
+
+      // Redirect to login with checkout as the callback destination
+      router.push("/login?next=/checkout");
+      return;
+    }
+
+    console.log("✅ USER IS LOGGED IN - proceeding to checkout");
+
     // Set loading state and navigate
     setIsNavigatingToCheckout(true);
 
     try {
-      if (DEBUG) console.log("[CART] Navigating to /checkout");
+      console.log("🔵 ABOUT TO CALL router.push('/checkout')");
+      if (DEBUG) console.log("[CART] Navigating to /checkout (authenticated)");
 
       // Use router.push with error handling
       await router.push("/checkout");
+      console.log("🟢 router.push('/checkout') COMPLETED");
 
       // If we reach here, navigation started successfully
       if (DEBUG) console.log("[CART] Navigation initiated successfully");
