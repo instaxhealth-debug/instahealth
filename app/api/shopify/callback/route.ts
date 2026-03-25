@@ -161,15 +161,57 @@ export async function GET(request: NextRequest) {
         });
       });
 
-    // ✅ FIX: Redirect to embedded app home (Shopify requirement for public apps)
-    // Include shop and host params for Shopify embedded app context
+    // ✅ SHOPIFY APP STORE FIX: Return 200 OK with embedded app redirect
+    // Shopify automated checks require HTTP 200 response, not 302 redirect
+    // We use App Bridge to redirect within the embedded app context
     const redirectUrl = new URL(`${BASE_URL}/shopify`);
     redirectUrl.searchParams.set("shop", shop);
     redirectUrl.searchParams.set("shopify", "connected");
 
-    console.log(`[SHOPIFY_CALLBACK] Redirecting to embedded app home: ${redirectUrl.toString()}`);
+    console.log(`[SHOPIFY_CALLBACK] Returning 200 OK with embedded app redirect: ${redirectUrl.toString()}`);
 
-    return NextResponse.redirect(redirectUrl.toString());
+    // Return 200 with HTML that uses Shopify App Bridge to redirect
+    return new NextResponse(
+      `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+</head>
+<body>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.top === window.self) {
+        // Not in iframe, use regular redirect
+        window.location.href = "${redirectUrl.toString()}";
+      } else {
+        // In iframe, use App Bridge redirect
+        var AppBridge = window['app-bridge'];
+        var createApp = AppBridge.default;
+        var Redirect = AppBridge.actions.Redirect;
+
+        var app = createApp({
+          apiKey: "${SHOPIFY_CLIENT_ID}",
+          host: new URLSearchParams(window.location.search).get('host') || btoa("${shop}/admin")
+        });
+
+        var redirect = Redirect.create(app);
+        redirect.dispatch(Redirect.Action.APP, "${redirectUrl.pathname}${redirectUrl.search}");
+      }
+    });
+  </script>
+  <p>Redirecting to app...</p>
+</body>
+</html>`,
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
     console.error("Shopify callback error:", error);
 

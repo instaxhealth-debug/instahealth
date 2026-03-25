@@ -22,26 +22,10 @@ embedded = true
 # Invalid HMAC must return 401 Unauthorized
 # =============================================================================
 
-[webhooks]
-api_version = "2024-10"
-
-# GDPR Compliance Webhooks - customers/data_request
-# Customer requests access to their data (GDPR Article 15)
-[[webhooks.subscriptions]]
-topics = ["customers/data_request"]
-uri = "/api/shopify/compliance"
-
-# GDPR Compliance Webhooks - customers/redact
-# Customer requests data deletion (GDPR Article 17 - Right to be forgotten)
-[[webhooks.subscriptions]]
-topics = ["customers/redact"]
-uri = "/api/shopify/compliance"
-
-# GDPR Compliance Webhooks - shop/redact
-# Shop uninstalled - delete all shop data within 48 hours
-[[webhooks.subscriptions]]
-topics = ["shop/redact"]
-uri = "/api/shopify/compliance"
+[[webhooks.privacy_compliance]]
+customer_deletion_url = "https://instahealth.ae/api/shopify/compliance"
+customer_data_request_url = "https://instahealth.ae/api/shopify/compliance"
+shop_deletion_url = "https://instahealth.ae/api/shopify/compliance"
 
 # =============================================================================
 # OPTIONAL: PRODUCT SYNC WEBHOOKS
