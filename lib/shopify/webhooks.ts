@@ -11,10 +11,10 @@ const SHOPIFY_API_VERSION = "2024-01";
 /**
  * Webhook topics to register for each vendor
  *
- * MANDATORY COMPLIANCE WEBHOOKS (required for Shopify App Store):
- * - customers/data_request (GDPR data access request)
- * - customers/redact (GDPR customer deletion)
- * - shop/redact (Shop data deletion after uninstall)
+ * NOTE: GDPR compliance webhooks are now configured in shopify.app.toml
+ * and should NOT be registered via REST API to avoid duplicates.
+ *
+ * Only non-compliance webhooks are registered dynamically here.
  */
 const WEBHOOK_TOPICS = [
   // Product sync webhooks
@@ -25,10 +25,11 @@ const WEBHOOK_TOPICS = [
   // App lifecycle
   "app/uninstalled",
 
-  // ✅ MANDATORY GDPR/Privacy compliance webhooks
-  "customers/data_request",
-  "customers/redact",
-  "shop/redact",
+  // ❌ REMOVED: GDPR compliance webhooks (now in shopify.app.toml)
+  // Do NOT register these via API - they are configured in TOML:
+  // - "customers/data_request"
+  // - "customers/redact"
+  // - "shop/redact"
 ] as const;
 
 type WebhookTopic = (typeof WEBHOOK_TOPICS)[number];
@@ -72,19 +73,11 @@ function getWebhookUrl(topic: WebhookTopic): string {
     process.env.NEXTAUTH_URL ||
     "https://instahealth.ae";
 
-  // Map GDPR topics to their dedicated endpoints (Shopify requirement)
-  const gdprEndpoints: Record<string, string> = {
-    "customers/data_request": "/api/shopify/gdpr/customers-data-request",
-    "customers/redact": "/api/shopify/gdpr/customers-redact",
-    "shop/redact": "/api/shopify/gdpr/shop-redact",
-  };
+  // NOTE: GDPR compliance webhooks are configured in shopify.app.toml
+  // and point to /api/shopify/compliance (unified endpoint)
+  // This function is now only used for non-compliance webhooks
 
-  // Use dedicated GDPR endpoint if applicable
-  if (gdprEndpoints[topic]) {
-    return `${baseUrl}${gdprEndpoints[topic]}`;
-  }
-
-  // All other webhooks use the main webhook handler
+  // All product/lifecycle webhooks use the main webhook handler
   return `${baseUrl}/api/shopify/webhooks`;
 }
 

@@ -25,7 +25,11 @@ export async function POST(request: NextRequest) {
     const contentType = headersList.get("content-type");
 
     if (!topic || !hmac || !shopDomain) {
-      return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
+      // CRITICAL: Missing HMAC must return 401 (not 400) per Shopify requirements
+      return NextResponse.json(
+        { error: "Unauthorized - missing authentication headers" },
+        { status: 401 }
+      );
     }
 
     // ✅ SECURITY FIX: Validate Content-Type to prevent content-type confusion attacks

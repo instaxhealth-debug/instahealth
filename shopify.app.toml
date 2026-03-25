@@ -1,0 +1,84 @@
+# =============================================================================
+# SHOPIFY PUBLIC APP CONFIGURATION
+# =============================================================================
+# This file is REQUIRED for Shopify App Store review and automated checks
+# Documentation: https://shopify.dev/docs/apps/build/cli-for-apps/app-configuration
+# =============================================================================
+
+# App identification (get these from Shopify Partner Dashboard)
+name = "InstaHealth Marketplace"
+client_id = ""  # Set via SHOPIFY_API_KEY environment variable
+scopes = "read_products,read_inventory,read_orders"
+
+# Application URLs
+application_url = "https://instahealth.ae/shopify"
+embedded = true
+
+# =============================================================================
+# MANDATORY COMPLIANCE WEBHOOKS (CRITICAL FOR APP STORE APPROVAL)
+# =============================================================================
+# Shopify requires ALL public apps to handle these GDPR compliance webhooks
+# Even if your app doesn't store customer PII, you must respond with 200 OK
+# Invalid HMAC must return 401 Unauthorized
+# =============================================================================
+
+[webhooks]
+api_version = "2024-10"
+
+# Single compliance endpoint for all three mandatory GDPR webhooks
+# This endpoint will route internally based on X-Shopify-Topic header
+# CRITICAL: Must use "compliance_topics" not "topics" for GDPR webhooks
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "/api/shopify/compliance"
+
+# =============================================================================
+# OPTIONAL: PRODUCT SYNC WEBHOOKS
+# =============================================================================
+# These are auto-registered at runtime via registerWebhooks() function
+# Including here for documentation, but they will be registered dynamically
+# to allow per-shop customization
+# =============================================================================
+
+# Product lifecycle webhooks (auto-registered after OAuth)
+# [[webhooks.subscriptions]]
+# topics = ["products/create", "products/update", "products/delete"]
+# uri = "/api/shopify/webhooks"
+
+# App uninstall webhook (auto-registered after OAuth)
+# [[webhooks.subscriptions]]
+# topics = ["app/uninstalled"]
+# uri = "/api/shopify/webhooks"
+
+# =============================================================================
+# ACCESS SCOPES
+# =============================================================================
+# These must match the scopes set in Shopify Partner Dashboard
+
+[access_scopes]
+scopes = "read_products,read_inventory,read_orders"
+
+# =============================================================================
+# AUTH CONFIGURATION
+# =============================================================================
+
+[auth]
+redirect_urls = [
+  "https://instahealth.ae/api/shopify/callback",
+  "http://localhost:3000/api/shopify/callback"  # Development only
+]
+
+# =============================================================================
+# APP PROXY (if needed in future)
+# =============================================================================
+# Uncomment and configure if you need storefront proxy endpoints
+# [app_proxy]
+# url = "https://instahealth.ae/api/shopify/proxy"
+# subpath = "instahealth"
+# prefix = "apps"
+
+# =============================================================================
+# POS (if needed in future)
+# =============================================================================
+# [pos]
+# embedded = false

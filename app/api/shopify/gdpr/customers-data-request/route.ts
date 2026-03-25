@@ -27,7 +27,11 @@ export async function POST(request: NextRequest) {
 
     if (!hmac || !shopDomain) {
       console.error("[GDPR:CUSTOMERS_DATA_REQUEST] Missing required headers");
-      return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
+      // CRITICAL: Missing HMAC must return 401 (not 400) per Shopify requirements
+      return NextResponse.json(
+        { error: "Unauthorized - missing authentication headers" },
+        { status: 401 }
+      );
     }
 
     // Get raw body for HMAC verification
