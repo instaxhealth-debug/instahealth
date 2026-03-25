@@ -25,11 +25,22 @@ embedded = true
 [webhooks]
 api_version = "2024-10"
 
-# Single compliance endpoint for all three mandatory GDPR webhooks
-# This endpoint will route internally based on X-Shopify-Topic header
-# CRITICAL: Must use "compliance_topics" not "topics" for GDPR webhooks
+# GDPR Compliance Webhooks - customers/data_request
+# Customer requests access to their data (GDPR Article 15)
 [[webhooks.subscriptions]]
-compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+topics = ["customers/data_request"]
+uri = "/api/shopify/compliance"
+
+# GDPR Compliance Webhooks - customers/redact
+# Customer requests data deletion (GDPR Article 17 - Right to be forgotten)
+[[webhooks.subscriptions]]
+topics = ["customers/redact"]
+uri = "/api/shopify/compliance"
+
+# GDPR Compliance Webhooks - shop/redact
+# Shop uninstalled - delete all shop data within 48 hours
+[[webhooks.subscriptions]]
+topics = ["shop/redact"]
 uri = "/api/shopify/compliance"
 
 # =============================================================================
@@ -65,7 +76,9 @@ scopes = "read_products,read_inventory,read_orders"
 [auth]
 redirect_urls = [
   "https://instahealth.ae/api/shopify/callback",
-  "http://localhost:3000/api/shopify/callback"  # Development only
+  "https://instahealth.ae/admin/oauth/redirect_to_install",
+  "http://localhost:3000/api/shopify/callback",  # Development only
+  "http://localhost:3000/admin/oauth/redirect_to_install"  # Development only
 ]
 
 # =============================================================================

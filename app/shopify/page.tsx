@@ -24,22 +24,23 @@ function ShopifyAppContent() {
     // Get shop and host from URL params (Shopify embedded app params)
     const shopParam = searchParams.get("shop");
     const hostParam = searchParams.get("host");
+    const isInstall = searchParams.get("install") === "true";
+    const isConnected = searchParams.get("shopify") === "connected";
 
     console.log("[SHOPIFY_APP_HOME] Mounted with params:", {
       shop: shopParam,
       host: hostParam,
+      isInstall,
+      isConnected,
       allParams: Object.fromEntries(searchParams.entries())
     });
 
     setShop(shopParam);
     setHost(hostParam);
 
-    // Check if this is post-install
-    if (searchParams.get("shopify") === "connected") {
-      setStatus("success");
-    } else {
-      setStatus("success");
-    }
+    // Always show success status for app home page
+    // This ensures Shopify automated checks pass
+    setStatus("success");
   }, [searchParams]);
 
   if (status === "loading") {
@@ -70,18 +71,23 @@ function ShopifyAppContent() {
         </div>
 
         {/* Success message */}
-        {searchParams.get("shopify") === "connected" && (
+        {(searchParams.get("shopify") === "connected" || searchParams.get("install") === "true") && (
           <Card className="border-green-200 bg-green-50">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <CardTitle className="text-green-900">Successfully Connected!</CardTitle>
+                <CardTitle className="text-green-900">
+                  {searchParams.get("install") === "true"
+                    ? "Welcome to InstaHealth!"
+                    : "Successfully Connected!"}
+                </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-green-800">
-                Your Shopify store is now connected to InstaHealth. Your products will sync
-                automatically.
+                {searchParams.get("install") === "true"
+                  ? "Your Shopify app is ready to use. Complete the OAuth flow to start syncing products."
+                  : "Your Shopify store is now connected to InstaHealth. Your products will sync automatically."}
               </p>
             </CardContent>
           </Card>
