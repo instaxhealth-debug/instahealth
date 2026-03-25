@@ -172,8 +172,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Shopify callback error:", error);
+
+    // Extract shop from request URL for error redirect
+    const requestUrl = new URL(request.url);
+    const shop = requestUrl.searchParams.get("shop");
+
     const errorUrl = new URL(`${BASE_URL}/shopify`);
-    const shop = searchParams.get("shop");
     if (shop) {
       errorUrl.searchParams.set("shop", shop);
     }
