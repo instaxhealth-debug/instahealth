@@ -628,7 +628,7 @@ model ServiceBooking {
 
 model ShopifyOAuthState {
   nonce      String   @id
-  vendorId   String
+  vendorId   String?  // Nullable to support public installs from App Store
   timestamp  BigInt
   createdAt  DateTime @default(now())
 

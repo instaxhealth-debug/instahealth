@@ -82,7 +82,92 @@ export async function GET(request: NextRequest) {
       where: { nonce: state },
     });
 
-    // Verify vendor exists
+    // ✅ PUBLIC INSTALL FIX: Handle null vendorId from /api/shopify/install endpoint
+    // If vendorId is null, this is an App Store install without existing InstaHealth account
+    // We need to prompt the merchant to create/link their account
+    if (!vendorId) {
+      console.log(
+        "[SHOPIFY_CALLBACK] Public install detected (no vendorId), redirecting to account setup"
+      );
+
+      // Exchange code for access token first
+      const tokenResponse = await exchangeCodeForToken(
+        shop,
+        code,
+        SHOPIFY_CLIENT_ID,
+        SHOPIFY_CLIENT_SECRET
+      );
+
+      // Store token temporarily for account linking
+      // We'll create a special "pending" vendor record that can be claimed
+      const pendingVendor = await prisma.vendor.create({
+        data: {
+          email: `shopify-pending-${shop}@instahealth.ae`,
+          name: shop.replace(".myshopify.com", ""),
+          slug: `shopify-pending-${shop.replace(".myshopify.com", "")}-${Date.now()}`,
+          shopifyConnected: true,
+          shopifyShopDomain: shop,
+          shopifyAccessToken: tokenResponse.access_token,
+          shopifyScopes: tokenResponse.scope,
+          shopifyInstalledAt: new Date(),
+          shopifySyncStatus: "pending_account",
+        },
+      });
+
+      console.log(
+        `[SHOPIFY_CALLBACK] Created pending vendor ${pendingVendor.id} for shop ${shop}`
+      );
+
+      // Redirect to account setup page with pending vendor ID
+      const redirectUrl = new URL(`${BASE_URL}/shopify`);
+      redirectUrl.searchParams.set("shop", shop);
+      redirectUrl.searchParams.set("setup", "true");
+      redirectUrl.searchParams.set("pendingVendor", pendingVendor.id);
+
+      console.log(
+        `[SHOPIFY_CALLBACK] Redirecting to account setup: ${redirectUrl.toString()}`
+      );
+
+      return new NextResponse(
+        `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Account Setup Required</title>
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+</head>
+<body>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.top === window.self) {
+        window.location.href = "${redirectUrl.toString()}";
+      } else {
+        var AppBridge = window['app-bridge'];
+        var createApp = AppBridge.default;
+        var Redirect = AppBridge.actions.Redirect;
+        var app = createApp({
+          apiKey: "${SHOPIFY_CLIENT_ID}",
+          host: new URLSearchParams(window.location.search).get('host') || btoa("${shop}/admin")
+        });
+        var redirect = Redirect.create(app);
+        redirect.dispatch(Redirect.Action.APP, "${redirectUrl.pathname}${redirectUrl.search}");
+      }
+    });
+  </script>
+  <p>Setting up your InstaHealth account...</p>
+</body>
+</html>`,
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+          },
+        }
+      );
+    }
+
+    // Verify vendor exists (for existing InstaHealth accounts)
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
     });
