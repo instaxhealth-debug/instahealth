@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
           host: new URLSearchParams(window.location.search).get('host') || btoa("${shop}/admin")
         });
         var redirect = Redirect.create(app);
-        redirect.dispatch(Redirect.Action.APP, "${redirectUrl.pathname}${redirectUrl.search}");
+        redirect.dispatch(Redirect.Action.REMOTE, "${redirectUrl.toString()}");
       }
     });
   </script>
@@ -282,7 +282,7 @@ export async function GET(request: NextRequest) {
         });
 
         var redirect = Redirect.create(app);
-        redirect.dispatch(Redirect.Action.APP, "${redirectUrl.pathname}${redirectUrl.search}");
+        redirect.dispatch(Redirect.Action.REMOTE, "${redirectUrl.toString()}");
       }
     });
   </script>

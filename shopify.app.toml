@@ -11,7 +11,9 @@ client_id = ""  # Set via SHOPIFY_API_KEY environment variable
 scopes = "read_products,read_inventory,read_orders"
 
 # Application URLs
-application_url = "https://instahealth.ae/shopify"
+# CRITICAL: For embedded apps, use root URL not /shopify path
+# Shopify will load this URL in an iframe at {store}.myshopify.com/admin/apps/{handle}
+application_url = "https://instahealth.ae"
 embedded = true
 
 # =============================================================================
@@ -60,8 +62,10 @@ scopes = "read_products,read_inventory,read_orders"
 [auth]
 redirect_urls = [
   "https://instahealth.ae/api/shopify/callback",
+  "https://instahealth.ae/api/shopify/install",  # Public install endpoint
   "https://instahealth.ae/admin/oauth/redirect_to_install",
   "http://localhost:3000/api/shopify/callback",  # Development only
+  "http://localhost:3000/api/shopify/install",  # Development only
   "http://localhost:3000/admin/oauth/redirect_to_install"  # Development only
 ]
 
