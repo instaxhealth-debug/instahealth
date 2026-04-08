@@ -47,6 +47,14 @@ function ShopifyAppContent() {
     setShop(shopParam);
     setHost(hostParam);
 
+    // CRITICAL: If accessed outside embedded context (missing shop/host), redirect to install
+    // This prevents top-level load bugs and ensures proper embedded app flow
+    if (!shopParam || !hostParam) {
+      console.warn("[SHOPIFY_APP_HOME] Missing shop/host params - redirecting to install");
+      window.location.href = "/api/shopify/install";
+      return;
+    }
+
     // Initialize App Bridge and fetch session token if embedded
     if (shopParam && hostParam && !appBridgeRef.current) {
       try {

@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   "/vendor/login",
   "/vendor/apply",
   "/vendor/activate",
+  "/shopify",
 ];
 
 export function middleware(request: NextRequest) {

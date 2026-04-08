@@ -11,10 +11,15 @@ client_id = ""  # Set via SHOPIFY_API_KEY environment variable
 scopes = "read_products,read_inventory,read_orders"
 
 # Application URLs
-# CRITICAL: For embedded apps, use root URL not /shopify path
-# Shopify will load this URL in an iframe at {store}.myshopify.com/admin/apps/{handle}
-application_url = "https://instahealth.ae"
+# CRITICAL: For embedded apps, app_url is for install, application_url is for the embedded UI
+app_url = "https://instahealth.ae/api/shopify/install"
+application_url = "https://instahealth.ae/shopify"
 embedded = true
+
+# Auth configuration
+# CRITICAL: Redirect URLs must be configured in Partner Dashboard to match these
+[[auth]]
+redirect_urls = ["https://instahealth.ae/api/shopify/callback"]
 
 # =============================================================================
 # MANDATORY COMPLIANCE WEBHOOKS (CRITICAL FOR APP STORE APPROVAL)
