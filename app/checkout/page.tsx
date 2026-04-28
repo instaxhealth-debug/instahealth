@@ -15,20 +15,10 @@ import { AddressModal } from "@/components/account/AddressModal";
 import Link from "next/link";
 
 export default function CheckoutPage() {
-  console.log("🟣 CHECKOUT PAGE COMPONENT MOUNTED");
 
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const { items, getTotalPrice, getTotalItems, isLoading: cartIsLoading, isHydrated } = useEnhancedCart();
-
-  console.log("🟣 CHECKOUT PAGE STATE", {
-    itemsLength: items.length,
-    sessionStatus,
-    cartIsLoading,
-    isHydrated,
-    hasSession: !!session,
-    pathname: typeof window !== "undefined" ? window.location.pathname : "SSR"
-  });
 
   const [addresses, setAddresses] = useState<Array<{
     id: string;
@@ -51,37 +41,17 @@ export default function CheckoutPage() {
 
   // Redirect if not authenticated
   useEffect(() => {
-    console.log("🔴 CHECKOUT AUTH GUARD CHECK", {
-      sessionStatus,
-      willRedirect: sessionStatus === "unauthenticated"
-    });
-
     if (sessionStatus === "unauthenticated") {
-      console.log("🔴 REDIRECTING TO LOGIN - user not authenticated");
       router.push("/login?next=/checkout");
     }
   }, [sessionStatus, router]);
 
   // Redirect if cart is empty (FIXED: Wait for cart to actually load)
   useEffect(() => {
-    console.log("🟠 CHECKOUT CART GUARD CHECK", {
-      itemsLength: items.length,
-      sessionStatus,
-      cartIsLoading,
-      isHydrated,
-      sessionLoading: sessionStatus === "loading",
-      willRedirect: items.length === 0 && sessionStatus !== "loading" && isHydrated
-    });
-
     // CRITICAL FIX: Wait for cart to be hydrated before checking if empty
     // isHydrated: For auth users, true when dbCart loaded OR not loading
     // This prevents redirect during the brief window when dbCart === null
     if (items.length === 0 && sessionStatus !== "loading" && isHydrated) {
-      console.log("🟠 REDIRECTING TO CART - cart is genuinely empty", {
-        itemsLength: items.length,
-        sessionStatus,
-        isHydrated
-      });
       router.push("/cart");
     }
   }, [items.length, sessionStatus, isHydrated, router]);
@@ -172,8 +142,6 @@ export default function CheckoutPage() {
         throw new Error("Selected address not found");
       }
 
-      console.log("[CHECKOUT] Submitting with address:", selectedAddr.id);
-
       const shippingPayload = buildShippingPayload({
         shippingName: formData.shippingName,
         shippingPhone: formData.shippingPhone,
@@ -181,8 +149,6 @@ export default function CheckoutPage() {
         shippingAddressLine2: formData.shippingAddressLine2,
         selectedAddress: selectedAddr,
       });
-
-      console.log("[CHECKOUT] Shipping payload:", shippingPayload);
 
       // 1) Create order (PENDING_PAYMENT)
       const createResponse = await fetch("/api/checkout/create", {
@@ -209,8 +175,6 @@ export default function CheckoutPage() {
         throw new Error(createData.error || "Failed to create order");
       }
 
-      console.log("[CHECKOUT] Order created:", createData.orderId);
-
       // 2) Create Stripe session
       const sessionResponse = await fetch("/api/checkout/stripe-session", {
         method: "POST",
@@ -230,7 +194,6 @@ export default function CheckoutPage() {
         throw new Error("No payment session URL returned");
       }
 
-      console.log("[CHECKOUT] Redirecting to Stripe:", sessionData.url);
       window.location.assign(sessionData.url);
     } catch (err: any) {
       console.error("[CHECKOUT] Error:", err);
@@ -241,12 +204,6 @@ export default function CheckoutPage() {
 
   // Loading state (FIXED: Wait for cart hydration)
   if (sessionStatus === "loading" || !isHydrated) {
-    console.log("🟣 CHECKOUT SHOWING LOADING SCREEN", {
-      sessionStatus,
-      isHydrated,
-      cartIsLoading,
-      itemsLength: items.length
-    });
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -146,16 +146,10 @@ export default async function MarketplaceCategoryPage({
   const session = await auth();
   const showDebug = process.env.NODE_ENV !== "production" && session?.user?.role === "ADMIN";
 
-  // DEBUG: Log query params
-  console.log(`[${categorySlug}] selectedLocationId`, selectedLocationId);
-
-  // DEBUG: Count total products in this category (no filters)
   const totalProductsInCategory = await prisma.product.count({
     where: { category: canonicalCategory },
   });
-  console.log(`[${categorySlug}] totalProductsInCategory:`, totalProductsInCategory);
 
-  // DEBUG: Count active+inStock products in this category
   const activeProductsInCategory = await prisma.product.count({
     where: {
       category: canonicalCategory,
@@ -164,9 +158,7 @@ export default async function MarketplaceCategoryPage({
       ...(isService ? {} : { inStock: true }),
     },
   });
-  console.log(`[${categorySlug}] activeProductsInCategory:`, activeProductsInCategory);
 
-  // DEBUG: Count global products
   const globalProducts = await prisma.product.count({
     where: {
       category: canonicalCategory,
@@ -176,7 +168,6 @@ export default async function MarketplaceCategoryPage({
       isGlobal: true,
     },
   });
-  console.log(`[${categorySlug}] globalProducts:`, globalProducts);
 
   // Fetch vendors allowed in this category (vendor-driven, not product-driven)
   const vendors = await prisma.vendor.findMany({
@@ -215,13 +206,6 @@ export default async function MarketplaceCategoryPage({
       throw new Error("Marketplace vendors must come from Prisma only (mock source detected).");
     }
   }
-
-  console.log(`[${categorySlug}] vendors found:`, vendors.length);
-  
-  // DEBUG: Log vendor details for logo resolution
-  vendors.forEach((v) => {
-    console.log(`  [vendor] name="${v.name}" slug="${v.slug}" logoUrl="${v.logoUrl}"`);
-  });
 
   // Build vendor shop data
   const vendorShops = vendors.map((vendor) => {

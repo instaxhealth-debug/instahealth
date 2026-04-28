@@ -96,26 +96,14 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
 
   const resolvedLogoUrl = normalizeLogoUrl(vendor.logoUrl);
 
-  console.log("[VENDOR HEADER]", {
-    name: vendor.name,
-    slug: vendor.slug,
-    logoUrl: vendor.logoUrl,
-    resolvedLogoUrl,
-    keys: Object.keys(vendor),
-  });
-
   const selectedLocationId = await getSelectedLocationId();
   const selectedLocation = await getSelectedLocation();
   const session = await auth();
 
   // DEV DEBUG: Count products at each filter stage
-  console.log(`[VENDOR SHOP] vendorSlug=${params.vendorSlug}, category=${categorySlug}`);
-  console.log(`[VENDOR SHOP] selectedLocationId=${selectedLocationId}`);
-
   const totalProductsForVendor = await prisma.product.count({
     where: { vendorId: vendor.id },
   });
-  console.log(`[VENDOR SHOP] totalProductsForVendor (no filters):`, totalProductsForVendor);
 
   const activeInStockForVendor = await prisma.product.count({
     where: {
@@ -124,7 +112,6 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
       inStock: true,
     },
   });
-  console.log(`[VENDOR SHOP] activeInStockForVendor:`, activeInStockForVendor);
 
   const activeInStockCategoryForVendor = await prisma.product.count({
     where: {
@@ -134,7 +121,6 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
       category: canonicalCategory,
     },
   });
-  console.log(`[VENDOR SHOP] activeInStockCategoryForVendor (${canonicalCategory}):`, activeInStockCategoryForVendor);
 
   // Build search conditions (vendor-scoped, category-scoped)
   const searchConditions = searchQuery
@@ -183,7 +169,6 @@ export default async function VendorShopPage({ params, searchParams }: VendorSho
     },
   });
 
-  console.log(`[VENDOR SHOP] products after location filter:`, products.length);
 
   // Transform products to StorefrontProduct format
   const storefrontProducts: StorefrontProduct[] = products.map((product) => {
