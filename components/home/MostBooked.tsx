@@ -13,9 +13,9 @@ export function MostBooked({ offerings }: MostBookedProps) {
       {offerings.length === 0 ? (
         <p className="text-sm text-muted-foreground">No bookings yet.</p>
       ) : (
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4">
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 pl-1 pr-4" style={{ scrollPaddingRight: '16px' }}>
           {offerings.map((offering) => (
-            <div key={offering.id} className="flex-shrink-0 w-64">
+            <div key={offering.id} className="flex-shrink-0 w-[180px] md:w-[220px]">
               <OfferingCard offering={offering} />
             </div>
           ))}

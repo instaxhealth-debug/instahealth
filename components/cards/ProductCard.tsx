@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Clock } from "lucide-react";
+import { ShoppingCart, Clock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnhancedCart } from "@/hooks/use-enhanced-cart";
 import { useToast } from "@/hooks/use-toast";
@@ -17,24 +18,39 @@ interface ProductCardProps {
 export function ProductCard({ product, className }: ProductCardProps) {
   const { addItem } = useEnhancedCart();
   const { toast } = useToast();
+  const [isAdding, setIsAdding] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isAdding || justAdded) return;
+
+    setIsAdding(true);
     try {
       if (process.env.NEXT_PUBLIC_DEBUG_CART === "true") {
         console.log("[CART:PRODUCT_CARD] Adding item:", { productId: product.id, variantId: undefined, qty: 1 });
       }
       await addItem(product.id, undefined, 1);
+
+      setIsAdding(false);
+      setJustAdded(true);
+
       toast({
         title: "Added to cart",
-        description: `${product.name} added to your cart`,
+        description: product.name,
+        duration: 2000,
       });
+
+      setTimeout(() => setJustAdded(false), 2000);
     } catch (error) {
+      setIsAdding(false);
       toast({
         title: "Error",
         description: "Failed to add item to cart",
         variant: "destructive",
+        duration: 2000,
       });
     }
   };
@@ -51,22 +67,22 @@ export function ProductCard({ product, className }: ProductCardProps) {
   return (
     <Card
       className={cn(
-        "group overflow-hidden transition-all duration-200 hover:shadow-medium border-border/50 flex flex-col h-full",
+        "group overflow-hidden transition-all duration-200 hover:shadow-lg border-border/50 w-full md:w-[220px]",
         className
       )}
     >
-      <a href={`/product/${product.slug}`} className="flex flex-col h-full">
-        <CardContent className="p-0 flex flex-col h-full">
-          <div className="relative aspect-square overflow-hidden bg-muted">
-            {product.image && 
-             !product.image.startsWith("/Users") && 
+      <a href={`/product/${product.slug}`} className="block">
+        <CardContent className="p-0 flex flex-col">
+          <div className="relative w-full h-[180px] md:h-[220px] overflow-hidden bg-white">
+            {product.image &&
+             !product.image.startsWith("/Users") &&
              (product.image.startsWith("/logos/") || product.image.startsWith("http")) ? (
               <Image
                 src={product.image}
                 alt={product.name}
                 fill
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-contain transition-transform duration-300 group-hover:scale-105 p-2"
+                sizes="(max-width: 768px) 180px, 220px"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = "none";
@@ -96,37 +112,45 @@ export function ProductCard({ product, className }: ProductCardProps) {
               </div>
             )}
           </div>
-          <div className="p-3 md:p-4 flex flex-col flex-1">
-            <div className="flex-1 space-y-2">
-              <h3 className="font-semibold text-sm md:text-base leading-tight line-clamp-2 group-hover:text-primary transition-colors">
-                {product.name}
-              </h3>
-              {product.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                  {product.description}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2 pt-3 mt-auto">
+          <div className="p-3 flex flex-col h-[140px]">
+            <h3 className="font-semibold text-sm leading-tight line-clamp-2 mb-2 group-hover:text-primary transition-colors h-10">
+              {product.name}
+            </h3>
+            <div className="mt-auto space-y-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-lg md:text-xl font-bold">{product.priceDisplay}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {deliveryTime}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-lg font-bold">{product.priceDisplay}</p>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {deliveryTime}
+                </span>
               </div>
               <Button
                 onClick={handleAddToCart}
-                className="w-full"
+                disabled={isAdding || justAdded}
+                className={cn(
+                  "w-full h-[42px] rounded-xl font-semibold transition-all",
+                  justAdded
+                    ? "bg-green-600 hover:bg-green-600"
+                    : "bg-[#0ea5e9] hover:bg-[#0284c7]"
+                )}
                 size="sm"
-                variant="default"
               >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Add to cart
+                {isAdding ? (
+                  <>
+                    <div className="h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Adding...
+                  </>
+                ) : justAdded ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Added
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Add to cart
+                  </>
+                )}
               </Button>
             </div>
           </div>
