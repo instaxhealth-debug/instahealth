@@ -163,10 +163,10 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
                   onClick={handleAddToCart}
                   disabled={offering.stockStatus === "out_of_stock" || isAdding || justAdded}
                   className={cn(
-                    "w-full h-[42px] rounded-xl font-semibold transition-all",
+                    "w-full h-[36px] rounded-xl font-medium transition-all",
                     justAdded
                       ? "bg-green-600 hover:bg-green-600"
-                      : "bg-[#0ea5e9] hover:bg-[#0284c7]"
+                      : "bg-[#41a59b] hover:bg-[#369189]"
                   )}
                   size="sm"
                 >
@@ -189,7 +189,7 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
                 </Button>
               ) : (
                 <Button
-                  className="w-full h-[42px] rounded-xl font-semibold bg-[#0ea5e9] hover:bg-[#0284c7]"
+                  className="w-full h-[36px] rounded-xl font-medium bg-[#41a59b] hover:bg-[#369189]"
                   size="sm"
                   disabled={!hasValidBooking}
                   onClick={(e) => {

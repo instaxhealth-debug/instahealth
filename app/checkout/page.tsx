@@ -232,14 +232,24 @@ export default function CheckoutPage() {
 
   const total = getTotalPrice();
 
-  // Prepare order items for summary
-  const orderItems = items.map((item) => ({
-    id: item.product.id,
-    productName: item.product.name,
-    quantity: item.quantity,
-    unitPrice: item.product.price,
-    lineTotal: item.product.price * item.quantity,
-  }));
+  // Prepare order items for summary with proper price normalization
+  const orderItems = items.map((item) => {
+    // Handle both DB cart items (unitPriceFils) and local cart items (product.price)
+    const isDBItem = (item as any).unitPriceFils !== undefined;
+    const unitPriceAED = isDBItem
+      ? (item as any).unitPriceFils / 100
+      : (item as any).product?.price || 0;
+
+    const product = isDBItem ? (item as any).product : item as any;
+
+    return {
+      id: product.id,
+      productName: product.name,
+      quantity: item.quantity,
+      unitPrice: unitPriceAED,
+      lineTotal: unitPriceAED * item.quantity,
+    };
+  });
 
   // If user has 0 addresses and modal is forced open, block checkout
   if (addresses.length === 0 && modalForceOpen) {
