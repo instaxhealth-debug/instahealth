@@ -27,12 +27,12 @@ export function PromoBanner() {
   }, []);
 
   return (
-    <div className="relative w-full h-[260px] md:h-[320px] rounded-xl overflow-hidden">
+    <div className="relative w-full max-w-[1200px] h-[200px] mx-auto rounded-xl overflow-hidden">
       <Image
         src={promoImages[currentIndex].src}
         alt={promoImages[currentIndex].alt}
         fill
-        className="object-cover"
+        className="object-fill"
         priority={currentIndex === 0}
       />
     </div>
