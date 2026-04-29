@@ -78,7 +78,7 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
   return (
     <Card
       className={cn(
-        "group overflow-hidden transition-all duration-200 hover:shadow-lg border-border/50 w-full",
+        "group overflow-hidden transition-all duration-200 hover:shadow-md border-border/50 bg-white shadow-sm rounded-[20px] flex flex-col w-full",
         className
       )}
     >
@@ -90,9 +90,10 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
             event.stopPropagation();
           }
         }}
+        className="flex flex-col flex-1"
       >
-        <CardContent className="p-0 flex flex-col">
-          <div className="relative w-full h-[180px] md:h-[220px] overflow-hidden bg-white">
+        <CardContent className="p-0 flex flex-col flex-1">
+          <div className="relative w-full h-[210px] md:h-[260px] overflow-hidden bg-gray-50 rounded-t-[20px]">
             {offering.image &&
              !offering.image.startsWith("/Users") &&
              (offering.image.startsWith("/logos/") || offering.image.startsWith("http")) ? (
@@ -100,8 +101,8 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
                 src={offering.image}
                 alt={offering.name}
                 fill
-                className="object-contain transition-transform duration-300 group-hover:scale-105 p-2"
-                sizes="(max-width: 768px) 180px, 220px"
+                className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                sizes="(max-width: 768px) 190px, 240px"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = "none";
@@ -118,7 +119,7 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
                 }}
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
                 <span className="text-muted-foreground text-xs">No image</span>
               </div>
             )}
@@ -141,22 +142,15 @@ export function OfferingCard({ offering, className }: OfferingCardProps) {
               </div>
             )}
           </div>
-          <div className="p-3 flex flex-col h-[120px]">
-            <h3 className="font-semibold text-sm line-clamp-2 mb-2 group-hover:text-primary transition-colors leading-tight h-10">
+          <div className="p-4 flex flex-col flex-1">
+            <h3 className="font-semibold text-sm line-clamp-2 mb-2 group-hover:text-primary transition-colors leading-tight min-h-[2.5rem]">
               {offering.name}
             </h3>
 
             <div className="mt-auto space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-base">
-                  {offering.currency} {offering.price.toFixed(2)}
-                </span>
-                {offering.duration && (
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {offering.duration} min
-                  </span>
-                )}
-              </div>
+              <span className="font-bold text-base">
+                {offering.currency} {offering.price.toFixed(2)}
+              </span>
 
               {offering.type === "product" ? (
                 <Button

@@ -59,16 +59,17 @@ export function normalizePriceAED(value: unknown): number {
 
 /**
  * Get price in AED from cart item (handles both DB and local cart)
+ * CRITICAL: unitPriceFils currently stores AED directly (not fils), so NO division by 100
  */
 export function getCartItemPriceAED(item: any): number {
   if (isDBCartItem(item)) {
-    // DB cart item: price stored in fils
-    const priceFils = item.unitPriceFils;
-    if (typeof priceFils !== "number" || isNaN(priceFils)) {
-      console.error("[getCartItemPriceAED] Invalid unitPriceFils:", priceFils);
+    // DB cart item: unitPriceFils currently stores AED directly (NOT fils)
+    const priceAED = item.unitPriceFils;
+    if (typeof priceAED !== "number" || isNaN(priceAED)) {
+      console.error("[getCartItemPriceAED] Invalid unitPriceFils:", priceAED);
       return 0;
     }
-    return priceFils / 100;
+    return priceAED;  // Already in AED, no conversion needed
   }
 
   if (isLocalCartItem(item)) {

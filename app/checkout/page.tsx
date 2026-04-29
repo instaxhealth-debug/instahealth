@@ -233,11 +233,12 @@ export default function CheckoutPage() {
   const total = getTotalPrice();
 
   // Prepare order items for summary with proper price normalization
+  // CRITICAL: unitPriceFils already contains the AED price (not fils), DO NOT divide by 100
   const orderItems = items.map((item) => {
     // Handle both DB cart items (unitPriceFils) and local cart items (product.price)
     const isDBItem = (item as any).unitPriceFils !== undefined;
     const unitPriceAED = isDBItem
-      ? (item as any).unitPriceFils / 100
+      ? (item as any).unitPriceFils  // Already in AED, NOT fils
       : (item as any).product?.price || 0;
 
     const product = isDBItem ? (item as any).product : item as any;
@@ -289,7 +290,7 @@ export default function CheckoutPage() {
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 mt-4">
           <h1 className="text-3xl font-bold mb-2">Secure Checkout</h1>
           <p className="text-gray-600">Complete your order securely</p>
         </div>
