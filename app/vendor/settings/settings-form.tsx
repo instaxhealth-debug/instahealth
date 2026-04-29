@@ -74,14 +74,14 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Card>
+      <Card className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <CardHeader>
-          <CardTitle>Editable Settings</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-900">Editable Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Logo URL */}
           <div className="space-y-2">
-            <Label htmlFor="logoUrl">Logo URL</Label>
+            <Label htmlFor="logoUrl" className="text-sm font-medium text-gray-900">Logo URL</Label>
             <Input
               id="logoUrl"
               type="text"
@@ -90,8 +90,9 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
                 setFormData({ ...formData, logoUrl: e.target.value })
               }
               placeholder="https://example.com/logo.png or /logos/vendor-logo.png"
+              className="rounded-xl"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500">
               Must be a web URL (https://) or relative path (/logos/). Local
               file paths are not allowed.
             </p>
@@ -99,7 +100,7 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
 
           {/* Tagline */}
           <div className="space-y-2">
-            <Label htmlFor="tagline">Tagline</Label>
+            <Label htmlFor="tagline" className="text-sm font-medium text-gray-900">Tagline</Label>
             <Textarea
               id="tagline"
               value={formData.tagline}
@@ -108,12 +109,13 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
               }
               placeholder="Brief description of your business"
               rows={3}
+              className="rounded-xl"
             />
           </div>
 
           {/* Booking URL */}
           <div className="space-y-2">
-            <Label htmlFor="bookingUrl">Booking URL (Vendor Default)</Label>
+            <Label htmlFor="bookingUrl" className="text-sm font-medium text-gray-900">Booking URL (Vendor Default)</Label>
             <Input
               id="bookingUrl"
               type="url"
@@ -122,15 +124,16 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
                 setFormData({ ...formData, bookingUrl: e.target.value })
               }
               placeholder="https://calendly.com/your-link or Acuity/Fresha/Square URL"
+              className="rounded-xl"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500">
               Default booking link for your services. Supports Calendly, Acuity, Fresha, Square, or any HTTPS URL. Services can override this with their own booking URL.
             </p>
           </div>
 
           {/* Booking Instructions */}
           <div className="space-y-2">
-            <Label htmlFor="bookingInstructions">Booking Instructions (Optional)</Label>
+            <Label htmlFor="bookingInstructions" className="text-sm font-medium text-gray-900">Booking Instructions (Optional)</Label>
             <Textarea
               id="bookingInstructions"
               value={formData.bookingInstructions}
@@ -139,15 +142,16 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
               }
               placeholder="e.g., 'Please have your health records ready' or 'Select morning slots for faster service'"
               rows={4}
+              className="rounded-xl"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500">
               Instructions shown to customers before they schedule. Use this to prepare customers or provide helpful tips.
             </p>
           </div>
 
           {/* Service Radius */}
           <div className="space-y-2">
-            <Label htmlFor="serviceRadiusKm">
+            <Label htmlFor="serviceRadiusKm" className="text-sm font-medium text-gray-900">
               Service Radius (km): {formData.serviceRadiusKm}
             </Label>
             <Input
@@ -162,8 +166,9 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
                   serviceRadiusKm: parseInt(e.target.value),
                 })
               }
+              className="rounded-xl"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500">
               Maximum delivery distance from your base location
             </p>
           </div>
@@ -171,10 +176,10 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
           {/* Enforce Service Radius */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="enforceServiceRadius">
+              <Label htmlFor="enforceServiceRadius" className="text-sm font-medium text-gray-900">
                 Enforce Service Radius
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-500">
                 Reject orders outside your service radius
               </p>
             </div>
@@ -190,10 +195,10 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
           {/* Allow Out of Radius Override */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="allowOutOfRadiusOverride">
+              <Label htmlFor="allowOutOfRadiusOverride" className="text-sm font-medium text-gray-900">
                 Allow Out-of-Radius Override
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-500">
                 Allow admins to override radius restrictions
               </p>
             </div>
@@ -210,7 +215,7 @@ export function VendorSettingsForm({ vendor }: VendorSettingsFormProps) {
           </div>
 
           {/* Save Button */}
-          <Button type="submit" disabled={isLoading} className="w-full">
+          <Button type="submit" disabled={isLoading} className="w-full h-11 bg-[#41a59b] hover:bg-[#369189] rounded-xl">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
