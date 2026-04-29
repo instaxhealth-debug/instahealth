@@ -25,15 +25,16 @@ export function VendorNav() {
 
   return (
     <>
-      <nav className="hidden md:flex items-center gap-4">
+      <nav className="hidden md:flex items-center gap-1">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "text-sm text-muted-foreground hover:text-foreground transition-colors",
-              isActive(pathname, item.href) &&
-                "text-foreground font-semibold border-b-2 border-primary pb-1"
+              "text-sm px-4 py-2 rounded-lg transition-all font-medium",
+              isActive(pathname, item.href)
+                ? "bg-[#41a59b] text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             )}
           >
             {item.label}
@@ -46,7 +47,7 @@ export function VendorNav() {
         </label>
         <select
           id="vendor-manage-nav"
-          className="rounded border px-2 py-1 text-sm bg-background"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white font-medium text-gray-900"
           value={NAV_ITEMS.find((item) => isActive(pathname, item.href))?.href}
           onChange={(event) => router.push(event.target.value)}
         >
