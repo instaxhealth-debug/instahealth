@@ -85,12 +85,8 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      if (vendor.allowedCategories.length > 0 && !vendor.allowedCategories.includes(bulkCategory)) {
-        return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", requestId, message: `Bulk category '${bulkCategory}' is not in your allowed categories. Allowed: ${formatAllowedCategories(vendor.allowedCategories)}` },
-          { status: 400 },
-        );
-      }
+      // REMOVED: vendor.allowedCategories restriction
+      // Vendors/admins can now use any valid category slug
     }
 
     // TOCTOU protection: verify previewId matches

@@ -7,12 +7,14 @@
  * Handles checkout handoff for external products
  */
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ShoppingCart } from "lucide-react";
+import { ExternalLink, ShoppingCart, Calendar } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { BookingStepModal } from "@/components/bookings/BookingStepModal";
 
 interface Product {
   id: string;
@@ -25,6 +27,14 @@ interface Product {
   source?: string;
   checkoutMode?: string;
   externalCheckoutUrl?: string | null;
+  serviceType?: string;
+  requiresBooking?: boolean;
+  durationMinutes?: number | null;
+  variants?: Array<{
+    id: string;
+    strength: string;
+    priceFils: number;
+  }>;
   vendor: {
     name: string;
     slug: string;
@@ -36,8 +46,10 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const price = `AED ${(product.priceFils / 100).toFixed(2)}`;
   const isExternalCheckout = product.checkoutMode === "handoff" && product.externalCheckoutUrl;
+  const isBookableService = product.serviceType === "appointment-service" || product.requiresBooking;
 
   const handleExternalCheckout = () => {
     if (product.externalCheckoutUrl) {
@@ -92,7 +104,16 @@ export function ProductCard({ product }: ProductCardProps) {
           <Badge variant="outline">{product.category}</Badge>
         </div>
 
-        {isExternalCheckout ? (
+        {isBookableService ? (
+          <Button
+            onClick={() => setBookingModalOpen(true)}
+            className="w-full"
+            variant="default"
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Book Now
+          </Button>
+        ) : isExternalCheckout ? (
           <Button
             onClick={handleExternalCheckout}
             className="w-full"
@@ -110,6 +131,14 @@ export function ProductCard({ product }: ProductCardProps) {
           </Button>
         )}
       </CardContent>
+
+      {isBookableService && (
+        <BookingStepModal
+          open={bookingModalOpen}
+          onClose={() => setBookingModalOpen(false)}
+          product={product}
+        />
+      )}
     </Card>
   );
 }

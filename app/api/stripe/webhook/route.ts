@@ -54,7 +54,156 @@ export async function POST(req: NextRequest) {
 
       console.log('Checkout session completed:', session.id);
 
-      // Check if this is a service booking
+      // Check if this is a native booking (new system)
+      if (session.metadata?.type === 'booking') {
+        const bookingId = session.metadata.bookingId;
+        const DEBUG_BOOKINGS = process.env.DEBUG_BOOKINGS === 'true';
+
+        if (DEBUG_BOOKINGS) {
+          console.log('[BOOKING:WEBHOOK] Booking webhook received', {
+            bookingId,
+            sessionId: session.id,
+            paymentIntent: session.payment_intent
+          });
+        }
+
+        const booking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: {
+            product: { select: { name: true } },
+            vendor: { select: { name: true, email: true } },
+          },
+        });
+
+        if (!booking) {
+          console.error('[BOOKING:WEBHOOK] Booking not found:', bookingId);
+          return NextResponse.json({ received: true, warning: 'Booking not found' });
+        }
+
+        // Idempotency check: verify booking is still in PENDING_PAYMENT state
+        if (booking.status !== 'PENDING_PAYMENT') {
+          if (DEBUG_BOOKINGS) {
+            console.log('[BOOKING:WEBHOOK] Already processed - idempotency check', {
+              bookingId: booking.id,
+              currentStatus: booking.status,
+              paymentIntentId: booking.stripePaymentIntentId
+            });
+          }
+          return NextResponse.json({
+            received: true,
+            alreadyProcessed: true,
+            bookingId: booking.id,
+            status: booking.status
+          });
+        }
+
+        const previousStatus = booking.status;
+
+        // Update booking status to PENDING_VENDOR_CONFIRMATION and store payment intent
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: 'PENDING_VENDOR_CONFIRMATION',
+            stripePaymentIntentId: session.payment_intent as string,
+          },
+        });
+
+        if (DEBUG_BOOKINGS) {
+          console.log('[BOOKING:WEBHOOK] Booking status updated', {
+            bookingId: booking.id,
+            from: previousStatus,
+            to: 'PENDING_VENDOR_CONFIRMATION',
+            paymentIntentId: session.payment_intent
+          });
+        }
+
+        // Send confirmation emails (graceful failure handling)
+        try {
+          const { sendEmail } = await import('@/lib/email');
+
+          // Email to customer
+          try {
+            await sendEmail({
+              to: booking.customerEmail,
+              subject: `Booking Confirmed: ${booking.product.name}`,
+              html: `
+                <h2>Your booking is confirmed!</h2>
+                <p>Hi ${booking.customerName},</p>
+                <p>Your booking for <strong>${booking.product.name}</strong> with ${booking.vendor.name} has been confirmed and paid.</p>
+                <p><strong>Amount Paid:</strong> ${booking.currency} ${(booking.amountFils / 100).toFixed(2)}</p>
+                <p><strong>Address:</strong> ${booking.address}</p>
+                ${booking.preferredDate ? `<p><strong>Preferred Date:</strong> ${new Date(booking.preferredDate).toLocaleDateString()}</p>` : ''}
+                ${booking.preferredTimeWindow ? `<p><strong>Preferred Time:</strong> ${booking.preferredTimeWindow}</p>` : ''}
+                <p><strong>Booking ID:</strong> ${booking.id}</p>
+                <p>The vendor will contact you shortly to confirm the exact appointment time.</p>
+              `,
+            });
+
+            if (DEBUG_BOOKINGS) {
+              console.log('[BOOKING:WEBHOOK] Customer email sent', {
+                bookingId: booking.id,
+                to: booking.customerEmail
+              });
+            }
+          } catch (customerEmailError) {
+            console.error('[BOOKING:WEBHOOK] Failed to send customer email', {
+              bookingId: booking.id,
+              error: customerEmailError instanceof Error ? customerEmailError.message : 'Unknown error'
+            });
+          }
+
+          // Email to vendor
+          if (booking.vendor.email) {
+            try {
+              await sendEmail({
+                to: booking.vendor.email,
+                subject: `New Booking: ${booking.product.name}`,
+                html: `
+                  <h2>New booking received</h2>
+                  <p><strong>Service:</strong> ${booking.product.name}</p>
+                  <p><strong>Customer:</strong> ${booking.customerName}</p>
+                  <p><strong>Email:</strong> ${booking.customerEmail}</p>
+                  <p><strong>Phone:</strong> ${booking.customerPhone}</p>
+                  <p><strong>Address:</strong> ${booking.address}</p>
+                  ${booking.preferredDate ? `<p><strong>Preferred Date:</strong> ${new Date(booking.preferredDate).toLocaleDateString()}</p>` : ''}
+                  ${booking.preferredTimeWindow ? `<p><strong>Preferred Time:</strong> ${booking.preferredTimeWindow}</p>` : ''}
+                  <p><strong>Amount:</strong> ${booking.currency} ${(booking.amountFils / 100).toFixed(2)}</p>
+                  ${booking.notes ? `<p><strong>Notes:</strong> ${booking.notes}</p>` : ''}
+                  <p><strong>Booking ID:</strong> ${booking.id}</p>
+                  <p><a href="${process.env.NEXT_PUBLIC_BASE_URL}/vendor/bookings">View in vendor dashboard</a></p>
+                `,
+              });
+
+              if (DEBUG_BOOKINGS) {
+                console.log('[BOOKING:WEBHOOK] Vendor email sent', {
+                  bookingId: booking.id,
+                  to: booking.vendor.email
+                });
+              }
+            } catch (vendorEmailError) {
+              console.error('[BOOKING:WEBHOOK] Failed to send vendor email', {
+                bookingId: booking.id,
+                vendorEmail: booking.vendor.email,
+                error: vendorEmailError instanceof Error ? vendorEmailError.message : 'Unknown error'
+              });
+            }
+          }
+        } catch (emailModuleError) {
+          console.error('[BOOKING:WEBHOOK] Failed to load email module', {
+            bookingId: booking.id,
+            error: emailModuleError instanceof Error ? emailModuleError.message : 'Unknown error'
+          });
+        }
+
+        return NextResponse.json({
+          received: true,
+          bookingProcessed: true,
+          bookingId: booking.id,
+          status: 'PENDING_VENDOR_CONFIRMATION'
+        });
+      }
+
+      // Check if this is a service booking (legacy system)
       if (session.metadata?.kind === 'SERVICE_BOOKING') {
         const bookingId = session.metadata.bookingId;
         

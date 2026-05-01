@@ -259,17 +259,6 @@ export function ProductImportModal() {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Allowed categories info */}
-        {allowedCategories.length > 0 && state !== "complete" && (
-          <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              <strong>Allowed categories:</strong>{" "}
-              {allowedCategories.join(", ")}
-            </span>
-          </div>
-        )}
-
         {/* INITIAL */}
         {state === "initial" && (
           <div className="space-y-4">
