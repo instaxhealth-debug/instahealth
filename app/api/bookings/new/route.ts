@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { calculateMarketplaceFees } from "@/lib/time-slot-generator";
 
 const DEBUG_BOOKINGS = process.env.DEBUG_BOOKINGS === "true";
 
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
       address,
       preferredDate,
       preferredTimeWindow,
+      // MARKETPLACE: Real time slot booking
+      scheduledStart,
+      scheduledEnd,
       notes,
     } = body;
 
@@ -188,6 +192,85 @@ export async function POST(req: NextRequest) {
     }
 
     // =========================================
+    // MARKETPLACE: CALCULATE MONEY FLOW
+    // =========================================
+
+    const { totalPriceFils, platformFeeFils, vendorPayoutFils } =
+      calculateMarketplaceFees(amountFils);
+
+    // =========================================
+    // MARKETPLACE: VALIDATE TIME SLOT
+    // =========================================
+
+    let scheduledStartDate: Date | null = null;
+    let scheduledEndDate: Date | null = null;
+
+    if (scheduledStart && scheduledEnd) {
+      scheduledStartDate = new Date(scheduledStart);
+      scheduledEndDate = new Date(scheduledEnd);
+
+      // Validate dates are valid
+      if (
+        isNaN(scheduledStartDate.getTime()) ||
+        isNaN(scheduledEndDate.getTime())
+      ) {
+        return NextResponse.json(
+          { error: "Invalid scheduled time format" },
+          { status: 400 }
+        );
+      }
+
+      // Validate end is after start
+      if (scheduledEndDate <= scheduledStartDate) {
+        return NextResponse.json(
+          { error: "End time must be after start time" },
+          { status: 400 }
+        );
+      }
+
+      // Validate not in the past
+      if (scheduledStartDate < new Date()) {
+        return NextResponse.json(
+          { error: "Cannot book time slots in the past" },
+          { status: 400 }
+        );
+      }
+
+      // Check for overlapping bookings
+      const overlappingBooking = await prisma.booking.findFirst({
+        where: {
+          vendorId: product.vendorId,
+          status: {
+            in: ["PENDING_VENDOR_CONFIRMATION", "CONFIRMED", "IN_PROGRESS"],
+          },
+          AND: [
+            {
+              scheduledStart: {
+                lt: scheduledEndDate,
+              },
+            },
+            {
+              scheduledEnd: {
+                gt: scheduledStartDate,
+              },
+            },
+          ],
+        },
+      });
+
+      if (overlappingBooking) {
+        return NextResponse.json(
+          {
+            error:
+              "This time slot is no longer available. Please select another time.",
+            conflictingBookingId: overlappingBooking.id,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // =========================================
     // CREATE BOOKING
     // =========================================
 
@@ -202,11 +285,20 @@ export async function POST(req: NextRequest) {
         customerEmail: customerEmail.toLowerCase().trim(),
         customerPhone: customerPhone.trim(),
         address: address.trim(),
+        // Legacy fields (backwards compatibility)
         preferredDate: preferredDate ? new Date(preferredDate) : null,
         preferredTimeWindow: preferredTimeWindow?.trim() || null,
+        // MARKETPLACE: Real time slots
+        scheduledStart: scheduledStartDate,
+        scheduledEnd: scheduledEndDate,
         notes: notes?.trim() || null,
+        // MARKETPLACE: Money tracking
         amountFils, // Always from database
         currency: "AED",
+        totalPriceFils,
+        platformFeeFils,
+        vendorPayoutFils,
+        payoutStatus: "PENDING",
       },
     });
 

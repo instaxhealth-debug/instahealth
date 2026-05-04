@@ -149,6 +149,12 @@ model Vendor {
   shopifyShopDomain        String?
   shopifyStorefrontToken   String?
   shopifySyncStatus        String?
+  // MARKETPLACE: Vendor Availability System
+  workingDays              Int[]              @default([1, 2, 3, 4, 5, 6, 0]) // 0=Sun, 1=Mon, etc
+  workingHoursStart        String?            @default("09:00") // HH:mm format
+  workingHoursEnd          String?            @default("18:00")
+  slotDurationMinutes      Int?               @default(60)
+  bufferTimeMinutes        Int?               @default(15)
   cartItems                CartItem[]
   orderItems               OrderItem[]
   products                 Product[]
@@ -600,11 +606,19 @@ model Booking {
   preferredDate           DateTime?
   preferredTimeWindow     String?
   notes                   String?
-  scheduledAt             DateTime?
+  // MARKETPLACE: Real Availability System (replaces soft preference)
+  scheduledStart          DateTime?
+  scheduledEnd            DateTime?
+  scheduledAt             DateTime?     // Legacy field - keeping for backwards compatibility
   stripeCheckoutSessionId String?       @unique
   stripePaymentIntentId   String?       @unique
   amountFils              Int
   currency                String        @default("AED")
+  // MARKETPLACE: Money Flow Tracking
+  totalPriceFils          Int?          // Total customer paid (same as amountFils initially)
+  platformFeeFils         Int?          // Platform commission
+  vendorPayoutFils        Int?          // Amount vendor receives
+  payoutStatus            PayoutStatus  @default(PENDING)
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
 
@@ -619,6 +633,9 @@ model Booking {
   @@index([createdAt])
   @@index([vendorId, status])
   @@index([userId, status])
+  @@index([scheduledStart])
+  @@index([vendorId, scheduledStart])
+  @@index([payoutStatus])
 }
 
 model ShopifyOAuthState {
@@ -698,4 +715,10 @@ enum BookingStatus {
   CANCELLED
   PAYMENT_FAILED
   REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  CANCELLED
 }

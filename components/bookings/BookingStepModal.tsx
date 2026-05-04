@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar, Clock, MapPin, CreditCard, ChevronRight, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { TimeSlotPicker } from "@/components/bookings/TimeSlotPicker";
 
 interface Product {
   id: string;
@@ -47,6 +48,9 @@ export function BookingStepModal({ open, onClose, product }: BookingStepModalPro
   const [preferredDate, setPreferredDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("");
   const [exactTime, setExactTime] = useState("");
+  // MARKETPLACE: Real time slots
+  const [scheduledStart, setScheduledStart] = useState<string>("");
+  const [scheduledEnd, setScheduledEnd] = useState<string>("");
   const [address, setAddress] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -79,7 +83,8 @@ export function BookingStepModal({ open, onClose, product }: BookingStepModalPro
       case 1:
         return product.variants ? !!selectedVariant : true;
       case 2:
-        return !!preferredDate && !!timeWindow;
+        // MARKETPLACE: Require real time slot selection
+        return !!scheduledStart && !!scheduledEnd;
       case 3:
         return !!address && !!customerName && !!customerEmail && !!customerPhone;
       case 4:
@@ -116,10 +121,11 @@ export function BookingStepModal({ open, onClose, product }: BookingStepModalPro
           customerEmail,
           customerPhone,
           address,
-          preferredDate,
-          preferredTimeWindow: timeWindow === "Exact time (I will specify)" ? exactTime : timeWindow,
+          // MARKETPLACE: Send real time slots
+          scheduledStart,
+          scheduledEnd,
           notes,
-          amountFils: finalPrice,
+          // Price is calculated server-side, not sent from client
         }),
       });
 
@@ -204,50 +210,15 @@ export function BookingStepModal({ open, onClose, product }: BookingStepModalPro
       case 2:
         return (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="preferredDate">Preferred Date *</Label>
-              <Input
-                id="preferredDate"
-                type="date"
-                value={preferredDate}
-                onChange={(e) => setPreferredDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Preferred Time Window *</Label>
-              <div className="grid gap-2">
-                {TIME_WINDOWS.map((window) => (
-                  <button
-                    key={window}
-                    onClick={() => setTimeWindow(window)}
-                    className={`p-3 border rounded-lg text-left transition-colors ${
-                      timeWindow === window
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <Clock className="h-4 w-4 inline mr-2" />
-                    {window}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {timeWindow === "Exact time (I will specify)" && (
-              <div className="space-y-2">
-                <Label htmlFor="exactTime">Specify Exact Time</Label>
-                <Input
-                  id="exactTime"
-                  type="time"
-                  value={exactTime}
-                  onChange={(e) => setExactTime(e.target.value)}
-                  placeholder="e.g., 2:30 PM"
-                />
-              </div>
-            )}
+            <TimeSlotPicker
+              vendorId={product.vendor.slug}
+              productId={product.id}
+              onSlotSelect={(start, end) => {
+                setScheduledStart(start);
+                setScheduledEnd(end);
+              }}
+              selectedStart={scheduledStart}
+            />
           </div>
         );
 
@@ -329,12 +300,16 @@ export function BookingStepModal({ open, onClose, product }: BookingStepModalPro
 
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>{new Date(preferredDate).toLocaleDateString("en-US", { dateStyle: "full" })}</span>
+                <span>{scheduledStart ? new Date(scheduledStart).toLocaleDateString("en-US", { dateStyle: "full" }) : "Not selected"}</span>
               </div>
 
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{timeWindow === "Exact time (I will specify)" ? exactTime : timeWindow}</span>
+                <span>
+                  {scheduledStart && scheduledEnd
+                    ? `${new Date(scheduledStart).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} - ${new Date(scheduledEnd).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+                    : "Not selected"}
+                </span>
               </div>
 
               <div className="flex items-start gap-2 text-sm">
